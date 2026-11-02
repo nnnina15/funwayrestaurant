@@ -208,7 +208,19 @@ function importFrom_(src) {
   KEYS[S.PAYROLL] = ['店別', '月份', '姓名'];
   KEYS[S.DELIVERY] = ['店別', '月份', '平台'];
   KEYS[S.DEDUCT] = ['店別', '編號'];
+  KEYS[S.CAT] = ['店別(全部/店名)', '分類'];
   const lines = [];
+  // 進貨分類：匯入檔若是「每家店各自一套」，就把原本共用（全部）的那套換掉
+  const srcCat = src.getSheetByName(S.CAT);
+  if (srcCat && srcCat.getLastRow() > 1) {
+    const sv = srcCat.getRange(1, 1, srcCat.getLastRow(), srcCat.getLastColumn()).getValues();
+    const si = sv[0].map(str_).indexOf('店別(全部/店名)');
+    const perStore = si >= 0 && sv.slice(1).every(function (r) { return str_(r[si]) && str_(r[si]) !== '全部'; });
+    if (perStore) {
+      const n = deleteWhere_(S.CAT, function (r) { return str_(r['店別(全部/店名)']) === '全部'; });
+      if (n) lines.push(S.CAT + '：改成每家店各自的分類（移除共用 ' + n + ' 筆）');
+    }
+  }
   Object.keys(KEYS).forEach(function (name) {
     const sh = src.getSheetByName(name);
     if (!sh || sh.getLastRow() < 2) return;
@@ -216,7 +228,7 @@ function importFrom_(src) {
     const h = vals[0].map(str_);
     const objs = vals.slice(1).map(function (r) {
       const o = {}; h.forEach(function (k, i) { o[k] = r[i]; }); return o;
-    }).filter(function (o) { return str_(o['店別']); });
+    }).filter(function (o) { return str_(o[KEYS[name][0]]); });
     const keyOf = function (o) { return KEYS[name].map(function (k) { return normCell_(k, o[k]); }).join('|'); };
     if (name === S.EMP) deleteWhere_(S.EMP, function (r) { return str_(r['姓名']).indexOf('範例') >= 0; });
     const have = {};
