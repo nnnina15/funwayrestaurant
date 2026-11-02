@@ -66,15 +66,21 @@ const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del'];
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('風味記帳')
     .addItem('① 初始化（第一次使用）', 'setup')
-    .addItem('② 重新計算報表', 'buildReports')
+    .addItem('② 需要時產生報表（平常不用）', 'buildReportsMenu')
     .addItem('③ 匯入舊資料', 'importOldData')
     .addItem('④ 清除舊表匯入的資料（重新匯入前用）', 'clearImported')
     .addToUi();
 }
 
+// 報表分頁平常不產生（大家看 App 的「總覽」）；需要時用選單「② 需要時產生報表」
+const REPORT_SHEETS = [S.R_MONTH, S.R_SHARE, S.R_CAT, S.R_WARN];
+
 function setup() {
   const ss = SpreadsheetApp.getActive();
-  Object.keys(HEAD).forEach(function (name) {
+  // 拿掉報表分頁和每天自動重算的排程
+  REPORT_SHEETS.forEach(function (n) { const sh = ss.getSheetByName(n); if (sh && ss.getSheets().length > 1) ss.deleteSheet(sh); });
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'buildReports') ScriptApp.deleteTrigger(t); });
+  Object.keys(HEAD).filter(function (n) { return REPORT_SHEETS.indexOf(n) < 0; }).forEach(function (name) {
     let sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
     const h = HEAD[name];
@@ -102,13 +108,10 @@ function setup() {
   seed_(S.PRESET, DEFAULT_PRESETS.map(function (p) { return ['全部'].concat(p); }));
   secret_();   // 建立登入用的密鑰
   MailApp.getRemainingDailyQuota();   // 先要求寄信權限，之後鎖定通知才寄得出去
-  const has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'buildReports'; });
-  if (!has) ScriptApp.newTrigger('buildReports').timeBased().everyDays(1).atHour(2).create();
 
   const def = ss.getSheetByName('工作表1') || ss.getSheetByName('Sheet1');
   if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
 
-  buildReports();
   SpreadsheetApp.getUi().alert('初始化完成！\n\n1. 到「設定_帳號」把「管理員」改成你的名字；第一次登入用臨時 PIN「Funway#2026」，登入後會要求設定自己的 PIN\n2. 到「設定_員工」填入真實員工\n3. 部署成網頁應用程式，把網址貼到 App');
 }
 
@@ -163,7 +166,6 @@ function clearImported() {
   const ui = SpreadsheetApp.getUi();
   if (ui.alert('清除舊表匯入的資料', '會刪掉每日營收、進貨、其他支出、人事明細、外送對帳、分配前扣除裡「裝置＝舊表匯入」的資料。\n用 App 輸入的資料不會動。確定嗎？', ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
   const msg = withLock_(function () { return clearImported_(); });
-  buildReports();
   ui.alert('已清除：\n' + msg + '\n\n接著用「③ 匯入舊資料」匯入新的檔案。');
 }
 function clearImported_() {
@@ -194,8 +196,7 @@ function importOldData() {
   const m = resp.getResponseText().match(/[-\w]{25,}/);
   if (!m) { ui.alert('看不懂這個網址，請貼上完整的試算表網址'); return; }
   const msg = withLock_(function () { return importFrom_(SpreadsheetApp.openById(m[0])); });
-  buildReports();
-  ui.alert('匯入完成！\n\n' + msg + '\n\n報表已重新計算，請看「報表_月結」和「警示」。');
+  ui.alert('匯入完成！\n\n' + msg + '\n\n打開 App 的「總覽」就能看到。');
 }
 
 function importFrom_(src) {
@@ -412,7 +413,6 @@ function sync_(req) {
         }
       });
     });
-    if (changed) buildReports();
   }
   return Object.assign({ ok: true, account: acc.name, role: role, stores: list, results: results }, pull_(s, role));
 }
@@ -699,7 +699,17 @@ function loadData_() {
   };
 }
 
+function buildReportsMenu() {
+  const n = buildReports();
+  SpreadsheetApp.getUi().alert('已產生報表（' + n + ' 個月）：報表_月結、報表_分紅、報表_進貨分類、警示。\n\n這些分頁不會自動更新，下次按「① 初始化」會刪掉。');
+}
+
 function buildReports() {
+  const ss = SpreadsheetApp.getActive();
+  REPORT_SHEETS.forEach(function (n) {
+    let sh = ss.getSheetByName(n); if (!sh) sh = ss.insertSheet(n);
+    sh.getRange(1, 1, 1, HEAD[n].length).setValues([HEAD[n]]).setFontWeight('bold').setBackground('#f3efe6'); sh.setFrozenRows(1);
+  });
   const R = computeAll_(loadData_(), today_());
   const money = '#,##0';
   writeTable_(S.R_MONTH, R.months.map(function (m) {

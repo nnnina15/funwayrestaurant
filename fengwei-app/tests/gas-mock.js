@@ -49,7 +49,7 @@ function createGas() {
   const ctx = {
     console, Date, JSON, Math, Object, Array, String, Number, isFinite, Error,
     SpreadsheetApp: { getActive: () => ss, openById: (id) => others[id], getUi: () => ({ alert() {}, createMenu() { const m = { addItem: () => m, addToUi: () => m }; return m; } }) },
-    ScriptApp: { getProjectTriggers: () => [], newTrigger: () => { const t = { timeBased: () => t, everyDays: () => t, atHour: () => t, create: () => t }; return t; } },
+    ScriptApp: { getProjectTriggers: () => [], deleteTrigger: () => {}, newTrigger: () => { const t = { timeBased: () => t, everyDays: () => t, atHour: () => t, create: () => t }; return t; } },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) },
     CacheService: { getScriptCache: () => ({ get: (k) => (cache[k] === undefined ? null : cache[k]), put: (k, v) => { cache[k] = v; }, remove: (k) => { delete cache[k]; } }) },
     MailApp: { sendEmail: (o) => { mails.push(o); }, getRemainingDailyQuota: () => 100 },

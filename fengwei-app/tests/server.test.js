@@ -95,7 +95,9 @@ assert.strictEqual(g.rows(S.PAYROLL).find(x => x['項目'] === '時薪')['金額
 assert.strictEqual(g.rows(S.PURCHASE).length, 0);
 assert.strictEqual(r.data.payroll.length, 4);
 
-// 報表有產生，伺服器和 App 算出來一樣
+// 報表平常不產生（同步不重算）；需要時按選單才產生，算出來和 App 一樣
+assert.strictEqual(g.sheets[S.R_MONTH], undefined, '平常不要有報表分頁');
+g.ctx.buildReports();
 const rep = g.rows(S.R_MONTH).find(x => x['月份'] === '2026-10');
 assert.ok(rep, '報表_月結 要有 10 月');
 const C = r.config, emps = { '大埔店': C.employees.map(e => e.name) };
