@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '2.5.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '2.6.0';   // 和 sw.js 的 VERSION 一起改
 
 var TABS = [
   ['daily', '每日結帳', false], ['purchase', '進貨', false], ['summary', '月結總覽', true], ['year', '年度總覽', true],
@@ -675,7 +675,50 @@ function saveDelivery() {
 }
 
 /* ---------- 固定/其他支出 ---------- */
+/* 固定／其他支出的常用項目：內建＋過去用過的（用越多次越前面） */
+var EXP_PRESETS = [['房租', '固定'], ['電費', '固定'], ['水費', '固定'], ['電話費', '固定'], ['網路費', '固定'], ['瓦斯費', '固定'], ['拜拜', '固定'],
+  ['修繕', '其他'], ['清潔', '其他'], ['廣告費', '其他'], ['試菜', '其他'], ['聚餐', '其他']];
+function expensePresets() {
+  var stat = {};
+  view().expense.slice().sort(function (a, b) { return a.month < b.month ? -1 : 1; }).forEach(function (x) {
+    if (/^E\d{8}/.test(x.id || '')) return;                // 每日結帳自動產生的不算
+    var n = String(x.item || '').trim(); if (!n) return;
+    if (!stat[n]) stat[n] = { n: 0 };
+    stat[n].n++; stat[n].type = x.type; stat[n].last = x.amount; stat[n].month = x.month;
+  });
+  var seen = {}, out = [];
+  EXP_PRESETS.filter(function (p) { return p[1] === '固定'; }).concat(
+    Object.keys(stat).sort(function (a, b) { return stat[b].n - stat[a].n; }).map(function (n) { return [n, stat[n].type]; }),
+    EXP_PRESETS.filter(function (p) { return p[1] === '其他'; })
+  ).forEach(function (p) {
+    if (seen[p[0]]) return; seen[p[0]] = true;
+    var st = stat[p[0]];
+    out.push({ name: p[0], type: st ? st.type : p[1], last: st ? st.last : null, lastMonth: st ? st.month : '' });
+  });
+  return out;
+}
+function pickExpense(i) {
+  var p = ST.expPresets[i];
+  $('e-item').value = p.name; $('e-type').value = p.type === '其他' ? '其他' : '固定';
+  expenseHint();
+  $('e-amount').focus();
+}
+function expenseHint() {
+  var n = $('e-item').value.trim();
+  var p = (ST.expPresets || []).filter(function (x) { return x.name === n; })[0];
+  $('e-amount').placeholder = p && p.last ? '上次 ' + money(p.last) + '（' + p.lastMonth + '）' : '';
+  if (p && document.activeElement === $('e-item')) $('e-type').value = p.type === '其他' ? '其他' : '固定';
+}
 function renderExpenseTab() {
+  var month0 = $('e-month').value;
+  ST.expPresets = expensePresets();
+  var haveFixed = {};
+  view().expense.forEach(function (x) { if (x.month === month0 && x.type === '固定') haveFixed[x.item] = true; });
+  $('e-presets').innerHTML = ST.expPresets.map(function (p, i) {
+    if (p.type === '固定' && haveFixed[p.name]) return '';      // 這個月已經記過的固定支出就不顯示
+    return '<button onclick="pickExpense(' + i + ')">' + esc(p.name) + (p.last ? '<small>' + money(p.last) + '</small>' : '') + '</button>';
+  }).join('') || '<span class="muted">這個月的固定支出都記好了</span>';
+  $('e-names').innerHTML = ST.expPresets.map(function (p) { return '<option value="' + esc(p.name) + '">'; }).join('');
   var month = $('e-month').value;
   var list = view().expense.filter(function (x) { return x.month === month; });
   var total = list.reduce(function (a, x) { return a + Number(x.amount || 0); }, 0);
@@ -688,7 +731,7 @@ function addExpense() {
   var amt = v('e-amount');
   if (!$('e-item').value.trim() || isNaN(amt) || !amt) return toast('請填項目和金額');
   enqueue('expense.add', { id: uid(), month: $('e-month').value, type: $('e-type').value, item: $('e-item').value.trim(), amount: amt, note: $('e-note').value });
-  $('e-item').value = ''; $('e-amount').value = ''; $('e-note').value = ''; $('e-amount-hint').textContent = '';
+  $('e-item').value = ''; $('e-amount').value = ''; $('e-amount').placeholder = ''; $('e-note').value = ''; $('e-amount-hint').textContent = '';
   renderExpenseTab();
   toast('已新增 ✓');
 }

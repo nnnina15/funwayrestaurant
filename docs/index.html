@@ -49,6 +49,8 @@
   .chips button { background: var(--soft); color: var(--ink); padding: 12px 14px; font-size: 17px; }
   .chips button.on { background: var(--brand); color: #fff; }
   #s-presets { margin-bottom: 10px; }
+  #e-presets button { padding: 9px 12px; font-size: 16px; }
+  #e-presets button small { color: var(--muted); margin-left: 4px; }
   #s-presets button { padding: 9px 12px; font-size: 16px; }
   #s-presets button.neg { color: var(--bad); }
   body.wide main { max-width: 1400px; }
@@ -264,10 +266,12 @@
       <label>月份</label><input id="e-month" type="month" onchange="renderExpenseTab()">
       <div class="grid2">
         <div><label>類型</label><select id="e-type"><option>固定</option><option>其他</option></select></div>
-        <div><label>項目（例：房租、電費、洗冷氣）</label><input id="e-item"></div>
+        <div><label>項目（例：房租、電費、洗冷氣）</label><input id="e-item" list="e-names" oninput="expenseHint()"><datalist id="e-names"></datalist></div>
         <div><label>金額（可以打 360+262+320）</label><input id="e-amount" inputmode="text" oninput="showExpr('e-amount','e-amount-hint')"><div id="e-amount-hint" class="muted"></div></div>
         <div><label>備註</label><input id="e-note"></div>
       </div>
+      <label>常用項目（點一下帶入）</label>
+      <div class="chips" id="e-presets"></div>
       <button class="primary" onclick="addExpense()">新增</button>
       <button class="ghost wide" onclick="copyFixed()">複製上個月的固定支出</button>
     </div>

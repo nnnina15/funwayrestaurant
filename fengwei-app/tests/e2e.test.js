@@ -89,6 +89,15 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('text=儲存這位員工');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 26140);
+  // 固定支出常用項目：點「房租」帶入名稱和類型，記過就不再顯示；下個月會顯示上次金額
+  await B.pg.click('#tb-expense'); await B.pg.fill('#e-month', '2026-11'); await B.pg.dispatchEvent('#e-month', 'change');
+  await B.pg.click('#e-presets button:has-text("房租")');
+  assert.strictEqual(await B.pg.inputValue('#e-item'), '房租'); assert.strictEqual(await B.pg.inputValue('#e-type'), '固定');
+  await B.pg.fill('#e-amount', '32000'); await B.pg.click('#tab-expense .primary');
+  assert.ok(!(await B.pg.textContent('#e-presets')).includes('房租'), '記過的固定支出不再顯示');
+  await B.pg.fill('#e-month', '2026-12'); await B.pg.dispatchEvent('#e-month', 'change');
+  assert.ok((await B.pg.textContent('#e-presets')).includes('房租32,000'), '下個月顯示上次金額');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-expense.png'), fullPage: true });
   await B.pg.click('#tb-year'); await B.pg.waitForSelector('.ytable');
   const yt = await B.pg.textContent('#y-body');
   assert.ok(yt.includes('Q4 合計') && yt.includes('2026 全年') && yt.includes('豐吉 60%'), '年度總覽要有季合計、全年、股東欄');
