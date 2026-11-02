@@ -62,6 +62,9 @@
   #sync { background: rgba(255,255,255,.12); border: 0; font-size: 14px; padding: 7px 12px; white-space: nowrap; }
   #sync.pending { background: var(--amber); color: #3d2600; }
   #sync.err { background: #ff8a75; color: #3d0b04; }
+  #sync .sync-ic { margin-left: 4px; }
+  .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ===== 分頁：電腦在上方，手機在下方 ===== */
   nav#tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: var(--card); border-bottom: 1px solid var(--line);
@@ -341,8 +344,14 @@
     header #pickbar.multi input[type=month] { width: 120px; }
     header #pickbar .step { width: 26px; height: 26px; font-size: 17px; }
     header #pickbar .pin, header #pickbar #ov-month-pick, header #pickbar #ov-year-pick, header #pickbar #ov-seg { box-shadow: none; }
-    body.has-bar #sync { position: fixed; z-index: 7; right: 74px; bottom: calc(92px + env(safe-area-inset-bottom)); height: 36px;
-      background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15); font-size: 13px; padding: 0 12px; }
+    body.has-bar #sync { position: fixed; z-index: 7; right: 16px; bottom: calc(144px + env(safe-area-inset-bottom)); height: 48px; min-width: 48px;
+      display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px;
+      background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15); font-size: 14px; padding: 0; }
+    body.has-bar #sync .sync-txt { display: none; }
+    body.has-bar #sync.open { padding: 0 0 0 16px; }
+    body.has-bar #sync.open .sync-txt { display: inline; }
+    body.has-bar #sync .sync-ic { width: 46px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: var(--ok); }
+    body.has-bar #sync.pending .sync-ic, body.has-bar #sync.err .sync-ic { color: inherit; font-size: 15px; }
     body.has-bar #sync.pending { background: var(--amber); color: #3d2600; }
     body.has-bar #sync.err { background: #ff8a75; color: #3d0b04; }
   }

@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.7';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.8';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -498,16 +498,29 @@ function relogin() {
   showView('login');
   toast('請重新輸入 PIN，沒上傳的資料會保留');
 }
-function onSyncClick() { if (ST.authLost) relogin(); else trySync(true); }
+// 手機：平常只顯示 ✓；點一下展開「05:21 已同步 ✓」；展開時再點一下開始同步（轉圈），同步完更新時間
+function onSyncClick() {
+  if (ST.authLost) return relogin();
+  var b = $('sync');
+  if (PHONE.matches && !b.classList.contains('open')) { b.classList.add('open'); syncAutoClose(); return; }
+  trySync(true);
+}
+function syncAutoClose() {
+  clearTimeout(ST.syncCloseT);
+  ST.syncCloseT = setTimeout(function () { if (!ST.syncing) $('sync').classList.remove('open'); else syncAutoClose(); }, 4000);
+}
 
 function renderStatus() {
   renderBanner();
   var b = $('sync'), n = ST.outbox.length;
   b.classList.remove('pending', 'err');
-  if (ST.authLost) { b.textContent = '⚠ 需重新登入'; b.classList.add('err'); return; }
-  if (ST.syncing) { b.textContent = '同步中…'; return; }
-  if (n) { b.textContent = (navigator.onLine === false ? '離線｜' : '') + n + ' 筆待上傳'; b.classList.add('pending'); return; }
-  b.textContent = navigator.onLine === false ? '離線｜已全部上傳' : '✓ 已同步 ' + (ST.lastSync ? ST.lastSync.slice(11, 16) : '');
+  var set = function (txt, ic) { b.innerHTML = '<span class="sync-txt">' + txt + '</span><span class="sync-ic">' + ic + '</span>'; b.title = txt; };
+  if (b.classList.contains('open')) syncAutoClose();
+  if (ST.authLost) { set('需重新登入', '!'); b.classList.add('err'); return; }
+  if (ST.syncing) { set('同步中', '<i class="spin"></i>'); return; }
+  if (n) { set((navigator.onLine === false ? '離線｜' : '') + n + ' 筆待上傳', n > 99 ? '99+' : n); b.classList.add('pending'); return; }
+  if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
+  set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
 var NEED_SERVER = '4.0.5';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
