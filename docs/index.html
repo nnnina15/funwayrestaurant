@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>風味記帳</title>
+<meta name="theme-color" content="#b5532a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="風味記帳">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #faf7f1; --card: #ffffff; --ink: #2b2620; --muted: #7a7064; --line: #e6dfd3;
+    --brand: #b5532a; --ok: #2f7d4f; --warn: #b26f00; --bad: #c0392b; --soft: #f3efe6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; font-size: 18px; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--brand); color: #fff;
+    padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; }
+  header h1 { font-size: 19px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6); padding: 6px 12px; font-size: 15px; }
+  #sync { background: rgba(255,255,255,.18); border: 0; border-radius: 999px; font-size: 14px; padding: 6px 12px; white-space: nowrap; }
+  #sync.pending { background: #ffd28a; color: #5a3a00; }
+  #sync.err { background: #ffd6d0; color: #7a1b10; }
+  nav { display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: calc(52px + env(safe-area-inset-top)); z-index: 4; }
+  nav button { flex: none; background: var(--soft); color: var(--ink); border: 0; padding: 10px 16px; font-size: 17px; border-radius: 999px; }
+  nav button.on { background: var(--ink); color: #fff; }
+  main { max-width: 860px; margin: 0 auto; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 12px; font-size: 19px; }
+  label { display: block; font-size: 15px; color: var(--muted); margin: 10px 0 4px; }
+  input, select { width: 100%; font-size: 20px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+  input[type=checkbox] { width: 26px; height: 26px; vertical-align: middle; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 14px; }
+  @media (max-width: 560px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+  button { font-size: 18px; border-radius: 10px; border: 0; padding: 14px 18px; cursor: pointer; font-family: inherit; }
+  .primary { background: var(--brand); color: #fff; width: 100%; margin-top: 14px; font-size: 20px; }
+  .ghost { background: var(--soft); color: var(--ink); }
+  .wide { width: 100%; margin-top: 10px; }
+  .danger { background: transparent; color: var(--bad); padding: 6px 10px; font-size: 15px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { background: var(--soft); color: var(--ink); padding: 12px 14px; font-size: 17px; }
+  .chips button.on { background: var(--brand); color: #fff; }
+  .calc { background: var(--soft); border-radius: 12px; padding: 12px 14px; margin-top: 14px; font-size: 17px; line-height: 1.8; }
+  .calc b { font-size: 20px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); font-size: 15px; }
+  .hide { display: none !important; }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #ffd28a; color: #5a3a00; margin-left: 6px; vertical-align: middle; }
+  #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: #fff;
+    padding: 12px 20px; border-radius: 999px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; z-index: 30; }
+  #toast.show { opacity: 1; }
+  #busy { position: fixed; inset: 0; background: rgba(250,247,241,.7); display: none; align-items: center; justify-content: center; font-size: 20px; z-index: 20; }
+  .item-row { display: grid; grid-template-columns: 2fr 1.4fr 1.2fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  @media (max-width: 560px) { .item-row { grid-template-columns: 1fr 1fr; } .item-row select { grid-column: 1; } }
+  .item-row input, .item-row select { font-size: 17px; padding: 10px; }
+  .hours { display: flex; gap: 6px; align-items: center; font-size: 15px; }
+  .hours input { padding: 10px; }
+  .emp-list button { display: flex; justify-content: space-between; width: 100%; background: var(--soft); color: var(--ink); margin-bottom: 8px; text-align: left; }
+  .emp-list button.on { outline: 3px solid var(--brand); }
+  .big { font-size: 26px; font-weight: 700; }
+  .banner { background: #fff4df; border: 1px solid #f0d49c; color: #5a3a00; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 16px; }
+  .banner.err { background: #fdecea; border-color: #f2b8b0; color: #7a1b10; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="title">風味記帳</h1>
+  <button id="sync" class="hide" onclick="onSyncClick()">—</button>
+  <button id="menuBtn" class="hide" onclick="openSettings()">⋯</button>
+</header>
+
+<!-- 第一次設定 -->
+<main id="v-setup" class="hide">
+  <div class="card">
+    <h2>第一次設定這台裝置</h2>
+    <label>同步網址（Google Apps Script 部署後的網址，請管理者提供）</label>
+    <input id="cfg-url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    <label>這台裝置的名字（例：大埔平板、Nina 手機）</label>
+    <input id="cfg-device" autocomplete="off">
+    <button class="primary" onclick="saveSetup()">測試連線並儲存</button>
+    <p class="muted">只有第一次設定和第一次登入需要網路，之後沒網路也能記帳。</p>
+  </div>
+</main>
+
+<!-- 登入 -->
+<main id="v-login" class="hide">
+  <div class="card">
+    <h2>選擇店別</h2>
+    <div class="chips" id="storeChips"><span class="muted">載入中…</span></div>
+    <label>PIN 碼</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')login()">
+    <button class="primary" onclick="login()">登入</button>
+    <p class="muted">店長 PIN：每日結帳、進貨。管理 PIN：全部功能。<br>登入一次後會記住，沒網路也能打開。</p>
+    <button class="ghost wide" onclick="showView('setup')">修改同步網址 / 裝置名字</button>
+  </div>
+</main>
+
+<nav id="tabs" class="hide"></nav>
+
+<main id="v-app" class="hide">
+  <div id="banner"></div>
+
+  <section id="tab-daily">
+    <div class="card">
+      <h2>每日結帳</h2>
+      <div class="grid2">
+        <div><label>日期</label><input id="d-date" type="date" onchange="loadDaily()"></div>
+        <div><label>&nbsp;</label><label style="font-size:18px;color:var(--ink)"><input id="d-closed" type="checkbox" onchange="dailyCalc()"> 今天公休</label></div>
+      </div>
+      <p id="d-exist" class="muted hide"></p>
+      <div id="d-fields">
+        <div class="grid3">
+          <div><label>現場營業額</label><input id="d-site" inputmode="decimal" oninput="dailyCalc()"></div>
+          <div><label>Panda 營業額</label><input id="d-panda" inputmode="decimal" oninput="dailyCalc()"></div>
+          <div><label>Uber 營業額</label><input id="d-uber" inputmode="decimal" oninput="dailyCalc()"></div>
+        </div>
+        <p class="muted">下面三項都是「現場營業額」裡面的錢，用來對現金：</p>
+        <div class="grid3">
+          <div><label>全支付</label><input id="d-allpay" inputmode="decimal" oninput="dailyCalc()"></div>
+          <div><label>LINE Pay</label><input id="d-line" inputmode="decimal" oninput="dailyCalc()"></div>
+          <div><label>現場支出（收銀機付的錢）</label><input id="d-spend" inputmode="decimal" oninput="dailyCalc()"></div>
+        </div>
+        <label>點收現金（實際數到的現金）</label>
+        <input id="d-cash" inputmode="decimal" oninput="dailyCalc()">
+        <div class="calc" id="d-calc"></div>
+      </div>
+      <label>備註</label><input id="d-note">
+      <button class="primary" onclick="saveDaily()">儲存今日結帳</button>
+    </div>
+  </section>
+
+  <section id="tab-purchase" class="hide">
+    <div class="card">
+      <h2>進貨登記</h2>
+      <label>日期</label><input id="p-date" type="date" onchange="renderPurchaseTab()">
+      <label>分類（點一下選擇）</label>
+      <div class="chips" id="p-cats"></div>
+      <div class="grid2">
+        <div><label>金額（可以打 3200+575+140）</label><input id="p-amount" inputmode="text" oninput="showExpr('p-amount','p-amount-hint')"><div id="p-amount-hint" class="muted"></div></div>
+        <div><label>備註</label><input id="p-note"></div>
+      </div>
+      <button class="primary" onclick="addPurchase()">新增這筆</button>
+    </div>
+    <div class="card"><h2 id="p-list-title">當天進貨</h2><table><tbody id="p-list"></tbody></table></div>
+  </section>
+
+  <section id="tab-payroll" class="hide">
+    <div class="card">
+      <h2>人事薪資</h2>
+      <label>月份</label><input id="s-month" type="month" onchange="ST.emp='';renderPayrollTab()">
+      <label>員工（點一下編輯）</label>
+      <div class="emp-list" id="s-emps"></div>
+      <button class="ghost" onclick="addTempEmployee()">＋ 其他人（不在員工名單）</button>
+    </div>
+    <div class="card hide" id="s-editor">
+      <h2 id="s-name"></h2>
+      <p class="muted">每個人可以自己加項目：加班費、全勤、津貼、扣款、預支…<br>
+        <b>薪資</b>＝發給員工、也算公司成本；<b>公司負擔</b>＝勞健保勞退公司付的，只算成本；<b>預支</b>＝已先給的錢，只影響實發。</p>
+      <div id="s-items"></div>
+      <button class="ghost" onclick="addItem(false)">＋ 新增項目</button>
+      <button class="ghost" onclick="addItem(true)">＋ 時數 × 時薪</button>
+      <div class="calc" id="s-calc"></div>
+      <button class="primary" onclick="savePayroll()">儲存這位員工</button>
+    </div>
+  </section>
+
+  <section id="tab-delivery" class="hide">
+    <div class="card">
+      <h2>外送平台對帳</h2>
+      <label>月份</label><input id="v-month" type="month" onchange="renderDeliveryTab()">
+      <p class="muted">請看平台對帳單，填「實際匯進來的金額」（扣完佣金、月費之後）。</p>
+      <div class="grid2">
+        <div><label>Panda 實際入帳</label><input id="v-panda" inputmode="decimal"><div id="v-panda-hint" class="muted"></div></div>
+        <div><label>Uber 實際入帳</label><input id="v-uber" inputmode="decimal"><div id="v-uber-hint" class="muted"></div></div>
+      </div>
+      <button class="primary" onclick="saveDelivery()">儲存對帳</button>
+    </div>
+  </section>
+
+  <section id="tab-expense" class="hide">
+    <div class="card">
+      <h2>固定 / 其他支出</h2>
+      <label>月份</label><input id="e-month" type="month" onchange="renderExpenseTab()">
+      <div class="grid2">
+        <div><label>類型</label><select id="e-type"><option>固定</option><option>其他</option></select></div>
+        <div><label>項目（例：房租、電費、洗冷氣）</label><input id="e-item"></div>
+        <div><label>金額（可以打 360+262+320）</label><input id="e-amount" inputmode="text" oninput="showExpr('e-amount','e-amount-hint')"><div id="e-amount-hint" class="muted"></div></div>
+        <div><label>備註</label><input id="e-note"></div>
+      </div>
+      <button class="primary" onclick="addExpense()">新增</button>
+      <button class="ghost wide" onclick="copyFixed()">複製上個月的固定支出</button>
+    </div>
+    <div class="card"><h2>這個月的支出</h2><table><tbody id="e-list"></tbody></table></div>
+  </section>
+
+  <section id="tab-deduct" class="hide">
+    <div class="card">
+      <h2>分配前扣除</h2>
+      <p class="muted">股東分紅前要先扣掉的錢：員工分紅（每月不一定）、年終預留…</p>
+      <label>月份</label><input id="x-month" type="month" onchange="renderDeductTab()">
+      <div class="grid2">
+        <div><label>類型</label><select id="x-type"></select></div>
+        <div><label>金額</label><input id="x-amount" inputmode="decimal"></div>
+      </div>
+      <label>備註（例：Q4 員工季分紅）</label><input id="x-note">
+      <button class="primary" onclick="addDeduct()">新增</button>
+    </div>
+    <div class="card"><h2>這個月的扣除</h2><table><tbody id="x-list"></tbody></table></div>
+  </section>
+
+  <section id="tab-summary" class="hide">
+    <div class="card">
+      <h2>月結總覽</h2>
+      <label>月份</label><input id="m-month" type="month" onchange="renderSummaryTab()">
+      <div id="m-body" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <section id="tab-settings" class="hide">
+    <div class="card">
+      <h2>這台裝置</h2>
+      <div id="set-info" class="muted" style="line-height:1.9"></div>
+      <button class="ghost wide" onclick="trySync(true)">立即同步</button>
+      <button class="ghost wide" onclick="showView('setup')">修改同步網址 / 裝置名字</button>
+      <button class="ghost wide" onclick="logout()" style="color:var(--bad)">登出並清除這台裝置的資料</button>
+    </div>
+    <div class="card" id="set-failed-card"><h2>同步問題紀錄</h2><div id="set-failed"></div></div>
+  </section>
+</main>
+
+<div id="toast"></div>
+<div id="busy">處理中…</div>
+
+<script src="compute.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

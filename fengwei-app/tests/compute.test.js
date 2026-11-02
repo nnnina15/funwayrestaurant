@@ -1,12 +1,7 @@
 // 用 Node 測試計算邏輯：node tests/compute.test.js
-const fs = require('fs');
-const path = require('path');
 const assert = require('assert');
-const vm = require('vm');
 
-const ctx = { Utilities: { formatDate: (d) => d.toISOString().slice(0, 10) }, console };
-vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8') + '\nthis.computeAll_=computeAll_;', ctx);
+const ctx = { computeAll_: require('../../docs/compute.js').computeAll_ };
 
 const D = {
   stores: [{ name: '大埔店', fee: 2, cashIn: false, cashWarn: 500 }],
@@ -42,7 +37,7 @@ const profit = sep.actual - 3000 - sep.staff - 32000 - 5000 - sep.fee;
 assert.strictEqual(sep.profit, profit);                            // 現金差額不計入
 assert.strictEqual(sep.dist, profit - 12500 - 3000);
 const shares = R.shares.filter(s => s.month === '2026-09');
-assert.strictEqual(JSON.stringify(shares.map(s => s.amount)), JSON.stringify([Math.round(sep.dist * 0.6), Math.round(sep.dist * 0.2), Math.round(sep.dist * 0.2)]));
+assert.deepStrictEqual(shares.map(s => s.amount), [Math.round(sep.dist * 0.6), Math.round(sep.dist * 0.2), Math.round(sep.dist * 0.2)]);
 const types = R.warns.filter(w => w.month === '2026-09').map(w => w.type);
 assert.ok(types.includes('外送未對帳'), 'Uber 未對帳要警示');
 assert.ok(types.includes('缺少每日結帳'), '漏填 9/15 要警示');
