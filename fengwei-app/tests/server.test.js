@@ -136,8 +136,10 @@ assert.ok(!zz.data.presets.some(x => x.store === '大埔店'), '中正店看不�
 // 外送對帳明細：照平台對帳單的項目，存成好讀的文字，讀回來一樣
 const periods = [{ label: '9/1-9/15', gross: 55672, commission: -15588, monthly: -3296 }, { label: '9/16-9/30', gross: 39182, commission: -10964, monthly: -315 }];
 r = g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, ops: [op('delivery.upsert', { month: '2026-09', platform: 'Panda', amount: 64691, periods, editedAt: '2026-11-02 12:00:00' })] });
-const dv = g.rows(S.DELIVERY).find(x => x['月份'] === '2026-09' && x['平台'] === 'Panda');
-assert.strictEqual(dv['明細'], '9/1-9/15：明細 55672、佣金 -15588、月費 -3296｜9/16-9/30：明細 39182、佣金 -10964、月費 -315');
+const dv = g.rows(S.DELIVERY).filter(x => x['月份'] === '2026-09' && x['平台'] === 'Panda');
+assert.deepStrictEqual(dv.map(x => [x['期間'], x['費用明細(訂單金額)'], x['佣金'], x['月費'], x['實際入帳']]),
+  [['9/1-9/15', 55672, -15588, -3296, 36788], ['9/16-9/30', 39182, -10964, -315, 27903]], '每期一列、每項一欄');
+assert.strictEqual(r.data.delivery.find(x => x.month === '2026-09' && x.platform === 'Panda').amount, 64691, '兩期加總＝當月入帳');
 assert.deepStrictEqual(r.data.delivery.find(x => x.month === '2026-09' && x.platform === 'Panda').periods, periods);
 
 // 猜錯 5 次鎖定（每個帳號分開算），寄一封信

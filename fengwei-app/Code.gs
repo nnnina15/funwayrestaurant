@@ -29,7 +29,7 @@ HEAD[S.DAILY] = ['輸入時間', '日期', '店別', '公休', '現場', 'Panda'
 HEAD[S.PURCHASE] = ['編號', '輸入時間', '日期', '店別', '分類', '金額', '備註', '裝置'];
 HEAD[S.EXPENSE] = ['編號', '輸入時間', '月份', '店別', '類型', '項目', '金額', '備註', '裝置'];
 HEAD[S.PAYROLL] = ['輸入時間', '月份', '店別', '姓名', '項目', '金額', '類別', '時數', '時薪', '裝置'];
-HEAD[S.DELIVERY] = ['輸入時間', '月份', '店別', '平台', '實際入帳', '備註', '裝置', '明細'];
+HEAD[S.DELIVERY] = ['輸入時間', '月份', '店別', '平台', '期間', '費用明細(訂單金額)', '佣金', '月費', '拒單費用', '其他調整', '實際入帳', '備註', '裝置'];   // 一列＝一期；同平台同月份的實際入帳加總＝當月入帳
 HEAD[S.DEDUCT] = ['編號', '輸入時間', '月份', '店別', '類型', '金額', '備註', '裝置'];
 HEAD[S.R_MONTH] = ['店別', '月份', '狀態', '工作天', '現場營收', 'Panda營業額', 'Panda入帳', 'Uber營業額', 'Uber入帳',
   '實際營收', '日均營收', '進貨', '人事成本', '固定支出', '其他支出', '全支付收款', '全支付入帳', 'LINE Pay收款', 'LINE Pay入帳',
@@ -39,7 +39,7 @@ HEAD[S.R_SHARE] = ['店別', '月份', '狀態', '股東', '比例(%)', '分紅�
 HEAD[S.R_CAT] = ['店別', '月份', '分類', '金額', '佔實際營收'];
 HEAD[S.R_WARN] = ['店別', '月份', '類型', '說明'];
 
-const TEXT_COLS = ['日期', '月份', '編號', '輸入時間', '帳號', '臨時PIN', 'PIN(加密，勿改)', '最後登入', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
+const TEXT_COLS = ['日期', '月份', '期間', '編號', '輸入時間', '帳號', '臨時PIN', 'PIN(加密，勿改)', '最後登入', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 const PAYROLL_KINDS = ['薪資', '公司負擔', '預支'];
 const EXPENSE_TYPES = ['固定', '其他'];
 const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除'];
@@ -78,6 +78,7 @@ function setup() {
     let sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
     const h = HEAD[name];
+    if (name === S.DELIVERY) migrateDelivery_(sh);   // 舊版「明細」文字欄 → 每期一列、每項一欄
     realign_(sh, h);                        // 欄位有增減時，舊資料照欄名搬到新位置，不會錯位
     sh.getRange(1, 1, 1, h.length).setValues([h]).setFontWeight('bold').setBackground('#f3efe6');
     sh.setFrozenRows(1);
@@ -126,6 +127,35 @@ function realign_(sh, h) {
   h.forEach(function (k, i) { if (TEXT_COLS.indexOf(k) >= 0) sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat('@'); });
   sh.getRange(1, 1, 1, h.length).setValues([h]);
   if (rows.length) sh.getRange(2, 1, rows.length, h.length).setValues(rows);
+}
+
+function migrateDelivery_(sh) {
+  const lr = sh.getLastRow(), lc = sh.getLastColumn();
+  if (lr < 1 || lc < 1) return;
+  const vals = sh.getRange(1, 1, lr, lc).getValues(), old = vals[0].map(str_), mi = old.indexOf('明細');
+  if (mi < 0) return;
+  const KEY = { '明細': 'gross', '佣金': 'commission', '月費': 'monthly', '拒單': 'reject', '其他': 'other' };
+  const h = HEAD[S.DELIVERY], out = [];
+  vals.slice(1).forEach(function (r) {
+    const get = function (k) { const i = old.indexOf(k); return i >= 0 ? r[i] : ''; };
+    if (!str_(get('平台'))) return;
+    const base = h.map(function (k) { return get(k); });
+    const text = str_(r[mi]);
+    if (!text) { out.push(base); return; }
+    text.split('｜').forEach(function (part) {
+      const i = part.indexOf('：'), row = base.slice(), q = {};
+      row[h.indexOf('期間')] = i >= 0 ? part.slice(0, i) : '';
+      (i >= 0 ? part.slice(i + 1) : part).split('、').forEach(function (kv) {
+        const m = kv.match(/^(\S+)\s+(-?[\d.]+)$/); if (m && KEY[m[1]]) q[KEY[m[1]]] = Number(m[2]);
+      });
+      DV_COLS.forEach(function (c) { row[h.indexOf(c[1])] = q[c[0]] || ''; });
+      row[h.indexOf('實際入帳')] = DV_COLS.reduce(function (a, c) { return a + (q[c[0]] || 0); }, 0);
+      out.push(row);
+    });
+  });
+  sh.clearContents();
+  sh.getRange(1, 1, 1, h.length).setValues([h]);
+  if (out.length) sh.getRange(2, 1, out.length, h.length).setValues(out);
 }
 
 // ④ 清除舊表匯入的資料：只刪「裝置＝舊表匯入」的列，App 輸入的資料不動（重新匯入前用）
@@ -487,8 +517,14 @@ function applyServerOp_(store, op) {
       if (newer_(S.DELIVERY, same, at)) return 'stale';
       deleteWhere_(S.DELIVERY, same);
       if (d.amount !== '' && d.amount !== null && d.amount !== undefined) {
-        append_(S.DELIVERY, [{ '輸入時間': at, '月份': month, '店別': store, '平台': p, '實際入帳': num_(d.amount), '備註': '', '裝置': dev,
-          '明細': deliveryText_(d.periods) }]);
+        const base = { '輸入時間': at, '月份': month, '店別': store, '平台': p, '備註': '', '裝置': dev };
+        const ps = (d.periods || []).filter(Boolean);
+        append_(S.DELIVERY, ps.length ? ps.map(function (q) {
+          const row = Object.assign({}, base, { '期間': str_(q.label) });
+          DV_COLS.forEach(function (k) { row[k[1]] = num_(q[k[0]]) || ''; });
+          row['實際入帳'] = DV_COLS.reduce(function (a, k) { return a + num_(q[k[0]]); }, 0);
+          return row;
+        }) : [Object.assign(base, { '實際入帳': num_(d.amount) })]);
       }
       return 'ok';
     }
@@ -496,25 +532,28 @@ function applyServerOp_(store, op) {
   throw new Error('未知的操作：' + op.type);
 }
 
-// 外送對帳明細：存成好讀的文字，例如「1-15：明細 55672、佣金 -15588、月費 -3296｜16-30：…」
-const DELIVERY_KEYS = [['gross', '明細'], ['commission', '佣金'], ['monthly', '月費'], ['reject', '拒單'], ['other', '其他']];
-function deliveryText_(periods) {
-  return (periods || []).map(function (p) {
-    return str_(p.label) + '：' + DELIVERY_KEYS.filter(function (k) { return num_(p[k[0]]); }).map(function (k) { return k[1] + ' ' + num_(p[k[0]]); }).join('、');
-  }).join('｜');
-}
-function parseDelivery_(text) {
-  text = str_(text);
-  if (!text) return null;
-  return text.split('｜').map(function (part) {
-    const i = part.indexOf('：'), o = { label: i >= 0 ? part.slice(0, i) : '' };
-    (i >= 0 ? part.slice(i + 1) : part).split('、').forEach(function (kv) {
-      const m = kv.match(/^(\S+)\s+(-?[\d.]+)$/);
-      if (!m) return;
-      DELIVERY_KEYS.forEach(function (k) { if (k[1] === m[1]) o[k[0]] = Number(m[2]); });
-    });
-    return o;
+// 外送對帳：試算表每個項目一欄、每一期一列
+const DV_COLS = [['gross', '費用明細(訂單金額)'], ['commission', '佣金'], ['monthly', '月費'], ['reject', '拒單費用'], ['other', '其他調整']];
+// 同店、同月、同平台的幾列合成一筆給 App／報表用
+function deliveryGroups_(rows) {
+  const by = {}, out = [];
+  rows.forEach(function (r) {
+    const store = str_(r['店別']), month = monthKey_(r['月份']), platform = str_(r['平台']);
+    if (!store || !month || !platform) return;
+    const k = store + '|' + month + '|' + platform;
+    if (!by[k]) { by[k] = { store: store, month: month, platform: platform, amount: 0, periods: [], editedAt: tsKey_(r['輸入時間']) }; out.push(by[k]); }
+    const g = by[k];
+    g.amount += num_(r['實際入帳']);
+    if (tsKey_(r['輸入時間']) > g.editedAt) g.editedAt = tsKey_(r['輸入時間']);
+    const hasDetail = str_(r['期間']) || DV_COLS.some(function (c) { return num_(r[c[1]]); });
+    if (hasDetail) {
+      const q = { label: str_(r['期間']) };
+      DV_COLS.forEach(function (c) { if (num_(r[c[1]])) q[c[0]] = num_(r[c[1]]); });
+      g.periods.push(q);
+    }
   });
+  out.forEach(function (g) { if (!g.periods.length) g.periods = null; g.amount = Math.round(g.amount * 100) / 100; });
+  return out;
 }
 
 // 支出明細：存成好讀的文字，例如「燉滷 500｜米 3516（記帳→米）」，App 讀回來可以再編輯
@@ -563,7 +602,7 @@ function pull_(s, role) {
     purchase: rows_(S.PURCHASE).map(rec_.purchase).filter(mine).filter(recent),
     expense: all ? rows_(S.EXPENSE).map(rec_.expense).filter(mine) : [],
     payroll: all ? rows_(S.PAYROLL).map(rec_.payroll).filter(mine) : [],
-    delivery: all ? rows_(S.DELIVERY).map(rec_.delivery).filter(mine) : [],
+    delivery: all ? deliveryGroups_(rows_(S.DELIVERY)).filter(mine) : [],
     deduct: all ? rows_(S.DEDUCT).map(rec_.deduct).filter(mine) : [],
     presets: rows_(S.PRESET).map(rec_.preset).filter(function (r) { return r.name && (r.store === s.name || r.store === '全部'); })
   };
@@ -603,10 +642,6 @@ const rec_ = {
       amount: num_(r['金額']), kind: str_(r['類別']) || '薪資',
       hours: r['時數'] === '' ? '' : num_(r['時數']), rate: r['時薪'] === '' ? '' : num_(r['時薪']),
       editedAt: tsKey_(r['輸入時間']) };
-  },
-  delivery: function (r) {
-    return { store: str_(r['店別']), month: monthKey_(r['月份']), platform: str_(r['平台']),
-      amount: num_(r['實際入帳']), editedAt: tsKey_(r['輸入時間']), periods: parseDelivery_(r['明細']) };
   },
   deduct: function (r) {
     return { store: str_(r['店別']), id: str_(r['編號']), month: monthKey_(r['月份']), type: str_(r['類型']),
@@ -660,7 +695,7 @@ function loadData_() {
     stores: stores, partners: partners_(), employees: employees,
     daily: rows_(S.DAILY).map(rec_.daily), purchase: rows_(S.PURCHASE).map(rec_.purchase),
     expense: rows_(S.EXPENSE).map(rec_.expense), payroll: rows_(S.PAYROLL).map(rec_.payroll),
-    delivery: rows_(S.DELIVERY).map(rec_.delivery), deduct: rows_(S.DEDUCT).map(rec_.deduct)
+    delivery: deliveryGroups_(rows_(S.DELIVERY)), deduct: rows_(S.DEDUCT).map(rec_.deduct)
   };
 }
 

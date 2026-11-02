@@ -144,7 +144,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tab-delivery .primary');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   const dvr = g.rows('外送對帳').filter(r => r['月份'] === '2026-09');
-  assert.deepStrictEqual(dvr.map(r => r['平台'] + r['實際入帳']).sort(), ['Panda64691', 'Uber15344']);
+  assert.deepStrictEqual(dvr.map(r => r['平台'] + r['期間'] + '=' + r['實際入帳']).sort(), ['Panda9/1-9/15=36788', 'Panda9/16-9/30=27903', 'Uber9/1-9/30=15344'], '外送對帳每期一列');
   await B.pg.dispatchEvent('#v-month', 'change');
   assert.strictEqual(await B.pg.inputValue('#dv-Panda tbody tr:nth-child(2) input >> nth=0'), '15588', '重新打開要看到存過的明細');
 
