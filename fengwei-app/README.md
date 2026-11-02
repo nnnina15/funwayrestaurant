@@ -34,7 +34,11 @@
    - 誰可以存取：**所有人**（App 有 PIN 碼保護）
    - 按「部署」，複製網址（`https://script.google.com/macros/s/……/exec`）。這就是「**同步網址**」。
 
-> 以後更新 `Code.gs` 時：**部署 → 管理部署作業 → 鉛筆 → 版本選「新版本」→ 部署**。網址不會變，App 不用重設。
+9. 開啟 **Apps Script API**（讓「⑤ 更新程式」能自己更新，只做一次）：打開 https://script.google.com/home/usersettings → 「Google Apps Script API」切到 **開啟**。
+
+> **以後更新程式：試算表選單「風味記帳 → ⑤ 更新程式」**。它會先顯示新版本和這次改了什麼，你按「確定」才會換上新程式並自動部署，網址不變、App 不用重設。
+> 程式只會從你自己的 GitHub Pages（nnnina15.github.io/funwayrestaurant）下載。建議 GitHub 帳號開啟兩步驟驗證。
+> App 發現試算表程式比較舊時，最上面會出現紅色提醒。
 
 ## 二、發布 App（約 3 分鐘，只做一次）
 
@@ -49,10 +53,10 @@
 
 1. 用瀏覽器打開 **https://nnnina15.github.io/funwayrestaurant/**
    - iPad、iPhone 請用 **Safari**；Android 和電腦用 **Chrome**。
-2. 第一次會要求設定：
-   - **同步網址**：貼上第一步複製的 `…/exec` 網址
-   - **裝置名字**：例如「大埔平板」「Nina 手機」「家裡電腦」
-3. 選店別、輸入 PIN 登入。
+2. 第一次打開時：
+   - 如果 `docs/app.js` 的 `DEFAULT_URL` 已經填好同步網址，會**直接進登入畫面**，什麼都不用輸入。
+   - 或者用「設定連結」打開，也會自動設好：`https://nnnina15.github.io/funwayrestaurant/?api=` 後面接上同步網址。
+3. 輸入帳號、PIN 登入。
 4. 加到主畫面：
    - iPad／iPhone：分享 → **加入主畫面**
    - Android：選單 → **安裝應用程式**
@@ -161,8 +165,11 @@
 node fengwei-app/tests/compute.test.js   # 計算邏輯
 node fengwei-app/tests/server.test.js    # 同步服務（模擬 Google 試算表）
 node fengwei-app/tests/reorder.test.js   # 試算表欄位自己換順序也照欄名讀寫
+node fengwei-app/tests/update.test.js    # ⑤ 更新程式（模擬 GitHub 和 Apps Script API）
+node fengwei-app/tests/publish.test.js   # docs/gas 和 Code.gs 一致
 node fengwei-app/tests/e2e.test.js       # 瀏覽器：離線記帳 → 恢復網路 → 自動同步 → 多裝置（需要 Playwright）
 node fengwei-app/tests/offline-root.test.js  # 瀏覽器：網址離線也打得開
 ```
 
-改版 App 時，把 `docs/sw.js` 裡的 VERSION 加 1。有網路時打開 App 一律先拿最新版，所以下次打開就是新的；在「⚙ 裝置」可以看到目前版本，也可以按「檢查 App 更新」。
+改版 App 時，把 `docs/sw.js` 裡的 VERSION 加 1。
+改 `Code.gs` 時，把 `SERVER_VERSION`、`SERVER_NOTES` 和 `docs/app.js` 的 `NEED_SERVER` 一起改，再執行 `node fengwei-app/publish-gas.js`（複製到 `docs/gas/`，「⑤ 更新程式」從那裡下載）。有網路時打開 App 一律先拿最新版，所以下次打開就是新的；在「⚙ 裝置」可以看到目前版本，也可以按「檢查 App 更新」。

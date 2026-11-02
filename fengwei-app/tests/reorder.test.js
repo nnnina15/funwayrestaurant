@@ -10,7 +10,7 @@ g.ctx.setup();
 assert.deepStrictEqual(g.sheets['外送對帳'].cells[0], H, '初始化要保留你排的順序');
 g.sheets['設定_帳號'].cells[1][4] = 'Funway#2026';
 const a = g.post({ action: 'login', account: '管理員', pin: 'Funway#2026', newPin: 'Admin#2026x' });
-assert.strictEqual(a.config.serverVersion, g.ctx.SERVER_VERSION || '4.0.4');
+assert.strictEqual(a.config.serverVersion, require('fs').readFileSync(__dirname + '/../Code.gs', 'utf8').match(/SERVER_VERSION = '([^']+)'/)[1]);
 const st = a.stores.indexOf('大埔店') >= 0 ? '大埔店' : a.stores[0];
 const s = g.post({ action: 'sync', account: '管理員', token: a.token, store: '大埔店', ops: [] });
 const pd = s.data.delivery.find(x => x.month === '2026-09' && x.platform === 'Panda');

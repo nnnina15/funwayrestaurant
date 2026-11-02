@@ -1,4 +1,6 @@
-const SERVER_VERSION = '4.0.4';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有重新部署
+const SERVER_VERSION = '4.0.5';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '新增「⑤ 更新程式」：以後按一下就能更新並自動部署，不用再手動貼程式碼';   // 「⑤ 更新程式」會顯示這段說明
+const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
  * ------------------------------------------------------------
@@ -70,7 +72,99 @@ function onOpen() {
     .addItem('② 需要時產生報表（平常不用）', 'buildReportsMenu')
     .addItem('③ 匯入舊資料', 'importOldData')
     .addItem('④ 清除舊表匯入的資料（重新匯入前用）', 'clearImported')
+    .addSeparator()
+    .addItem('⑤ 更新程式', 'updateProgram')
     .addToUi();
+}
+
+/* ============================================================
+ * ⑤ 更新程式：從 GitHub 抓最新版 → 你按確定 → 自動換程式碼並部署新版本
+ * 需要先開啟一次 Apps Script API：https://script.google.com/home/usersettings
+ * ============================================================ */
+
+function updateProgram() {
+  const ui = SpreadsheetApp.getUi();
+  let info;
+  try { info = checkUpdate_(); } catch (e) { ui.alert('連不到 GitHub，請稍後再試。\n\n' + e.message); return; }
+  if (!info.newer) { ui.alert('已經是最新版（' + SERVER_VERSION + '），不用更新。'); return; }
+  const ok = ui.alert('有新版程式', '目前：' + SERVER_VERSION + '\n最新：' + info.version + '\n\n這次更新：\n' + info.notes +
+    '\n\n按「確定」會自動換成新程式並部署，App 網址不變。', ui.ButtonSet.OK_CANCEL);
+  if (ok !== ui.Button.OK) return;
+  try {
+    const n = installUpdate_(info);
+    ui.alert('更新完成 ✓ 已是 ' + info.version + '（部署了 ' + n + ' 個網頁應用程式）。\n\n請重新整理試算表，App 下次同步就會用新程式。');
+  } catch (e) {
+    const m = String(e.message || e);
+    ui.alert('更新沒有成功', (/has not (been used|enabled)|not enabled|SERVICE_DISABLED|User has not enabled/i.test(m)
+      ? '請先開啟 Apps Script API（只要做一次）：\n1. 打開 https://script.google.com/home/usersettings\n2. 把「Google Apps Script API」切到「開啟」\n3. 回來再按一次「⑤ 更新程式」'
+      : m) + '\n\n舊程式還在，App 照常可以用。', ui.ButtonSet.OK);
+  }
+}
+
+function fetchText_(url) {
+  const r = UrlFetchApp.fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), { muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) throw new Error('下載失敗（' + r.getResponseCode() + '）：' + url);
+  return r.getContentText('UTF-8');
+}
+
+function verNum_(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
+
+function checkUpdate_() {
+  let last;
+  for (let i = 0; i < UPDATE_BASES.length; i++) {
+    try {
+      const meta = JSON.parse(fetchText_(UPDATE_BASES[i] + 'gas/version.json'));
+      return { base: UPDATE_BASES[i], version: meta.version, notes: meta.notes || '', newer: verNum_(meta.version) > verNum_(SERVER_VERSION) };
+    } catch (e) { last = e; }
+  }
+  throw last;
+}
+
+function scriptApi_(method, path, body) {
+  const r = UrlFetchApp.fetch('https://script.googleapis.com/v1/projects/' + ScriptApp.getScriptId() + path, {
+    method: method, contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: body ? JSON.stringify(body) : undefined
+  });
+  const text = r.getContentText();
+  if (r.getResponseCode() >= 300) {
+    let msg = text; try { msg = JSON.parse(text).error.message; } catch (e) {}
+    throw new Error(msg);
+  }
+  return text ? JSON.parse(text) : {};
+}
+
+function installUpdate_(info) {
+  const code = fetchText_(info.base + 'gas/Code.gs');
+  const compute = fetchText_(info.base + 'compute.js');
+  const manifest = fetchText_(info.base + 'gas/appsscript.json');
+  // 確認下載的是完整、版本相符的程式，才換上去
+  if (code.indexOf("const SERVER_VERSION = '" + info.version + "'") < 0 || code.indexOf('function installUpdate_') < 0) throw new Error('下載的程式不完整，沒有更新');
+  if (compute.indexOf('function computeAll_') < 0) throw new Error('下載的計算程式不完整，沒有更新');
+  JSON.parse(manifest);
+  const cur = scriptApi_('get', '/content').files || [];
+  let hasCode = false, hasCompute = false, hasManifest = false;
+  const files = cur.map(function (f) {
+    if (f.type === 'JSON' && f.name === 'appsscript') { hasManifest = true; return { name: f.name, type: 'JSON', source: manifest }; }
+    if (f.type === 'SERVER_JS' && f.source.indexOf('function computeAll_') >= 0 && f.source.indexOf('function doPost') < 0) { hasCompute = true; return { name: f.name, type: 'SERVER_JS', source: compute }; }
+    if (f.type === 'SERVER_JS' && f.source.indexOf('function doPost') >= 0) { hasCode = true; return { name: f.name, type: 'SERVER_JS', source: code }; }
+    return { name: f.name, type: f.type, source: f.source };
+  });
+  if (!hasCode) files.push({ name: 'Code', type: 'SERVER_JS', source: code });
+  if (!hasCompute) files.push({ name: 'compute', type: 'SERVER_JS', source: compute });
+  if (!hasManifest) files.push({ name: 'appsscript', type: 'JSON', source: manifest });
+  scriptApi_('put', '/content', { files: files });
+  const ver = scriptApi_('post', '/versions', { description: '風味記帳 ' + info.version });
+  const deps = (scriptApi_('get', '/deployments').deployments || []).filter(function (d) {
+    return d.deploymentConfig && d.deploymentConfig.versionNumber &&
+      (d.entryPoints || []).some(function (e) { return e.entryPointType === 'WEB_APP'; });
+  });
+  if (!deps.length) throw new Error('程式已換新，但找不到網頁應用程式的部署。請手動：部署 → 管理部署作業 → 編輯 → 新版本 → 部署');
+  deps.forEach(function (d) {
+    scriptApi_('put', '/deployments/' + d.deploymentId, { deploymentConfig: {
+      scriptId: ScriptApp.getScriptId(), versionNumber: ver.versionNumber, manifestFileName: 'appsscript', description: '風味記帳 ' + info.version } });
+  });
+  return deps.length;
 }
 
 // 報表分頁平常不產生（大家看 App 的「總覽」）；需要時用選單「② 需要時產生報表」
