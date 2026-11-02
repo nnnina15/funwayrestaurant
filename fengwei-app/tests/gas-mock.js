@@ -27,6 +27,7 @@ function makeSheet(name) {
 function createGas() {
   const sheets = {};
   const props = {};
+  const cache = {};
   const ss = {
     getSheetByName: (n) => sheets[n] || null,
     insertSheet: (n) => (sheets[n] = makeSheet(n)),
@@ -44,6 +45,7 @@ function createGas() {
     SpreadsheetApp: { getActive: () => ss, getUi: () => ({ alert() {}, createMenu() { const m = { addItem: () => m, addToUi: () => m }; return m; } }) },
     ScriptApp: { getProjectTriggers: () => [], newTrigger: () => { const t = { timeBased: () => t, everyDays: () => t, atHour: () => t, create: () => t }; return t; } },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) },
+    CacheService: { getScriptCache: () => ({ get: (k) => (cache[k] === undefined ? null : cache[k]), put: (k, v) => { cache[k] = v; }, remove: (k) => { delete cache[k]; } }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ content: s, setMimeType() { return this; } }) },
     Utilities: {

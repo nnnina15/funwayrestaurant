@@ -86,7 +86,7 @@ function setup() {
   if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
 
   buildReports();
-  SpreadsheetApp.getUi().alert('初始化完成！\n\n1. 到「設定_店家」改 PIN 碼\n2. 到「設定_員工」填入真實員工\n3. 部署成網頁應用程式，把網址貼到 App');
+  SpreadsheetApp.getUi().alert('初始化完成！\n\n1. 到「設定_店家」改 PIN 碼（建議 6 位數以上，店長和管理要不同）\n2. 到「設定_員工」填入真實員工\n3. 部署成網頁應用程式，把網址貼到 App');
 }
 
 function seed_(name, rows) {
@@ -125,13 +125,24 @@ function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// 猜錯 5 次就鎖 15 分鐘，防止有人拿到網址後一直猜 PIN
+const MAX_FAIL = 5, LOCK_SECONDS = 15 * 60;
+
 function login_(req) {
   const store = str_(req.store), pin = str_(req.pin);
   const s = storeByName_(store);
+  const cache = CacheService.getScriptCache();
+  const key = 'fail_' + s.name;
+  const fails = Number(cache.get(key) || 0);
+  if (fails >= MAX_FAIL) throw new Error('PIN 錯太多次，已鎖定 15 分鐘，請稍後再試');
   let role = '';
   if (pin && pin === s.admin) role = 'admin';
   else if (pin && pin === s.pin) role = 'manager';
-  else throw new Error('PIN 碼錯誤');
+  else {
+    cache.put(key, String(fails + 1), LOCK_SECONDS);
+    throw new Error('PIN 碼錯誤（再錯 ' + (MAX_FAIL - fails - 1) + ' 次會鎖定 15 分鐘）');
+  }
+  cache.remove(key);
   return Object.assign({ ok: true, role: role, token: token_(s, role) }, pull_(s, role));
 }
 

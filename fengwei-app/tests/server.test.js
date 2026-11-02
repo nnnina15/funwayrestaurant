@@ -70,6 +70,12 @@ const local = computeAll_({ stores: [C.store], partners: C.partners, employees: 
 assert.strictEqual(local.months.find(m => m.month === '2026-10').dist, rep['可分配']);
 assert.ok(g.rows(S.R_SHARE).some(x => x['股東'] === '豐吉' && x['比例(%)'] === 60));
 
+// 猜錯 5 次鎖定，連正確 PIN 也暫時不能登入
+for (let i = 0; i < 5; i++) assert.strictEqual(g.post({ action: 'login', store: '中正店', pin: '000' + i }).ok, false);
+const locked = g.post({ action: 'login', store: '中正店', pin: '9999' });
+assert.strictEqual(locked.ok, false); assert.ok(locked.error.includes('鎖定'));
+assert.strictEqual(g.post({ action: 'login', store: '大埔店', pin: '9999' }).ok, true, '別家店不受影響');
+
 // 改 PIN → 舊權杖失效
 g.sheets[S.STORE].cells[1][1] = '5678';
 r = g.post({ action: 'sync', store: '大埔店', token: mgr.token, ops: [] });
