@@ -38,16 +38,16 @@
 
 ## 二、發布 App（約 3 分鐘，只做一次）
 
-1. 到 GitHub 的 `nnnina15/new` → **Settings → Pages**。
+1. 到 GitHub 的 `nnnina15/funwayrestaurant` → **Settings → Pages**。
 2. **Source** 選 *Deploy from a branch*。
    - Branch 選 `claude/nifty-albattani-nvvc8b`（之後合併到 main，就改選 `main`）
    - 資料夾選 **`/docs`**
    - 按 Save。
-3. 等 1–2 分鐘，網址會是：**https://nnnina15.github.io/new/**
+3. 等 1–2 分鐘，網址會是：**https://nnnina15.github.io/funwayrestaurant/**
 
 ## 三、每台裝置安裝（每台約 1 分鐘）
 
-1. 用瀏覽器打開 **https://nnnina15.github.io/new/**
+1. 用瀏覽器打開 **https://nnnina15.github.io/funwayrestaurant/**
    - iPad、iPhone 請用 **Safari**；Android 和電腦用 **Chrome**。
 2. 第一次會要求設定：
    - **同步網址**：貼上第一步複製的 `…/exec` 網址
