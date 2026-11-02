@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.1';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -337,7 +337,7 @@ function closeMore() { $('moresheet').classList.add('hide'); }
 
 /* ---------- 日期／月份置頂：切換分頁時，把那頁的日期／月份搬到上方固定列 ---------- */
 var PIN_MAP = { daily: [['d-date', '日期']], purchase: [['p-date', '日期']], expense: [['e-month', '月份']],
-  overview: [['ov-month-pick'], ['ov-year-pick']], payroll: [['s-month', '月份']], delivery: [['v-month', '月份']], deduct: [['x-month', '月份']] };
+  overview: [['ov-seg'], ['ov-month-pick'], ['ov-year-pick']], payroll: [['s-month', '月份']], delivery: [['v-month', '月份']], deduct: [['x-month', '月份']] };
 function pinPickers(name) {
   (ST.pinned || []).forEach(function (p) { p.ph.parentNode.insertBefore(p.node, p.ph); p.ph.remove(); if (p.cap) p.cap.remove(); });
   ST.pinned = [];
@@ -1070,6 +1070,8 @@ function computeLocal() {
 /* ---------- 年度總覽：像舊表「總計」頁 ---------- */
 /* ---------- 總覽：日／月／年 ---------- */
 ST.ov = LS.get('fw_ov', 'month');
+ST.ymode = LS.get('fw_ymode', 'day');
+function setYMode(v) { ST.ymode = v; LS.set('fw_ymode', v); renderOverview(); }
 function setOverview(v) { ST.ov = v; LS.set('fw_ov', v); document.body.classList.toggle('page-wide', v !== 'month'); renderOverview(); }
 function renderOverview() {
   Array.prototype.forEach.call(document.querySelectorAll('#ov-seg button'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === ST.ov); });
@@ -1144,7 +1146,7 @@ function renderYearTab() {
   var cur = sel.value || (ys.indexOf(todayStr().slice(0, 4)) >= 0 ? todayStr().slice(0, 4) : ys[ys.length - 1]);
   sel.innerHTML = ys.map(function (y) { return '<option' + (y === cur ? ' selected' : '') + '>' + y + '</option>'; }).join('');
   if (!ys.length) { $('y-body').innerHTML = '<p class="muted">還沒有任何資料</p>'; return; }
-  var perDay = $('y-mode').value !== 'total';
+  var perDay = ST.ymode !== 'total';
   var months = R.months.filter(function (m) { return m.month.slice(0, 4) === cur && m.status !== '未來'; });
   var partners = (L.C.partners || []).map(function (p) { return p.name; });
   var share = {}; R.shares.forEach(function (s) { share[s.month + '|' + s.name] = s.amount; });
@@ -1192,7 +1194,7 @@ function renderYearTab() {
     return '<tr class="' + cls + '"><th>' + name + '</th><td class="n">' + sum(list, function (m) { return m.days; }) + '</td>' +
       dcols.map(function (c, i) { var v = dv(list, c[1]) * (i === 0 ? 1 : -1); return '<td class="n' + (i === 0 ? ' em' : '') + sgn(v) + '">' + money(v) + '</td>'; }).join('') + '</tr>';
   };
-  h += '<h2 style="margin-top:22px">平均細項（' + (perDay ? '每個工作天平均' : '每月合計') + '）</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
+  h += '<div class="h2row"><h2>平均細項</h2><select onchange="setYMode(this.value)"><option value="day"' + (perDay ? ' selected' : '') + '>每個工作天平均</option><option value="total"' + (perDay ? '' : ' selected') + '>每月合計</option></select></div><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
     dcols.map(function (c, i) { return '<th class="n' + (i >= 5 ? ' cat' : '') + '">' + esc(c[0]) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });

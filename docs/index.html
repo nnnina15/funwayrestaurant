@@ -181,6 +181,14 @@
   #pickbar #ov-year-pick { display: flex; gap: 4px; align-items: center; }
   #pickbar #ov-year-pick > div { display: block; }
   #pickbar #ov-year-pick select { padding: 4px 8px; }
+  #pickbar #ov-seg { border: 1px solid var(--line); border-radius: 999px; padding: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.10); background: var(--card); gap: 0; }
+  #pickbar #ov-seg button { padding: 0 16px; height: 32px; border-radius: 999px; font-size: 15px; box-shadow: none; }
+  #pickbar #ov-seg button.on { background: var(--brand); color: #fff; }
+  #pickbar select { -webkit-appearance: none; appearance: none; background-image: none; cursor: pointer; padding: 4px 10px !important; }
+  #pickbar input[type=month] { width: 170px; }
+  .h2row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+  .h2row h2 { margin: 0; }
+  .h2row select { width: auto; padding: 5px 10px; font-size: 14px; font-weight: 700; }
 
   .pinrule { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .pinrule span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
@@ -501,7 +509,6 @@
       <div id="ov-month-pick"><label>月份</label><input id="m-month" type="month" onchange="renderOverview()"></div>
       <div id="ov-year-pick" class="grid2">
         <div><label>年份</label><select id="y-year" onchange="renderOverview()"></select></div>
-        <div><label>平均細項顯示</label><select id="y-mode" onchange="renderOverview()"><option value="day">每個工作天平均</option><option value="total">每月合計</option></select></div>
       </div>
       <div id="dd-body" style="margin-top:14px"></div>
       <div id="m-body" style="margin-top:14px"></div>
