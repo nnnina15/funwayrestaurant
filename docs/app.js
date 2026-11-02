@@ -1,20 +1,19 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.4.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.5.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
   ['daily', '每日結帳', false], ['purchase', '進貨', false], ['expense', '固定/其他支出', true],
-  ['summary', '月結總覽', true], ['year', '年度總覽', true], ['payroll', '人事', true],
-  ['delivery', '外送對帳', true], ['deduct', '分紅扣除', true], ['settings', '裝置', false]
+  ['overview', '總覽', true], ['payroll', '人事', true], ['delivery', '外送對帳', true],
+  ['deduct', '分紅扣除', true], ['settings', '裝置', false]
 ];
-var SHORT = { daily: '結帳', purchase: '進貨', expense: '支出', summary: '月結', year: '年度', settings: '裝置' };
+var SHORT = { daily: '結帳', purchase: '進貨', expense: '支出', overview: '總覽', settings: '裝置' };
 function svg(d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; }
 var ICONS = {
   daily: svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
   purchase: svg('<path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>'),
-  summary: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
-  year: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2"/>'),
+  overview: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   payroll: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.6c2.6-.3 4.6 1.6 5 4.4"/>'),
   delivery: svg('<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>'),
   expense: svg('<path d="M4 6h16v13H4z"/><path d="M4 10h16M8 15h3"/>'),
@@ -293,7 +292,7 @@ function closeMore() { $('moresheet').classList.add('hide'); }
 
 function showTab(name) {
   ST.tab = name;
-  document.body.classList.toggle('page-wide', name === 'year');
+  document.body.classList.toggle('page-wide', name === 'overview' && ST.ov !== 'month');
   TABS.forEach(function (x) {
     $('tab-' + x[0]).classList.toggle('hide', x[0] !== name);
     var b = $('tb-' + x[0]); if (b) b.classList.toggle('on', x[0] === name);
@@ -312,8 +311,7 @@ function refreshTab(full) {
     case 'delivery': if (full) renderDeliveryTab(); break;
     case 'expense': renderExpenseTab(); break;
     case 'deduct': renderDeductTab(); break;
-    case 'summary': renderSummaryTab(); break;
-    case 'year': renderYearTab(); break;
+    case 'overview': renderOverview(); break;
     case 'settings': renderSettingsTab(); break;
     case 'daily': if (!full) renderDailyExist(); break;
   }
@@ -878,6 +876,74 @@ function computeLocal() {
 }
 
 /* ---------- 年度總覽：像舊表「總計」頁 ---------- */
+/* ---------- 總覽：日／月／年 ---------- */
+ST.ov = LS.get('fw_ov', 'month');
+function setOverview(v) { ST.ov = v; LS.set('fw_ov', v); document.body.classList.toggle('page-wide', v !== 'month'); renderOverview(); }
+function renderOverview() {
+  Array.prototype.forEach.call(document.querySelectorAll('#ov-seg button'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === ST.ov); });
+  $('ov-month-pick').classList.toggle('hide', ST.ov === 'year');
+  $('ov-year-pick').classList.toggle('hide', ST.ov !== 'year');
+  ['dd-body', 'm-body', 'y-body'].forEach(function (id) { $(id).classList.toggle('hide', id !== { day: 'dd-body', month: 'm-body', year: 'y-body' }[ST.ov]); });
+  if (ST.ov === 'day') renderDayView(); else if (ST.ov === 'month') renderSummaryTab(); else renderYearTab();
+}
+var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+function renderDayView() {
+  var month = $('m-month').value, V = view();
+  var y = Number(month.slice(0, 4)), mo = Number(month.slice(5, 7)), last = new Date(y, mo, 0).getDate();
+  var days = [];
+  for (var d = 1; d <= last; d++) {
+    var key = month + '-' + p2(d), dt = new Date(y, mo - 1, d);
+    days.push({ key: key, label: mo + '/' + d, wd: WEEK[dt.getDay()], weekend: dt.getDay() === 0 || dt.getDay() === 6 });
+  }
+  var daily = {}; V.daily.forEach(function (r) { if (r.date.slice(0, 7) === month) daily[r.date] = r; });
+  var buy = {}, catTot = {};
+  V.purchase.forEach(function (r) {
+    if (r.date.slice(0, 7) !== month) return;
+    buy[r.date] = buy[r.date] || {}; buy[r.date][r.cat] = (buy[r.date][r.cat] || 0) + Number(r.amount || 0);
+    catTot[r.cat] = (catTot[r.cat] || 0) + Number(r.amount || 0);
+  });
+  var cats = categoriesFor(month);
+  Object.keys(catTot).forEach(function (c) { if (cats.indexOf(c) < 0) cats.push(c); });
+  function cell(v, cls) { v = Math.round(v || 0); return '<td class="n' + (cls ? ' ' + cls : '') + (v ? sgn(v) : '') + '">' + (v ? money(v) : '') + '</td>'; }
+  function dayHead(dd, extra) { return '<th>' + dd.label + '<small>週' + dd.wd + '</small>' + (extra || '') + '</th>'; }
+
+  // 實際營收
+  var T = { site: 0, panda: 0, uber: 0, allpay: 0, line: 0, spend: 0, exp: 0, cash: 0, diff: 0, total: 0, days: 0 };
+  var revRows = days.map(function (dd) {
+    var r = daily[dd.key], cls = (dd.weekend ? 'we' : '');
+    if (!r) return '<tr class="off ' + cls + '">' + dayHead(dd) + '<td colspan="10" class="muted">' + (dd.key > todayStr() ? '' : '沒有紀錄') + '</td></tr>';
+    if (r.closed) return '<tr class="off ' + cls + '">' + dayHead(dd) + '<td colspan="10">公休</td></tr>';
+    var exp = r.site - r.allpay - r.line - (r.spend || 0), total = r.site + r.panda + r.uber;
+    T.site += r.site; T.panda += r.panda; T.uber += r.uber; T.allpay += r.allpay; T.line += r.line; T.spend += (r.spend || 0);
+    T.exp += exp; T.cash += r.cash; T.diff += r.cashDiff || 0; T.total += total; T.days++;
+    return '<tr class="' + cls + '">' + dayHead(dd, pendTag('daily', dd.key)) + cell(r.site) + cell(r.panda) + cell(r.uber) + cell(r.allpay) + cell(r.line) +
+      cell(-(r.spend || 0)) + cell(exp) + cell(r.cash) + cell(r.cashDiff, 'em') + cell(total, 'gold') + '</tr>';
+  }).join('');
+  var revHead = '<tr><th>' + month.replace('-', '/') + '</th>' + ['現場', 'panda', 'uber', '全支付', 'LINE', '現場支出', '現金盈餘', '現場現金', '現金差額', '總營收']
+    .map(function (h) { return '<th class="n">' + h + '</th>'; }).join('') + '</tr>';
+  var revTot = '<tr class="trow"><th>總計</th>' + cell(T.site) + cell(T.panda) + cell(T.uber) + cell(T.allpay) + cell(T.line) + cell(-T.spend) +
+    cell(T.exp) + cell(T.cash) + cell(T.diff) + cell(T.total, 'gold') + '</tr>';
+
+  // 支出計算（進貨）
+  var PT = 0;
+  var buyRows = days.map(function (dd) {
+    var b = buy[dd.key] || {}, r = daily[dd.key], sum = 0;
+    var tds = cats.map(function (c) { sum += b[c] || 0; return cell(-(b[c] || 0)); }).join('');
+    PT += sum;
+    var off = (!r || r.closed) && !sum;
+    return '<tr class="' + (off ? 'off ' : '') + (dd.weekend ? 'we' : '') + '">' + dayHead(dd) + tds + cell(-sum, 'sum') + '</tr>';
+  }).join('');
+  var buyHead = '<tr><th>' + month.replace('-', '/') + '</th>' + cats.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '<th class="n">總支出</th></tr>';
+  var buyTot = '<tr class="trow"><th>總計</th>' + cats.map(function (c) { return cell(-(catTot[c] || 0)); }).join('') + cell(-PT, 'sum') + '</tr>';
+
+  var h = '<div class="kpis">' + kpi('總營收', T.total, '現場＋panda＋uber', true) + kpi('日均營收', T.days ? Math.round(T.total / T.days) : 0, '營業 ' + T.days + ' 天') +
+    kpi('進貨總支出', -PT, T.total ? '佔總營收 ' + pct(PT / T.total) : '') + kpi('現金差額累計', T.diff) + '</div>';
+  h += '<h2>實際營收</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead>' + revHead + '</thead><tbody>' + revTot + revRows + '</tbody></table></div>';
+  h += '<h2 style="margin-top:22px">支出計算（進貨）</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead>' + buyHead + '</thead><tbody>' + buyTot + buyRows + '</tbody></table></div>';
+  h += '<p class="muted">總營收＝現場＋panda＋uber（外送是營業額，不是實際入帳）。月結請看「月」。</p>';
+  $('dd-body').innerHTML = h;
+}
+
 function renderYearTab() {
   var L = computeLocal(), R = L.R, V = L.V;
   var years = {}; R.months.forEach(function (m) { years[m.month.slice(0, 4)] = true; });

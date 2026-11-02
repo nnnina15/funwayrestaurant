@@ -110,15 +110,24 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.fill('#e-month', '2026-12'); await B.pg.dispatchEvent('#e-month', 'change');
   assert.ok((await B.pg.textContent('#e-presets')).includes('房租32,000'), '下個月顯示上次金額');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-expense.png'), fullPage: true });
-  await B.pg.click('#tb-year'); await B.pg.waitForSelector('.ytable');
-  assert.strictEqual(await B.pg.evaluate(() => document.querySelector('header').getBoundingClientRect().top), 0, '年度總覽上方不能有白邊');
+  // 總覽：年
+  await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="year"]'); await B.pg.waitForSelector('#y-body .ytable');
+  assert.strictEqual(await B.pg.evaluate(() => document.querySelector('header').getBoundingClientRect().top), 0, '總覽上方不能有白邊');
   const yt = await B.pg.textContent('#y-body');
-  assert.ok(yt.includes('Q4 合計') && yt.includes('2026 全年') && yt.includes('豐吉 60%'), '年度總覽要有季合計、全年、股東欄');
-  await B.pg.click('#tb-summary'); await B.pg.fill('#m-month', '2026-11'); await B.pg.dispatchEvent('#m-month', 'change');
+  assert.ok(yt.includes('Q4 合計') && yt.includes('2026 全年') && yt.includes('豐吉 60%'), '年：要有季合計、全年、股東欄');
+  // 總覽：日（看 2026-11 每天的營收和進貨）
+  await B.pg.click('#ov-seg button[data-v="day"]'); await B.pg.fill('#m-month', '2026-11'); await B.pg.dispatchEvent('#m-month', 'change');
+  const dt = await B.pg.textContent('#dd-body');
+  assert.ok(dt.includes('實際營收') && dt.includes('支出計算') && dt.includes('11/1週日') && dt.includes('40,045'), '日：每天一行、總營收 40,045');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-day.png'), fullPage: true });
+  assert.ok(await B.pg.isHidden('#m-body') && await B.pg.isHidden('#y-body'));
+  // 總覽：月
+  await B.pg.click('#ov-seg button[data-v="month"]');
+  assert.ok((await B.pg.textContent('#m-body')).includes('可分配給股東'));
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-summary.png'), fullPage: true });
   // 店長看不到管理分頁
   const tabsA = await A.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent));
-  assert.ok(!tabsA.includes('人事') && !tabsA.includes('月結總覽'));
+  assert.ok(!tabsA.includes('人事') && !tabsA.includes('總覽'));
   assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '裝置'], '店長只有三個分頁');
   console.log('多裝置 + 權限 ✓');
   // 常用項目設定：把每日結帳的清單改成「豬肉、米」，存檔同步後平板（店長）也看得到
@@ -141,9 +150,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.setViewportSize({ width: 390, height: 844 });
   assert.ok(await B.pg.isVisible('#bottombar') && !(await B.pg.isVisible('#tabs')), '手機要用下方分頁列');
   assert.deepStrictEqual(await B.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent)),
-    ['每日結帳', '進貨', '固定/其他支出', '月結總覽', '年度總覽', '人事', '外送對帳', '分紅扣除', '裝置'], '分頁順序');
-  assert.deepStrictEqual(await B.pg.$$eval('#bottombar button', bs => bs.map(b => b.textContent)), ['結帳', '進貨', '支出', '月結', '更多']);
-  assert.deepStrictEqual(await B.pg.$$eval('#moregrid button', bs => bs.map(b => b.textContent)), ['年度總覽', '人事', '外送對帳', '分紅扣除', '裝置']);
+    ['每日結帳', '進貨', '固定/其他支出', '總覽', '人事', '外送對帳', '分紅扣除', '裝置'], '分頁順序');
+  assert.deepStrictEqual(await B.pg.$$eval('#bottombar button', bs => bs.map(b => b.textContent)), ['結帳', '進貨', '支出', '總覽', '更多']);
+  assert.deepStrictEqual(await B.pg.$$eval('#moregrid button', bs => bs.map(b => b.textContent)), ['人事', '外送對帳', '分紅扣除', '裝置']);
   await B.pg.click('#bb-more'); await B.pg.click('#moregrid button:has-text("人事")');
   assert.ok(await B.pg.isVisible('#tab-payroll') && (await B.pg.getAttribute('#bb-more', 'class')).includes('on'));
   await B.pg.click('#bb-daily');

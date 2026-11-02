@@ -134,6 +134,18 @@
   .primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
   @media (max-width: 560px) { .pe-row, .pe-row.pay { grid-template-columns: 1fr 1fr 36px 36px auto; } .pe-row .pe-sign { grid-column: 1 / 3; } .pe-row.pay select:not(.pe-sign) { grid-column: 2; } }
 
+  .ov-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .ov-top h2 { margin: 0; }
+  .seg { display: inline-flex; background: var(--soft); border-radius: 12px; padding: 4px; gap: 2px; }
+  .seg button { background: transparent; padding: 8px 22px; font-size: 16px; font-weight: 700; color: var(--muted); border-radius: 9px; }
+  .seg button.on { background: var(--card); color: var(--brand); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .ytable tr.trow th, .ytable tr.trow td { background: color-mix(in srgb, var(--ok) 12%, var(--card)); font-weight: 800; border-bottom: 2px solid color-mix(in srgb, var(--ok) 40%, transparent); }
+  .ytable tr.off th, .ytable tr.off td { color: var(--zero); background: color-mix(in srgb, var(--soft) 60%, var(--card)); }
+  .ytable td.sum { background: color-mix(in srgb, var(--brand) 7%, var(--card)); font-weight: 700; }
+  .ytable td.gold { background: color-mix(in srgb, var(--amber) 14%, var(--card)); font-weight: 700; }
+  .ytable th small { color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .ytable tr.we th { color: var(--brand); }
+
   /* ===== 重點數字卡 ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
@@ -422,21 +434,22 @@
     <div class="card"><h2>這個月的扣除</h2><table><tbody id="x-list"></tbody></table></div>
   </section>
 
-  <section id="tab-year" class="hide">
+  <section id="tab-overview" class="hide">
     <div class="card">
-      <div class="grid2">
-        <div><label>年份</label><select id="y-year" onchange="renderYearTab()"></select></div>
-        <div><label>平均細項顯示</label><select id="y-mode" onchange="renderYearTab()"><option value="day">每個工作天平均</option><option value="total">每月合計</option></select></div>
+      <div class="ov-top">
+        <h2>總覽</h2>
+        <div class="seg" id="ov-seg">
+          <button data-v="day" onclick="setOverview('day')">日</button><button data-v="month" onclick="setOverview('month')">月</button><button data-v="year" onclick="setOverview('year')">年</button>
+        </div>
       </div>
+      <div id="ov-month-pick"><label>月份</label><input id="m-month" type="month" onchange="renderOverview()"></div>
+      <div id="ov-year-pick" class="grid2">
+        <div><label>年份</label><select id="y-year" onchange="renderOverview()"></select></div>
+        <div><label>平均細項顯示</label><select id="y-mode" onchange="renderOverview()"><option value="day">每個工作天平均</option><option value="total">每月合計</option></select></div>
+      </div>
+      <div id="dd-body" style="margin-top:14px"></div>
+      <div id="m-body" style="margin-top:14px"></div>
       <div id="y-body" style="margin-top:14px"></div>
-    </div>
-  </section>
-
-  <section id="tab-summary" class="hide">
-    <div class="card">
-      <h2>月結總覽</h2>
-      <label>月份</label><input id="m-month" type="month" onchange="renderSummaryTab()">
-      <div id="m-body" style="margin-top:12px"></div>
     </div>
   </section>
 
