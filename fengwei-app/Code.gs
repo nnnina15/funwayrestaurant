@@ -366,7 +366,13 @@ function applyServerOp_(store, op) {
 
 // 別台裝置已經存了「更新」的版本 → 這筆舊的不要蓋掉
 function newer_(name, pred, at) {
-  return rows_(name).some(function (x) { return pred(x) && str_(x['輸入時間']) > at; });
+  return rows_(name).some(function (x) { return pred(x) && tsKey_(x['輸入時間']) > at; });
+}
+
+// 輸入時間統一成 yyyy-MM-dd HH:mm:ss（試算表若自動轉成日期也能正確比較）
+function tsKey_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd HH:mm:ss');
+  return str_(v);
 }
 function exists_(name, store, id) { return rows_(name).some(byId_(store, id)); }
 function byId_(store, id) { return function (x) { return str_(x['店別']) === store && str_(x['編號']) === str_(id); }; }
@@ -404,29 +410,29 @@ const rec_ = {
     return { store: str_(r['店別']), date: dateKey_(r['日期']), closed: yes_(r['公休']), site: num_(r['現場']),
       panda: num_(r['Panda']), uber: num_(r['Uber']), allpay: num_(r['全支付']), line: num_(r['LINE Pay']),
       spend: num_(r['現場支出']), cash: num_(r['點收現金']), cashDiff: num_(r['現金差額']),
-      note: str_(r['備註']), editedAt: str_(r['輸入時間']), device: str_(r['裝置']) };
+      note: str_(r['備註']), editedAt: tsKey_(r['輸入時間']), device: str_(r['裝置']) };
   },
   purchase: function (r) {
     return { store: str_(r['店別']), id: str_(r['編號']), date: dateKey_(r['日期']), cat: str_(r['分類']),
-      amount: num_(r['金額']), note: str_(r['備註']), editedAt: str_(r['輸入時間']), device: str_(r['裝置']) };
+      amount: num_(r['金額']), note: str_(r['備註']), editedAt: tsKey_(r['輸入時間']), device: str_(r['裝置']) };
   },
   expense: function (r) {
     return { store: str_(r['店別']), id: str_(r['編號']), month: monthKey_(r['月份']), type: str_(r['類型']),
-      item: str_(r['項目']), amount: num_(r['金額']), note: str_(r['備註']), editedAt: str_(r['輸入時間']) };
+      item: str_(r['項目']), amount: num_(r['金額']), note: str_(r['備註']), editedAt: tsKey_(r['輸入時間']) };
   },
   payroll: function (r) {
     return { store: str_(r['店別']), month: monthKey_(r['月份']), name: str_(r['姓名']), item: str_(r['項目']),
       amount: num_(r['金額']), kind: str_(r['類別']) || '薪資',
       hours: r['時數'] === '' ? '' : num_(r['時數']), rate: r['時薪'] === '' ? '' : num_(r['時薪']),
-      editedAt: str_(r['輸入時間']) };
+      editedAt: tsKey_(r['輸入時間']) };
   },
   delivery: function (r) {
     return { store: str_(r['店別']), month: monthKey_(r['月份']), platform: str_(r['平台']),
-      amount: num_(r['實際入帳']), editedAt: str_(r['輸入時間']) };
+      amount: num_(r['實際入帳']), editedAt: tsKey_(r['輸入時間']) };
   },
   deduct: function (r) {
     return { store: str_(r['店別']), id: str_(r['編號']), month: monthKey_(r['月份']), type: str_(r['類型']),
-      amount: num_(r['金額']), note: str_(r['備註']), editedAt: str_(r['輸入時間']) };
+      amount: num_(r['金額']), note: str_(r['備註']), editedAt: tsKey_(r['輸入時間']) };
   }
 };
 

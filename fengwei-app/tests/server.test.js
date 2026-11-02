@@ -70,6 +70,17 @@ const local = computeAll_({ stores: [C.store], partners: C.partners, employees: 
 assert.strictEqual(local.months.find(m => m.month === '2026-10').dist, rep['可分配']);
 assert.ok(g.rows(S.R_SHARE).some(x => x['股東'] === '豐吉' && x['比例(%)'] === 60));
 
+// 試算表把輸入時間自動轉成日期時，「以較新為準」仍要正確
+g.post({ action: 'sync', store: '大埔店', token: adm.token, ops: [op('daily.upsert', { date: '2026-09-20', site: 100, editedAt: '2026-09-20 22:00:00' })] });
+const di = g.sheets[S.DAILY].cells.findIndex(c => c[1] === '2026-09-20');
+g.sheets[S.DAILY].cells[di][0] = new Date('2026-09-20T14:00:00Z');   // 試算表自動轉成日期（= 台北 22:00）
+r = g.post({ action: 'sync', store: '大埔店', token: adm.token, ops: [
+  op('daily.upsert', { date: '2026-09-20', site: 200, editedAt: '2026-11-02 09:00:00' }),
+  op('daily.upsert', { date: '2026-09-20', site: 999, editedAt: '2026-09-20 21:00:00' })
+]});
+assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'stale'], '日期格式的舊紀錄要能正確比較新舊');
+assert.strictEqual(g.rows(S.DAILY).find(x => x['日期'] === '2026-09-20')['現場'], 200);
+
 // 猜錯 5 次鎖定，連正確 PIN 也暫時不能登入
 for (let i = 0; i < 5; i++) assert.strictEqual(g.post({ action: 'login', store: '中正店', pin: '000' + i }).ok, false);
 assert.strictEqual(g.mails.length, 1, '第 5 次錯要寄一封信');

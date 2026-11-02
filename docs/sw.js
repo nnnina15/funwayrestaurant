@@ -1,5 +1,5 @@
 // 風味記帳｜離線快取。改版時把版本號加 1，所有裝置下次打開會自動更新。
-const CACHE = 'fengwei-v2.0.1';
+const CACHE = 'fengwei-v2.1.0';
 const ASSETS = ['./', './index.html', './app.js', './compute.js', './manifest.json',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 

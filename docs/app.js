@@ -412,16 +412,31 @@ function renderPayrollTab(full) {
   var rows = view().payroll.filter(function (x) { return x.month === month; });
   var by = {};
   rows.forEach(function (x) {
-    if (!by[x.name]) by[x.name] = { cost: 0 };
+    if (!by[x.name]) by[x.name] = { cost: 0, hourly: false };
     if (x.kind !== '預支') by[x.name].cost += Number(x.amount || 0);
+    if (x.rate !== '' && x.rate !== undefined && x.rate !== null) by[x.name].hourly = true;
   });
-  var names = (ST.snap.config.employees || []).map(function (e) { return e.name; });
-  Object.keys(by).forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
+  // 分組：依員工設定的類型；不在名單上的人，看薪資有沒有「時數×時薪」判斷
+  var groups = { '正職': [], '計時': [], '其他': [] };
+  var seen = {};
+  (ST.snap.config.employees || []).forEach(function (e) {
+    (groups[e.type === '計時' ? '計時' : '正職']).push(e.name); seen[e.name] = true;
+  });
+  Object.keys(by).forEach(function (n) { if (!seen[n]) (by[n].hourly ? groups['計時'] : groups['其他']).push(n); });
   var total = Object.keys(by).reduce(function (a, n) { return a + by[n].cost; }, 0);
-  $('s-emps').innerHTML = names.map(function (n) {
+  function btn(n) {
     return '<button class="' + (n === ST.emp ? 'on' : '') + '" onclick="openEmp(\'' + jsq(n) + '\')"><span>' + esc(n) + pendTag('payroll', month + '|' + n) + '</span><span>' +
       (by[n] ? '<span class="ok">✓</span> 成本 ' + money(by[n].cost) : '<span class="muted">未填</span>') + '</span></button>';
-  }).join('') + '<p class="muted">本月人事成本合計：<b>' + money(total) + '</b></p>';
+  }
+  function sub(list) { return list.reduce(function (a, n) { return a + (by[n] ? by[n].cost : 0); }, 0); }
+  var h = '';
+  [['正職', '正職'], ['計時', '計時（時薪）'], ['其他', '其他（不在員工名單）']].forEach(function (g) {
+    var list = groups[g[0]];
+    if (!list.length) return;
+    h += '<div class="grp"><div class="grp-h"><b>' + g[1] + '</b><span class="muted">' + list.length + ' 人｜小計 ' + money(sub(list)) + '</span></div>' + list.map(btn).join('') + '</div>';
+  });
+  $('s-emps').innerHTML = (h || '<p class="muted">員工名單是空的，請到試算表「設定_員工」新增</p>') +
+    '<p class="muted">本月人事成本合計：<b>' + money(total) + '</b></p>';
   if (full) $('s-editor').classList.toggle('hide', !ST.emp);
 }
 function addTempEmployee() {
