@@ -99,6 +99,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok((await B.pg.textContent('#e-presets')).includes('房租32,000'), '下個月顯示上次金額');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-expense.png'), fullPage: true });
   await B.pg.click('#tb-year'); await B.pg.waitForSelector('.ytable');
+  assert.strictEqual(await B.pg.evaluate(() => document.querySelector('header').getBoundingClientRect().top), 0, '年度總覽上方不能有白邊');
   const yt = await B.pg.textContent('#y-body');
   assert.ok(yt.includes('Q4 合計') && yt.includes('2026 全年') && yt.includes('豐吉 60%'), '年度總覽要有季合計、全年、股東欄');
   await B.pg.click('#tb-summary'); await B.pg.fill('#m-month', '2026-11'); await B.pg.dispatchEvent('#m-month', 'change');

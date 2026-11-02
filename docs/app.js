@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.0.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.0.1';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理, 手機下方列常駐]
 var TABS = [
@@ -263,7 +263,7 @@ function closeMore() { $('moresheet').classList.add('hide'); }
 
 function showTab(name) {
   ST.tab = name;
-  document.body.classList.toggle('wide', name === 'year');
+  document.body.classList.toggle('page-wide', name === 'year');
   TABS.forEach(function (x) {
     $('tab-' + x[0]).classList.toggle('hide', x[0] !== name);
     var b = $('tb-' + x[0]); if (b) b.classList.toggle('on', x[0] === name);
