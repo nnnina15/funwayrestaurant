@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.0.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.1.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理, 手機下方列常駐]
 var TABS = [
@@ -410,6 +410,51 @@ function renderDailyExist() {
     pendTag('daily', d.date) + '，修改後再儲存會覆蓋。';
 }
 var LINE_OTHER = '其他支出', LINE_WAGE = '薪資／預支';
+/* 支出明細的常用項目：預設＋店長最常用的（最多 12 個），帶入上次選的分類和金額 */
+var LINE_PRESETS = [['米', '米'], ['菜', '菜'], ['蔥', '菜'], ['油條', LINE_OTHER], ['燉滷', LINE_OTHER], ['PT', LINE_WAGE]];
+function linePresets() {
+  var stat = {};
+  view().daily.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (r) {
+    (r.lines || []).forEach(function (l) {
+      var n = String(l.name || '').trim();
+      if (!n || /舊資料|未命名/.test(n)) return;
+      if (!stat[n]) stat[n] = { n: 0 };
+      stat[n].n++; stat[n].cat = l.cat || stat[n].cat; stat[n].last = l.amount;
+    });
+  });
+  var out = [], seen = {};
+  function push(n, cat) {
+    if (seen[n]) return; seen[n] = true;
+    var st = stat[n], c = (st && st.cat) || cat;
+    if (c !== LINE_OTHER && c !== LINE_WAGE && ST.lineCats.indexOf(c) < 0) c = ST.lineCats.indexOf(n) >= 0 ? n : LINE_OTHER;
+    out.push({ name: n, cat: c, last: st ? st.last : null });
+  }
+  Object.keys(stat).sort(function (a, b) { return stat[b].n - stat[a].n; }).forEach(function (n) { push(n); });
+  LINE_PRESETS.forEach(function (p) { push(p[0], p[1]); });
+  // 用過的排前面，但預設項目一定要在，總數最多 12
+  var defaults = LINE_PRESETS.map(function (p) { return p[0]; });
+  var learned = out.filter(function (x) { return defaults.indexOf(x.name) < 0; }).slice(0, Math.max(0, 12 - defaults.length));
+  return out.filter(function (x) { return defaults.indexOf(x.name) >= 0 || learned.indexOf(x) >= 0; })
+    .sort(function (a, b) { return ((stat[b.name] || {}).n || 0) - ((stat[a.name] || {}).n || 0); });
+}
+function renderLineChips() {
+  var have = {}; ST.lines.forEach(function (l) { have[String(l.name || '').trim()] = true; });
+  ST.linePresets = linePresets();
+  $('d-presets').innerHTML = ST.linePresets.map(function (p, i) {
+    if (have[p.name]) return '';
+    return '<button onclick="addLinePreset(' + i + ')">＋' + esc(p.name) + (p.last ? '<small>' + money(p.last) + '</small>' : '') + '</button>';
+  }).join('');
+}
+function addLinePreset(i) {
+  var p = ST.linePresets[i];
+  var last = ST.lines[ST.lines.length - 1];
+  if (last && !String(last.name || '').trim() && !String(last.amount || '').trim()) { last.name = p.name; last.cat = p.cat; }
+  else ST.lines.push({ name: p.name, amount: '', cat: p.cat });
+  renderLines();
+  var rows = $('d-lines').querySelectorAll('.line');
+  var idx = ST.lines.map(function (l) { return l.name; }).lastIndexOf(p.name);
+  if (rows[idx]) rows[idx].querySelector('input.amt').focus();
+}
 function renderLines() {
   $('d-lines').innerHTML = ST.lines.map(function (l, i) {
     var opt = function (v, t) { return '<option value="' + esc(v) + '"' + (v === l.cat ? ' selected' : '') + '>' + esc(t || v) + '</option>'; };
@@ -422,9 +467,10 @@ function renderLines() {
       '</select>' +
       '<button class="danger" onclick="delLine(' + i + ')">✕</button></div>';
   }).join('');
+  renderLineChips();
   dailyCalc();
 }
-function setLine(i, k, val) { ST.lines[i][k] = val; dailyCalc(); }
+function setLine(i, k, val) { ST.lines[i][k] = val; if (k === 'name') renderLineChips(); dailyCalc(); }
 function guessLine(i) {
   var l = ST.lines[i], n = String(l.name || '').trim();
   if (!n) return;

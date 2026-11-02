@@ -38,6 +38,13 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
     await row.locator('input').nth(0).fill(slip[i][0]); await row.locator('input').nth(1).fill(slip[i][1]);
     await row.locator('select').selectOption(slip[i][2]);
   }
+  // 常用項目：已經加過的不顯示；點「米」會新增一行並帶入分類
+  const chips = await A.pg.textContent('#d-presets');
+  assert.ok(!chips.includes('蔥') && chips.includes('米') && chips.includes('油條') === false, '已加入的項目要隱藏：' + chips);
+  await A.pg.click('#d-presets button:has-text("米")');
+  const mi = A.pg.locator('#d-lines .line').last();
+  assert.strictEqual(await mi.locator('input').nth(0).inputValue(), '米'); assert.strictEqual(await mi.locator('select').inputValue(), '米');
+  await mi.locator('button.danger').click();
   await A.pg.fill('#d-cash', '22835'); await A.pg.dispatchEvent('#d-cash', 'input');
   assert.strictEqual(await A.pg.textContent('#d-total'), '40,045');
   assert.strictEqual(await A.pg.textContent('#d-spendv'), '-2,260');

@@ -115,7 +115,10 @@
   .chips button.on { background: color-mix(in srgb, var(--brand) 12%, var(--card)); border-color: var(--brand); color: var(--brand); font-weight: 700; }
   #s-presets { margin-bottom: 10px; }
   #s-presets button, #e-presets button { padding: 8px 12px; font-size: 15px; }
-  #e-presets button small { color: var(--muted); margin-left: 4px; }
+  #e-presets button small, #d-presets button small { color: var(--muted); margin-left: 4px; font-weight: 400; }
+  #d-presets { margin: 4px 0 10px; }
+  #d-presets button { padding: 8px 12px; font-size: 15px; }
+  .presets-h { font-size: 13px; color: var(--muted); font-weight: 600; margin: 10px 0 6px; }
   #s-presets button.neg { color: var(--bad); }
 
   /* ===== 重點數字卡 ===== */
@@ -305,6 +308,8 @@
         <div class="sec-h">支出明細 <span class="muted">當天付錢的貨和任何支出，每筆都從現金扣</span></div>
         <datalist id="d-names"></datalist>
         <div id="d-lines"></div>
+        <div class="presets-h">常用項目（點一下加入）</div>
+        <div class="chips" id="d-presets"></div>
         <button class="ghost addline" onclick="addLine()">＋ 新增一行</button>
       </div>
 
