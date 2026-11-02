@@ -202,6 +202,12 @@
   .h2row h2 { margin: 0; }
   .h2row select { width: auto; padding: 5px 10px; font-size: 14px; font-weight: 700; }
 
+  /* 日期／月份：顯示自己的格式，真正的輸入框疊在上面（點了還是跳出日曆） */
+  .pk { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 1; min-width: 0; }
+  .pk-label { font-weight: 700; white-space: nowrap; padding: 4px 8px; pointer-events: none; color: var(--ink); }
+  .pk input { position: absolute; inset: 0; width: 100% !important; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: 0; }
+  #pickbar .pk-label { font-size: 16px; min-width: 96px; text-align: center; }
+  @media (max-width: 899px) { header #pickbar .pk-label { font-size: 15px; min-width: 84px; padding: 4px 4px; } }
   .pinrule { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .pinrule span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
   .pinrule span.ok { background: color-mix(in srgb, var(--ok) 15%, var(--card)); color: var(--ok); font-weight: 700; }

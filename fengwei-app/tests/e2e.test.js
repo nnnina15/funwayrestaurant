@@ -47,7 +47,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await A.pg.reload(); await A.pg.waitForSelector('#tab-daily:not(.hide)');            // 沒網路也能打開
   await A.pg.fill('#d-date', '2026-11-01'); await A.pg.dispatchEvent('#d-date', 'change');
   // 日期左右的 ‹ ›：往前一天再往後一天，回到原本那天
-  await A.pg.click('#d-date ~ .step'); assert.strictEqual(await A.pg.inputValue('#d-date'), '2026-11-02');
+  assert.strictEqual(await A.pg.textContent('.stepper:has(#d-date) .pk-label'), '2026/11/1', '日期顯示成 2026/11/1（不用瀏覽器自己的格式）');
+  await A.pg.locator('.stepper:has(#d-date) .step').last().click(); assert.strictEqual(await A.pg.inputValue('#d-date'), '2026-11-02');
+  assert.strictEqual(await A.pg.textContent('.stepper:has(#d-date) .pk-label'), '2026/11/2', '按 › 之後顯示也要跟著變');
   await A.pg.locator('.stepper:has(#d-date) .step').first().click(); assert.strictEqual(await A.pg.inputValue('#d-date'), '2026-11-01');
   // 照紙本結帳單輸入（10/26 那張）
   for (const [id, v] of [['d-site', '29125'], ['d-panda', '6358'], ['d-uber', '4562'], ['d-allpay', '575'], ['d-line', '3713']]) await A.pg.fill('#' + id, v);
