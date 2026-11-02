@@ -28,6 +28,7 @@ function createGas() {
   const sheets = {};
   const props = {};
   const cache = {};
+  const mails = [];
   const ss = {
     getSheetByName: (n) => sheets[n] || null,
     insertSheet: (n) => (sheets[n] = makeSheet(n)),
@@ -46,6 +47,8 @@ function createGas() {
     ScriptApp: { getProjectTriggers: () => [], newTrigger: () => { const t = { timeBased: () => t, everyDays: () => t, atHour: () => t, create: () => t }; return t; } },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) },
     CacheService: { getScriptCache: () => ({ get: (k) => (cache[k] === undefined ? null : cache[k]), put: (k, v) => { cache[k] = v; }, remove: (k) => { delete cache[k]; } }) },
+    MailApp: { sendEmail: (o) => { mails.push(o); }, getRemainingDailyQuota: () => 100 },
+    Session: { getEffectiveUser: () => ({ getEmail: () => 'owner@example.com' }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ content: s, setMimeType() { return this; } }) },
     Utilities: {
@@ -61,7 +64,7 @@ function createGas() {
   vm.runInContext(fs.readFileSync(path.join(root, 'fengwei-app', 'Code.gs'), 'utf8') + '\nthis.__S=S;this.__rows=rows_;', ctx);
   ctx.setup();
   const post = (body) => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(body) } }).content);
-  return { ctx, post, sheets, rows: (n) => ctx.__rows(n) };
+  return { ctx, post, sheets, mails, rows: (n) => ctx.__rows(n) };
 }
 
 module.exports = { createGas };

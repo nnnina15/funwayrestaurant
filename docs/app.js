@@ -145,7 +145,7 @@ function login() {
   if (!ST.pickStore) return toast('請先選店別');
   var pin = $('pin').value;
   busy(true);
-  api('login', { store: ST.pickStore, pin: pin }).then(function (r) {
+  api('login', { store: ST.pickStore, pin: pin, device: ST.cfg.device }).then(function (r) {
     busy(false);
     $('pin').value = '';
     var sameStore = ST.sess && ST.sess.store === ST.pickStore;

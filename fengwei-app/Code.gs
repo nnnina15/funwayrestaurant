@@ -79,6 +79,7 @@ function setup() {
   ]);
 
   secret_();   // 建立登入用的密鑰
+  MailApp.getRemainingDailyQuota();   // 先要求寄信權限，之後鎖定通知才寄得出去
   const has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'buildReports'; });
   if (!has) ScriptApp.newTrigger('buildReports').timeBased().everyDays(1).atHour(2).create();
 
@@ -140,10 +141,42 @@ function login_(req) {
   else if (pin && pin === s.pin) role = 'manager';
   else {
     cache.put(key, String(fails + 1), LOCK_SECONDS);
+    if (fails + 1 === MAX_FAIL) alertLock_(s.name, str_(req.device));
     throw new Error('PIN 碼錯誤（再錯 ' + (MAX_FAIL - fails - 1) + ' 次會鎖定 15 分鐘）');
   }
   cache.remove(key);
   return Object.assign({ ok: true, role: role, token: token_(s, role) }, pull_(s, role));
+}
+
+// 被鎖定時寄 Gmail 給試算表擁有者（同一次鎖定只寄一封）
+function alertLock_(store, device) {
+  try {
+    const to = Session.getEffectiveUser().getEmail();
+    if (!to) return;
+    const time = now_();
+    MailApp.sendEmail({
+      to: to,
+      subject: '⚠ 風味記帳：' + store + ' PIN 連續錯 ' + MAX_FAIL + ' 次，已鎖定 15 分鐘',
+      body: [
+        '風味記帳偵測到有人連續輸入錯誤的 PIN。',
+        '',
+        '店別：' + store,
+        '時間：' + time,
+        '裝置名字：' + (device || '（沒有提供，可能不是用 App 登入）'),
+        '',
+        '這家店已鎖定 15 分鐘，期間連正確的 PIN 也無法登入。',
+        '',
+        '如果是員工自己打錯：不用處理，15 分鐘後就能再試。',
+        '如果不是你們的人：可能有人拿到了同步網址，建議：',
+        '  1. 到試算表「設定_店家」把 PIN 改成新的 6 位數以上（已登入的裝置要重新登入）',
+        '  2. 必要時到 Apps Script 重新部署一個新網址，並更新每台裝置的同步網址',
+        '',
+        '（這封信由風味記帳系統自動寄出）'
+      ].join('\n')
+    });
+  } catch (err) {
+    console.error('寄送鎖定通知失敗：' + err);
+  }
 }
 
 function sync_(req) {

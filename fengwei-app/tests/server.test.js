@@ -72,6 +72,11 @@ assert.ok(g.rows(S.R_SHARE).some(x => x['股東'] === '豐吉' && x['比例(%)']
 
 // 猜錯 5 次鎖定，連正確 PIN 也暫時不能登入
 for (let i = 0; i < 5; i++) assert.strictEqual(g.post({ action: 'login', store: '中正店', pin: '000' + i }).ok, false);
+assert.strictEqual(g.mails.length, 1, '第 5 次錯要寄一封信');
+assert.strictEqual(g.mails[0].to, 'owner@example.com');
+assert.ok(g.mails[0].subject.includes('中正店'));
+g.post({ action: 'login', store: '中正店', pin: '0009', device: '陌生裝置' });
+assert.strictEqual(g.mails.length, 1, '鎖定期間不要重複寄信');
 const locked = g.post({ action: 'login', store: '中正店', pin: '9999' });
 assert.strictEqual(locked.ok, false); assert.ok(locked.error.includes('鎖定'));
 assert.strictEqual(g.post({ action: 'login', store: '大埔店', pin: '9999' }).ok, true, '別家店不受影響');
