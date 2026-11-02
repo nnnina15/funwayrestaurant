@@ -51,6 +51,19 @@
   #s-presets { margin-bottom: 10px; }
   #s-presets button { padding: 9px 12px; font-size: 16px; }
   #s-presets button.neg { color: var(--bad); }
+  body.wide main { max-width: 1400px; }
+  .swipe { display: none; margin: -6px 0 6px; }
+  @media (max-width: 900px) { .swipe { display: block; } }
+  .xscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+  .ytable { border-collapse: separate; border-spacing: 0; font-size: 15px; white-space: nowrap; }
+  .ytable th, .ytable td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .ytable thead th { background: var(--soft); position: sticky; top: 0; font-weight: 600; }
+  .ytable thead th.cat { color: var(--muted); font-weight: 500; }
+  .ytable tbody th, .ytable thead th:first-child { position: sticky; left: 0; background: var(--card); text-align: left; z-index: 1; border-right: 1px solid var(--line); }
+  .ytable thead th:first-child { background: var(--soft); z-index: 2; }
+  .ytable td.em { font-weight: 700; }
+  .ytable tr.qrow th, .ytable tr.qrow td { background: #f8f3e9; font-weight: 700; }
+  .ytable tr.yrow th, .ytable tr.yrow td { background: #efe6d4; font-weight: 700; border-top: 2px solid #d9cdb4; }
   .neg-in { color: var(--bad); border-color: #f2b8b0 !important; }
   .calc { background: var(--soft); border-radius: 12px; padding: 12px 14px; margin-top: 14px; font-size: 17px; line-height: 1.8; }
   .calc b { font-size: 20px; }
@@ -226,6 +239,16 @@
       <button class="primary" onclick="addDeduct()">新增</button>
     </div>
     <div class="card"><h2>這個月的扣除</h2><table><tbody id="x-list"></tbody></table></div>
+  </section>
+
+  <section id="tab-year" class="hide">
+    <div class="card">
+      <div class="grid2">
+        <div><label>年份</label><select id="y-year" onchange="renderYearTab()"></select></div>
+        <div><label>平均細項顯示</label><select id="y-mode" onchange="renderYearTab()"><option value="day">每個工作天平均</option><option value="total">每月合計</option></select></div>
+      </div>
+      <div id="y-body" style="margin-top:14px"></div>
+    </div>
   </section>
 
   <section id="tab-summary" class="hide">

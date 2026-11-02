@@ -2,7 +2,7 @@
 'use strict';
 
 var TABS = [
-  ['daily', '每日結帳', false], ['purchase', '進貨', false], ['summary', '月結總覽', true],
+  ['daily', '每日結帳', false], ['purchase', '進貨', false], ['summary', '月結總覽', true], ['year', '年度總覽', true],
   ['payroll', '人事', true], ['delivery', '外送對帳', true], ['expense', '固定/其他支出', true],
   ['deduct', '分紅扣除', true], ['settings', '⚙ 裝置', false]
 ];
@@ -200,6 +200,7 @@ function openSettings() { showTab('settings'); }
 
 function showTab(name) {
   ST.tab = name;
+  document.body.classList.toggle('wide', name === 'year');
   TABS.forEach(function (x) {
     $('tab-' + x[0]).classList.toggle('hide', x[0] !== name);
     var b = $('tb-' + x[0]); if (b) b.classList.toggle('on', x[0] === name);
@@ -216,6 +217,7 @@ function refreshTab(full) {
     case 'expense': renderExpenseTab(); break;
     case 'deduct': renderDeductTab(); break;
     case 'summary': renderSummaryTab(); break;
+    case 'year': renderYearTab(); break;
     case 'settings': renderSettingsTab(); break;
     case 'daily': if (!full) renderDailyExist(); break;
   }
@@ -629,6 +631,80 @@ function addDeduct() {
 function delDeduct(id) { if (confirm('確定刪除？')) { enqueue('deduct.del', { id: id }); renderDeductTab(); } }
 
 /* ---------- 月結總覽（在裝置上計算，離線也能看） ---------- */
+function computeLocal() {
+  var store = ST.sess.store, V = view(), C = ST.snap.config;
+  var emps = {}; emps[store] = (C.employees || []).map(function (e) { return e.name; });
+  return { V: V, C: C, R: computeAll_({ stores: [C.store], partners: C.partners || [], employees: emps,
+    daily: V.daily, purchase: V.purchase, expense: V.expense, payroll: V.payroll, delivery: V.delivery, deduct: V.deduct }, todayStr()) };
+}
+
+/* ---------- 年度總覽：像舊表「總計」頁 ---------- */
+function renderYearTab() {
+  var L = computeLocal(), R = L.R, V = L.V;
+  var years = {}; R.months.forEach(function (m) { years[m.month.slice(0, 4)] = true; });
+  var ys = Object.keys(years).sort();
+  var sel = $('y-year');
+  var cur = sel.value || (ys.indexOf(todayStr().slice(0, 4)) >= 0 ? todayStr().slice(0, 4) : ys[ys.length - 1]);
+  sel.innerHTML = ys.map(function (y) { return '<option' + (y === cur ? ' selected' : '') + '>' + y + '</option>'; }).join('');
+  if (!ys.length) { $('y-body').innerHTML = '<p class="muted">還沒有任何資料</p>'; return; }
+  var perDay = $('y-mode').value !== 'total';
+  var months = R.months.filter(function (m) { return m.month.slice(0, 4) === cur && m.status !== '未來'; });
+  var partners = (L.C.partners || []).map(function (p) { return p.name; });
+  var share = {}; R.shares.forEach(function (s) { share[s.month + '|' + s.name] = s.amount; });
+  function sum(list, f) { return list.reduce(function (a, m) { return a + f(m); }, 0); }
+  function td(v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + (v < 0 ? ' bad' : '') + '">' + money(v) + '</td>'; }
+  function label(m) { return Number(m.month.slice(5, 7)) + '月' + (m.status === '進行中' ? '<span class="tag">進行中</span>' : ''); }
+
+  // 表一：盈餘與分紅
+  var cols = ['盈餘', '員工分紅', '年終預留', '可分配'].concat(partners.map(function (p) {
+    var pp = (L.C.partners || []).filter(function (x) { return x.name === p; })[0]; return p + ' ' + pp.pct + '%';
+  }));
+  var rowOf = function (list, name, cls) {
+    return '<tr class="' + cls + '"><th>' + name + '</th>' + td(sum(list, function (m) { return m.profit; })) +
+      td(sum(list, function (m) { return m.bonus; })) + td(sum(list, function (m) { return m.reserve; })) +
+      td(sum(list, function (m) { return m.dist; }), 'em') +
+      partners.map(function (p) { return td(sum(list, function (m) { return share[m.month + '|' + p] || 0; }), 'em'); }).join('') + '</tr>';
+  };
+  var h = '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th>' +
+    cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  [1, 2, 3, 4].forEach(function (q) {
+    var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
+    if (!qm.length) return;
+    qm.forEach(function (m) { h += rowOf([m], label(m), ''); });
+    h += rowOf(qm, 'Q' + q + ' 合計', 'qrow');
+  });
+  h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
+  h += '<p class="muted">每月的分紅＝可分配 × 股東比例。進行中的月份數字會變動，先不要拿來分紅。</p>';
+
+  // 表二：平均細項
+  var catSet = {}; R.cats.forEach(function (c) { if (c.month.slice(0, 4) === cur) catSet[c.cat] = (catSet[c.cat] || 0) + c.amount; });
+  var cats = Object.keys(catSet).sort(function (a, b) { return catSet[b] - catSet[a]; });
+  var catAmt = {}; R.cats.forEach(function (c) { catAmt[c.month + '|' + c.cat] = c.amount; });
+  var util = {};
+  V.expense.forEach(function (x) {
+    ['電費', '水費'].forEach(function (k) { if (String(x.item).indexOf(k) >= 0) util[x.month + '|' + k] = (util[x.month + '|' + k] || 0) + Number(x.amount || 0); });
+  });
+  var dcols = [['實際營收', function (m) { return m.actual; }], ['人事', function (m) { return m.staff; }],
+    ['電費', function (m) { return util[m.month + '|電費'] || 0; }], ['水費', function (m) { return util[m.month + '|水費'] || 0; }],
+    ['貨款', function (m) { return m.purchase; }]].concat(cats.map(function (c) { return [c, function (m) { return catAmt[m.month + '|' + c] || 0; }]; }));
+  var dv = function (list, f) { var days = sum(list, function (m) { return m.days; }); var t = sum(list, f); return perDay ? (days ? t / days : 0) : t; };
+  var drow = function (list, name, cls) {
+    return '<tr class="' + cls + '"><th>' + name + '</th><td class="n">' + sum(list, function (m) { return m.days; }) + '</td>' +
+      dcols.map(function (c, i) { return '<td class="n' + (i === 0 ? ' em' : '') + '">' + money(dv(list, c[1])) + '</td>'; }).join('') + '</tr>';
+  };
+  h += '<h2 style="margin-top:22px">平均細項（' + (perDay ? '每個工作天平均' : '每月合計') + '）</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
+    dcols.map(function (c, i) { return '<th class="n' + (i >= 5 ? ' cat' : '') + '">' + esc(c[0]) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  [1, 2, 3, 4].forEach(function (q) {
+    var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
+    if (!qm.length) return;
+    qm.forEach(function (m) { h += drow([m], label(m), ''); });
+    h += drow(qm, 'Q' + q + (perDay ? ' 平均' : ' 合計'), 'qrow');
+  });
+  h += drow(months, cur + (perDay ? ' 全年平均' : ' 全年'), 'yrow') + '</tbody></table></div>';
+  h += '<p class="muted">電費、水費是從「固定／其他支出」裡項目名稱有「電費」「水費」的金額抓的。季、全年的每天平均＝合計 ÷ 總工作天。</p>';
+  $('y-body').innerHTML = h;
+}
+
 function renderSummaryTab() {
   var month = $('m-month').value, store = ST.sess.store, V = view(), C = ST.snap.config;
   var emps = {}; emps[store] = (C.employees || []).map(function (e) { return e.name; });

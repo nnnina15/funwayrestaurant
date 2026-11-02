@@ -68,6 +68,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('text=儲存這位員工');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 26140);
+  await B.pg.click('#tb-year'); await B.pg.waitForSelector('.ytable');
+  const yt = await B.pg.textContent('#y-body');
+  assert.ok(yt.includes('Q4 合計') && yt.includes('2026 全年') && yt.includes('豐吉 60%'), '年度總覽要有季合計、全年、股東欄');
   await B.pg.click('#tb-summary'); await B.pg.fill('#m-month', '2026-11'); await B.pg.dispatchEvent('#m-month', 'change');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-summary.png'), fullPage: true });
   // 店長看不到管理分頁
