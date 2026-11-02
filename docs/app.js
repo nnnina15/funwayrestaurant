@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.5.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.6.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -754,31 +754,83 @@ function savePayroll() {
 }
 
 /* ---------- 外送對帳 ---------- */
+// 對帳單項目：[代號, 名稱, 是否為扣項]
+var DV_ROWS = [['gross', '費用明細（訂單金額）', false], ['commission', '佣金', true], ['monthly', '月費', true], ['reject', '拒單費用', true], ['other', '其他調整', false]];
+function dvPeriods(platform, month, split) {
+  var last = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate(), m = Number(month.slice(5, 7));
+  return split ? [m + '/1-' + m + '/15', m + '/16-' + m + '/' + last] : [m + '/1-' + m + '/' + last];
+}
 function renderDeliveryTab() {
   var month = $('v-month').value, V = view();
-  var gross = { Panda: 0, Uber: 0 }, net = { Panda: null, Uber: null };
+  var gross = { Panda: 0, Uber: 0 };
   V.daily.forEach(function (x) { if (x.date.slice(0, 7) === month && !x.closed) { gross.Panda += Number(x.panda || 0); gross.Uber += Number(x.uber || 0); } });
-  V.delivery.forEach(function (x) { if (x.month === month && net.hasOwnProperty(x.platform)) net[x.platform] = (net[x.platform] || 0) + Number(x.amount || 0); });
-  [['Panda', 'v-panda'], ['Uber', 'v-uber']].forEach(function (p) {
-    $(p[1]).value = net[p[0]] === null ? '' : net[p[0]];
-    var g = gross[p[0]];
-    $(p[1] + '-hint').innerHTML = '本月每日結帳的營業額合計：' + money(g) +
-      (net[p[0]] !== null && g ? '，入帳比例 ' + pct(net[p[0]] / g) : (g ? '，<span class="warn">尚未對帳</span>' : '')) +
-      pendTag('delivery', month + '|' + p[0]);
-  });
+  ST.dv = {};
+  $('v-body').innerHTML = ['Panda', 'Uber'].map(function (p) {
+    var rec = V.delivery.filter(function (x) { return x.month === month && x.platform === p; })[0];
+    var split = rec && rec.periods ? rec.periods.length > 1 : p === 'Panda';
+    var labels = dvPeriods(p, month, split);
+    ST.dv[p] = { split: split, periods: labels.map(function (l, i) {
+      var o = { label: l }, src = rec && rec.periods && rec.periods[i];
+      DV_ROWS.forEach(function (r) { o[r[0]] = src && src[r[0]] ? Math.abs(src[r[0]]) * (r[2] ? 1 : Math.sign(src[r[0]])) : ''; });
+      return o;
+    }), old: rec && !rec.periods ? rec.amount : null };
+    return '<div class="dv" id="dv-' + p + '"></div>';
+  }).join('');
+  ['Panda', 'Uber'].forEach(function (p) { renderDv(p, gross[p]); });
+}
+function dvNet(o) {
+  return DV_ROWS.reduce(function (a, r) { var v = expr(o[r[0]]); if (isNaN(v)) return a; return a + (r[2] ? -Math.abs(v) : v); }, 0);
+}
+function renderDv(p, gross) {
+  var st = ST.dv[p];
+  if (gross === undefined) gross = st.gross; else st.gross = gross;
+  var head = '<tr><th></th>' + st.periods.map(function (o) { return '<th>' + esc(o.label) + '</th>'; }).join('') + '</tr>';
+  var rows = DV_ROWS.map(function (r) {
+    return '<tr><th>' + r[1] + '</th>' + st.periods.map(function (o, i) {
+      return '<td><input' + (r[2] ? ' class="neg-in"' : '') + ' inputmode="text" value="' + esc(o[r[0]]) + '" placeholder="' + (r[2] ? '扣' : '0') + '" oninput="dvSet(\'' + p + '\',' + i + ',\'' + r[0] + '\',this.value)"></td>';
+    }).join('') + '</tr>';
+  }).join('');
+  var total = st.periods.reduce(function (a, o) { return a + dvNet(o); }, 0);
+  var sub = '<tr class="sub"><th>' + p + ' 營收</th>' + st.periods.map(function (o, i) { return '<td class="n" id="dv-' + p + '-n' + i + '">' + money(dvNet(o)) + '</td>'; }).join('') + '</tr>';
+  var tot = '<tr class="tot"><th>總收（實際入帳）</th><td class="n' + sgn(total) + '" colspan="' + st.periods.length + '" id="dv-' + p + '-tot">' + money(total) + '</td></tr>';
+  $('dv-' + p).innerHTML = '<div class="dv-h"><span>' + p + ' 實際營收' + pendTag('delivery', $('v-month').value + '|' + p) + '</span><span class="muted" id="dv-' + p + '-ratio">' + dvRatio(total, gross) + '</span></div>' +
+    '<table><thead>' + head + '</thead><tbody>' + rows + sub + tot + '</tbody></table>' +
+    '<label class="split"><input type="checkbox" ' + (st.split ? 'checked' : '') + ' onchange="dvSplit(\'' + p + '\',this.checked)"> 分上半月／下半月兩期</label>' +
+    (st.old !== null ? '<p class="muted" style="padding:0 14px 10px">舊資料：實際入帳 ' + money(st.old) + '（沒有明細）。填了明細儲存後會取代。</p>' : '');
+}
+function dvRatio(total, gross) { return '每日結帳營業額 ' + money(gross) + (gross && total ? '｜入帳 ' + pct(total / gross) : (gross ? '｜<span class="warn">尚未對帳</span>' : '')); }
+function dvSet(p, i, k, v) {
+  var st = ST.dv[p]; st.periods[i][k] = v; st.dirty = true;
+  var total = st.periods.reduce(function (a, o) { return a + dvNet(o); }, 0);
+  $('dv-' + p + '-n' + i).textContent = money(dvNet(st.periods[i]));
+  var t = $('dv-' + p + '-tot'); t.textContent = money(total); t.className = 'n' + sgn(total);
+  $('dv-' + p + '-ratio').innerHTML = dvRatio(total, st.gross);
+}
+function dvSplit(p, on) {
+  var st = ST.dv[p], labels = dvPeriods(p, $('v-month').value, on);
+  var merged = {}; DV_ROWS.forEach(function (r) { merged[r[0]] = st.periods.reduce(function (a, o) { var v = expr(o[r[0]]); return a + (isNaN(v) ? 0 : v); }, 0) || ''; });
+  st.split = on; st.dirty = true;
+  st.periods = on ? labels.map(function (l, i) { var o = { label: l }; DV_ROWS.forEach(function (r) { o[r[0]] = i === 0 ? merged[r[0]] : ''; }); return o; })
+    : [Object.assign({ label: labels[0] }, merged)];
+  renderDv(p);
 }
 function saveDelivery() {
-  var month = $('v-month').value;
-  var changed = 0;
-  [['Panda', 'v-panda'], ['Uber', 'v-uber']].forEach(function (p) {
-    var s = $(p[1]).value.trim();
-    var amt = s === '' ? '' : expr(s);
-    if (amt !== '' && isNaN(amt)) return;
-    var cur = view().delivery.filter(function (x) { return x.month === month && x.platform === p[0]; })[0];
-    if ((cur ? cur.amount : '') === amt) return;
-    enqueue('delivery.upsert', { month: month, platform: p[0], amount: amt });
+  var month = $('v-month').value, changed = 0, bad = false;
+  ['Panda', 'Uber'].forEach(function (p) {
+    var st = ST.dv[p];
+    var filled = st.periods.some(function (o) { return DV_ROWS.some(function (r) { return String(o[r[0]]).trim() !== ''; }); });
+    st.periods.forEach(function (o) { DV_ROWS.forEach(function (r) { if (String(o[r[0]]).trim() !== '' && isNaN(expr(o[r[0]]))) bad = true; }); });
+    if (bad || (!filled && !st.dirty)) return;
+    var periods = st.periods.map(function (o) {
+      var q = { label: o.label };
+      DV_ROWS.forEach(function (r) { var v = expr(o[r[0]]); if (v) q[r[0]] = r[2] ? -Math.abs(v) : v; });
+      return q;
+    });
+    var amount = filled ? periods.reduce(function (a, o) { return a + dvNet(o); }, 0) : '';
+    enqueue('delivery.upsert', { month: month, platform: p, amount: amount, periods: filled ? periods : null });
     changed++;
   });
+  if (bad) return toast('有金額格式看不懂');
   toast(changed ? '對帳已儲存 ✓' : '沒有變更');
   renderDeliveryTab();
 }

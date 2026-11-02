@@ -146,6 +146,19 @@
   .ytable th small { color: var(--muted); font-weight: 400; margin-left: 4px; }
   .ytable tr.we th { color: var(--brand); }
 
+  .dv { margin-top: 16px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .dv-h { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--soft); font-weight: 800; }
+  .dv-h .muted { font-weight: 400; }
+  .dv table { margin: 0; }
+  .dv th, .dv td { padding: 6px 10px; }
+  .dv thead th { font-size: 13px; color: var(--muted); text-align: right; font-weight: 600; }
+  .dv tbody th { font-weight: 600; font-size: 15px; white-space: nowrap; }
+  .dv input { text-align: right; font-size: 17px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
+  .dv input.neg-in { color: var(--bad); }
+  .dv tr.sub td, .dv tr.sub th { background: color-mix(in srgb, var(--amber) 12%, var(--card)); font-weight: 700; }
+  .dv tr.tot td, .dv tr.tot th { background: color-mix(in srgb, var(--brand) 10%, var(--card)); font-weight: 800; font-size: 18px; }
+  .dv .split { font-size: 13px; color: var(--muted); padding: 8px 14px; display: flex; align-items: center; gap: 6px; }
+
   /* ===== 重點數字卡 ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
@@ -392,11 +405,8 @@
     <div class="card">
       <h2>外送平台對帳</h2>
       <label>月份</label><input id="v-month" type="month" onchange="renderDeliveryTab()">
-      <p class="muted">請看平台對帳單，填「實際匯進來的金額」（扣完佣金、月費之後）。</p>
-      <div class="grid2">
-        <div><label>Panda 實際入帳</label><input id="v-panda" inputmode="decimal"><div id="v-panda-hint" class="muted"></div></div>
-        <div><label>Uber 實際入帳</label><input id="v-uber" inputmode="decimal"><div id="v-uber-hint" class="muted"></div></div>
-      </div>
+      <p class="muted">照平台對帳單填。佣金、月費、拒單費用打正數就好，會自動扣掉；總收就是這個月的實際入帳。</p>
+      <div id="v-body"></div>
       <button class="primary" onclick="saveDelivery()">儲存對帳</button>
     </div>
   </section>

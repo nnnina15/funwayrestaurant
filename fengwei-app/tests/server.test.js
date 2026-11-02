@@ -106,6 +106,13 @@ assert.deepStrictEqual(r.data.presets.filter(x => x.use === '每日結帳' && x.
 const zz = g.post({ action: 'login', store: '中正店', pin: '9999' });
 assert.ok(!zz.data.presets.some(x => x.store === '大埔店'), '中正店看不到大埔店自己的設定');
 
+// 外送對帳明細：照平台對帳單的項目，存成好讀的文字，讀回來一樣
+const periods = [{ label: '9/1-9/15', gross: 55672, commission: -15588, monthly: -3296 }, { label: '9/16-9/30', gross: 39182, commission: -10964, monthly: -315 }];
+r = g.post({ action: 'sync', store: '大埔店', token: adm.token, ops: [op('delivery.upsert', { month: '2026-09', platform: 'Panda', amount: 64691, periods, editedAt: '2026-11-02 12:00:00' })] });
+const dv = g.rows(S.DELIVERY).find(x => x['月份'] === '2026-09' && x['平台'] === 'Panda');
+assert.strictEqual(dv['明細'], '9/1-9/15：明細 55672、佣金 -15588、月費 -3296｜9/16-9/30：明細 39182、佣金 -10964、月費 -315');
+assert.deepStrictEqual(r.data.delivery.find(x => x.month === '2026-09' && x.platform === 'Panda').periods, periods);
+
 // 猜錯 5 次鎖定，連正確 PIN 也暫時不能登入
 for (let i = 0; i < 5; i++) assert.strictEqual(g.post({ action: 'login', store: '中正店', pin: '000' + i }).ok, false);
 assert.strictEqual(g.mails.length, 1, '第 5 次錯要寄一封信');

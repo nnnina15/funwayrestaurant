@@ -110,6 +110,21 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.fill('#e-month', '2026-12'); await B.pg.dispatchEvent('#e-month', 'change');
   assert.ok((await B.pg.textContent('#e-presets')).includes('房租32,000'), '下個月顯示上次金額');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-expense.png'), fullPage: true });
+  // 外送對帳：照對帳單填（9 月 Panda 兩期、Uber 一期），總收＝實際入帳
+  await B.pg.click('#tb-delivery'); await B.pg.fill('#v-month', '2026-09'); await B.pg.dispatchEvent('#v-month', 'change');
+  const fillDv = async (p, row, col, v) => { const inp = B.pg.locator('#dv-' + p + ' tbody tr').nth(row).locator('input').nth(col); await inp.fill(v); await inp.dispatchEvent('input'); };
+  await fillDv('Panda', 0, 0, '55672'); await fillDv('Panda', 1, 0, '15588'); await fillDv('Panda', 2, 0, '3296');
+  await fillDv('Panda', 0, 1, '39182'); await fillDv('Panda', 1, 1, '10964'); await fillDv('Panda', 2, 1, '315');
+  await fillDv('Uber', 0, 0, '24384'); await fillDv('Uber', 1, 0, '8540'); await fillDv('Uber', 2, 0, '500');
+  assert.strictEqual(await B.pg.textContent('#dv-Panda-tot'), '64,691'); assert.strictEqual(await B.pg.textContent('#dv-Uber-tot'), '15,344');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-delivery.png'), fullPage: true });
+  await B.pg.click('#tab-delivery .primary');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  const dvr = g.rows('外送對帳').filter(r => r['月份'] === '2026-09');
+  assert.deepStrictEqual(dvr.map(r => r['平台'] + r['實際入帳']).sort(), ['Panda64691', 'Uber15344']);
+  await B.pg.dispatchEvent('#v-month', 'change');
+  assert.strictEqual(await B.pg.inputValue('#dv-Panda tbody tr:nth-child(2) input >> nth=0'), '15588', '重新打開要看到存過的明細');
+
   // 總覽：年
   await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="year"]'); await B.pg.waitForSelector('#y-body .ytable');
   assert.strictEqual(await B.pg.evaluate(() => document.querySelector('header').getBoundingClientRect().top), 0, '總覽上方不能有白邊');

@@ -28,7 +28,7 @@ HEAD[S.DAILY] = ['輸入時間', '日期', '店別', '公休', '現場', 'Panda'
 HEAD[S.PURCHASE] = ['編號', '輸入時間', '日期', '店別', '分類', '金額', '備註', '裝置'];
 HEAD[S.EXPENSE] = ['編號', '輸入時間', '月份', '店別', '類型', '項目', '金額', '備註', '裝置'];
 HEAD[S.PAYROLL] = ['輸入時間', '月份', '店別', '姓名', '項目', '金額', '類別', '時數', '時薪', '裝置'];
-HEAD[S.DELIVERY] = ['輸入時間', '月份', '店別', '平台', '實際入帳', '備註', '裝置'];
+HEAD[S.DELIVERY] = ['輸入時間', '月份', '店別', '平台', '實際入帳', '備註', '裝置', '明細'];
 HEAD[S.DEDUCT] = ['編號', '輸入時間', '月份', '店別', '類型', '金額', '備註', '裝置'];
 HEAD[S.R_MONTH] = ['店別', '月份', '狀態', '工作天', '現場營收', 'Panda營業額', 'Panda入帳', 'Uber營業額', 'Uber入帳',
   '實際營收', '日均營收', '進貨', '人事成本', '固定支出', '其他支出', '線上手續費', '現金差額', '盈餘',
@@ -381,12 +381,34 @@ function applyServerOp_(store, op) {
       if (newer_(S.DELIVERY, same, at)) return 'stale';
       deleteWhere_(S.DELIVERY, same);
       if (d.amount !== '' && d.amount !== null && d.amount !== undefined) {
-        append_(S.DELIVERY, [{ '輸入時間': at, '月份': month, '店別': store, '平台': p, '實際入帳': num_(d.amount), '備註': '', '裝置': dev }]);
+        append_(S.DELIVERY, [{ '輸入時間': at, '月份': month, '店別': store, '平台': p, '實際入帳': num_(d.amount), '備註': '', '裝置': dev,
+          '明細': deliveryText_(d.periods) }]);
       }
       return 'ok';
     }
   }
   throw new Error('未知的操作：' + op.type);
+}
+
+// 外送對帳明細：存成好讀的文字，例如「1-15：明細 55672、佣金 -15588、月費 -3296｜16-30：…」
+const DELIVERY_KEYS = [['gross', '明細'], ['commission', '佣金'], ['monthly', '月費'], ['reject', '拒單'], ['other', '其他']];
+function deliveryText_(periods) {
+  return (periods || []).map(function (p) {
+    return str_(p.label) + '：' + DELIVERY_KEYS.filter(function (k) { return num_(p[k[0]]); }).map(function (k) { return k[1] + ' ' + num_(p[k[0]]); }).join('、');
+  }).join('｜');
+}
+function parseDelivery_(text) {
+  text = str_(text);
+  if (!text) return null;
+  return text.split('｜').map(function (part) {
+    const i = part.indexOf('：'), o = { label: i >= 0 ? part.slice(0, i) : '' };
+    (i >= 0 ? part.slice(i + 1) : part).split('、').forEach(function (kv) {
+      const m = kv.match(/^(\S+)\s+(-?[\d.]+)$/);
+      if (!m) return;
+      DELIVERY_KEYS.forEach(function (k) { if (k[1] === m[1]) o[k[0]] = Number(m[2]); });
+    });
+    return o;
+  });
 }
 
 // 支出明細：存成好讀的文字，例如「燉滷 500｜米 3516（記帳→米）」，App 讀回來可以再編輯
@@ -478,7 +500,7 @@ const rec_ = {
   },
   delivery: function (r) {
     return { store: str_(r['店別']), month: monthKey_(r['月份']), platform: str_(r['平台']),
-      amount: num_(r['實際入帳']), editedAt: tsKey_(r['輸入時間']) };
+      amount: num_(r['實際入帳']), editedAt: tsKey_(r['輸入時間']), periods: parseDelivery_(r['明細']) };
   },
   deduct: function (r) {
     return { store: str_(r['店別']), id: str_(r['編號']), month: monthKey_(r['月份']), type: str_(r['類型']),
