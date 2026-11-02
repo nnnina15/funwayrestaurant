@@ -1,14 +1,14 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.2.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.3.0';   // 和 sw.js 的 VERSION 一起改
 
-// [代號, 名稱, 只限管理, 手機下方列常駐]
+// [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
-  ['daily', '每日結帳', false, true], ['purchase', '進貨', false, true], ['summary', '月結總覽', true, true],
-  ['year', '年度總覽', true, true], ['payroll', '人事', true, false], ['delivery', '外送對帳', true, false],
-  ['expense', '固定/其他支出', true, false], ['deduct', '分紅扣除', true, false], ['settings', '裝置', false, false]
+  ['daily', '每日結帳', false], ['purchase', '進貨', false], ['expense', '固定/其他支出', true],
+  ['summary', '月結總覽', true], ['year', '年度總覽', true], ['payroll', '人事', true],
+  ['delivery', '外送對帳', true], ['deduct', '分紅扣除', true], ['settings', '裝置', false]
 ];
-var SHORT = { daily: '結帳', purchase: '進貨', summary: '月結', year: '年度', settings: '裝置' };
+var SHORT = { daily: '結帳', purchase: '進貨', expense: '支出', summary: '月結', year: '年度', settings: '裝置' };
 function svg(d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; }
 var ICONS = {
   daily: svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
@@ -275,8 +275,7 @@ function enterApp() {
   $('tabs').innerHTML = mine.map(function (x) {
     return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
   }).join('');
-  var main = mine.filter(function (x) { return x[3]; }), rest = mine.filter(function (x) { return !x[3]; });
-  if (rest.length === 1) { main = mine; rest = []; }
+  var main = mine.length <= 5 ? mine : mine.slice(0, 4), rest = mine.length <= 5 ? [] : mine.slice(4);
   $('bottombar').innerHTML = main.map(function (x) {
     return '<button id="bb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + (SHORT[x[0]] || x[1]) + '</button>';
   }).join('') + (rest.length ? '<button id="bb-more" onclick="openMore()">' + ICONS.more + '更多</button>' : '');

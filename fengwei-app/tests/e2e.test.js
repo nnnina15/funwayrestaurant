@@ -119,10 +119,15 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   // 店長看不到管理分頁
   const tabsA = await A.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent));
   assert.ok(!tabsA.includes('人事') && !tabsA.includes('月結總覽'));
+  assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '裝置'], '店長只有三個分頁');
   console.log('多裝置 + 權限 ✓');
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
   await B.pg.setViewportSize({ width: 390, height: 844 });
   assert.ok(await B.pg.isVisible('#bottombar') && !(await B.pg.isVisible('#tabs')), '手機要用下方分頁列');
+  assert.deepStrictEqual(await B.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent)),
+    ['每日結帳', '進貨', '固定/其他支出', '月結總覽', '年度總覽', '人事', '外送對帳', '分紅扣除', '裝置'], '分頁順序');
+  assert.deepStrictEqual(await B.pg.$$eval('#bottombar button', bs => bs.map(b => b.textContent)), ['結帳', '進貨', '支出', '月結', '更多']);
+  assert.deepStrictEqual(await B.pg.$$eval('#moregrid button', bs => bs.map(b => b.textContent)), ['年度總覽', '人事', '外送對帳', '分紅扣除', '裝置']);
   await B.pg.click('#bb-more'); await B.pg.click('#moregrid button:has-text("人事")');
   assert.ok(await B.pg.isVisible('#tab-payroll') && (await B.pg.getAttribute('#bb-more', 'class')).includes('on'));
   await B.pg.click('#bb-daily');
