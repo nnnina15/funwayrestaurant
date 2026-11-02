@@ -98,4 +98,18 @@ applyOp_(st, { type: 'payroll.upsert', data: { month: '2026-11', name: 'A', item
 assert.deepStrictEqual(st.purchase.map(x => x.id), ['b']);
 assert.deepStrictEqual(st.payroll.map(x => x.amount), [2]);
 
+// 匯入舊資料：不重複、不覆蓋、範例員工會移除
+g.addOther('I'.repeat(30), {
+  '設定_員工': [['店別', '姓名', '類型(正職/計時)', '月薪', '時薪', '員工自付健保', '員工自付勞保', '公司勞退', '公司健保', '公司勞保', '在職(是/否)'], ['大埔店', '甲', '正職', 40000, '', '', '', '', '', '', '是']],
+  '進貨': [['編號', '輸入時間', '日期', '店別', '分類', '金額', '備註', '裝置'], ['old1', '2026-11-02 00:00:00', '2026-09-01', '大埔店', '米', 900, '', '舊表匯入'], ['old2', '2026-11-02 00:00:00', '2026-09-02', '大埔店', '麵', 240, '', '舊表匯入']],
+  '每日營收': [['輸入時間', '日期', '店別', '公休', '現場', 'Panda', 'Uber', '全支付', 'LINE Pay', '現場支出', '點收現金', '應有現金', '現金差額', '備註', '裝置'],
+    ['2026-11-02 00:00:00', '2026-10-01', '大埔店', '', 1, 0, 0, 0, 0, 0, 1, 1, 0, '', '舊表匯入'], ['2026-11-02 00:00:00', '2026-09-30', '大埔店', '是', 0, 0, 0, 0, 0, 0, 0, 0, 0, '', '舊表匯入']]
+});
+let im = g.ctx.importFrom_(g.ctx.SpreadsheetApp.openById('I'.repeat(30)));
+assert.ok(im.includes('進貨：新增 2 筆') && im.includes('每日營收：新增 1 筆（已存在略過 1 筆）'), im);
+assert.strictEqual(g.rows(S.DAILY).find(r => r['日期'] === '2026-10-01')['現場'], 30000, '已存在的不能被蓋掉');
+assert.ok(!g.rows(S.EMP).some(r => String(r['姓名']).includes('範例')));
+im = g.ctx.importFrom_(g.ctx.SpreadsheetApp.openById('I'.repeat(30)));
+assert.ok(!/新增 [1-9]/.test(im), '第二次匯入不該新增');
+
 console.log('同步服務測試通過 ✓');

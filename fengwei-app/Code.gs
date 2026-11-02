@@ -51,6 +51,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('風味記帳')
     .addItem('① 初始化（第一次使用）', 'setup')
     .addItem('② 重新計算報表', 'buildReports')
+    .addItem('③ 匯入舊資料', 'importOldData')
     .addToUi();
 }
 
@@ -97,6 +98,66 @@ function seed_(name, rows) {
   append_(name, rows.map(function (r) {
     const o = {}; h.forEach(function (k, i) { o[k] = r[i] === undefined ? '' : r[i]; }); return o;
   }));
+}
+
+/* ============================================================
+ * 匯入舊資料：從另一份同格式的試算表把資料加進來
+ * 已經存在的資料（同一天、同一個編號、同一人同一月）會略過，不會重複或覆蓋
+ * ============================================================ */
+
+function importOldData() {
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.prompt('匯入舊資料', '貼上「風味記帳_舊資料匯入」試算表的網址：', ui.ButtonSet.OK_CANCEL);
+  if (resp.getSelectedButton() !== ui.Button.OK) return;
+  const m = resp.getResponseText().match(/[-\w]{25,}/);
+  if (!m) { ui.alert('看不懂這個網址，請貼上完整的試算表網址'); return; }
+  const msg = withLock_(function () { return importFrom_(SpreadsheetApp.openById(m[0])); });
+  buildReports();
+  ui.alert('匯入完成！\n\n' + msg + '\n\n報表已重新計算，請看「報表_月結」和「警示」。');
+}
+
+function importFrom_(src) {
+  const KEYS = {};
+  KEYS[S.EMP] = ['店別', '姓名'];
+  KEYS[S.DAILY] = ['店別', '日期'];
+  KEYS[S.PURCHASE] = ['店別', '編號'];
+  KEYS[S.EXPENSE] = ['店別', '編號'];
+  KEYS[S.PAYROLL] = ['店別', '月份', '姓名'];
+  KEYS[S.DELIVERY] = ['店別', '月份', '平台'];
+  KEYS[S.DEDUCT] = ['店別', '編號'];
+  const lines = [];
+  Object.keys(KEYS).forEach(function (name) {
+    const sh = src.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 2) return;
+    const vals = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+    const h = vals[0].map(str_);
+    const objs = vals.slice(1).map(function (r) {
+      const o = {}; h.forEach(function (k, i) { o[k] = r[i]; }); return o;
+    }).filter(function (o) { return str_(o['店別']); });
+    const keyOf = function (o) { return KEYS[name].map(function (k) { return normCell_(k, o[k]); }).join('|'); };
+    if (name === S.EMP) deleteWhere_(S.EMP, function (r) { return str_(r['姓名']).indexOf('範例') >= 0; });
+    const have = {};
+    rows_(name).forEach(function (r) { have[keyOf(r)] = true; });
+    const add = [];
+    let skip = 0;
+    objs.forEach(function (o) {
+      if (have[keyOf(o)]) { skip++; return; }
+      const row = {};
+      HEAD[name].forEach(function (k) { row[k] = normCell_(k, o[k]); });
+      add.push(row);
+    });
+    append_(name, add);
+    lines.push(name + '：新增 ' + add.length + ' 筆' + (skip ? '（已存在略過 ' + skip + ' 筆）' : ''));
+  });
+  return lines.join('\n');
+}
+
+function normCell_(k, v) {
+  if (k === '日期') return dateKey_(v);
+  if (k === '月份' || k === '啟用月份(yyyy-MM)' || k === '停用月份(yyyy-MM)') return monthKey_(v);
+  if (k === '輸入時間') return v instanceof Date ? Utilities.formatDate(v, TZ, 'yyyy-MM-dd HH:mm:ss') : str_(v);
+  if (k === '編號' || k === '店別' || k === '姓名') return str_(v);
+  return v === undefined || v === null ? '' : v;
 }
 
 /* ============================================================

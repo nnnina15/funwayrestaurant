@@ -29,6 +29,7 @@ function createGas() {
   const props = {};
   const cache = {};
   const mails = [];
+  const others = {};
   const ss = {
     getSheetByName: (n) => sheets[n] || null,
     insertSheet: (n) => (sheets[n] = makeSheet(n)),
@@ -43,7 +44,7 @@ function createGas() {
   };
   const ctx = {
     console, Date, JSON, Math, Object, Array, String, Number, isFinite, Error,
-    SpreadsheetApp: { getActive: () => ss, getUi: () => ({ alert() {}, createMenu() { const m = { addItem: () => m, addToUi: () => m }; return m; } }) },
+    SpreadsheetApp: { getActive: () => ss, openById: (id) => others[id], getUi: () => ({ alert() {}, createMenu() { const m = { addItem: () => m, addToUi: () => m }; return m; } }) },
     ScriptApp: { getProjectTriggers: () => [], newTrigger: () => { const t = { timeBased: () => t, everyDays: () => t, atHour: () => t, create: () => t }; return t; } },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) },
     CacheService: { getScriptCache: () => ({ get: (k) => (cache[k] === undefined ? null : cache[k]), put: (k, v) => { cache[k] = v; }, remove: (k) => { delete cache[k]; } }) },
@@ -64,7 +65,13 @@ function createGas() {
   vm.runInContext(fs.readFileSync(path.join(root, 'fengwei-app', 'Code.gs'), 'utf8') + '\nthis.__S=S;this.__rows=rows_;', ctx);
   ctx.setup();
   const post = (body) => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(body) } }).content);
-  return { ctx, post, sheets, mails, rows: (n) => ctx.__rows(n) };
+  // 建一份「別的試算表」給匯入測試用：data = { 分頁名: [[表頭...], [列...], ...] }
+  const addOther = (id, data) => {
+    const sh = {};
+    Object.keys(data).forEach((n) => { sh[n] = makeSheet(n); sh[n].cells = data[n].map((r) => r.slice()); sh[n].getLastColumn = () => data[n][0].length; });
+    others[id] = { getSheetByName: (n) => sh[n] || null };
+  };
+  return { ctx, post, sheets, mails, addOther, rows: (n) => ctx.__rows(n) };
 }
 
 module.exports = { createGas };
