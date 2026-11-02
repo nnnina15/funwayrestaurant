@@ -1,12 +1,44 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '2.6.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.0.0';   // 和 sw.js 的 VERSION 一起改
 
+// [代號, 名稱, 只限管理, 手機下方列常駐]
 var TABS = [
-  ['daily', '每日結帳', false], ['purchase', '進貨', false], ['summary', '月結總覽', true], ['year', '年度總覽', true],
-  ['payroll', '人事', true], ['delivery', '外送對帳', true], ['expense', '固定/其他支出', true],
-  ['deduct', '分紅扣除', true], ['settings', '⚙ 裝置', false]
+  ['daily', '每日結帳', false, true], ['purchase', '進貨', false, true], ['summary', '月結總覽', true, true],
+  ['year', '年度總覽', true, true], ['payroll', '人事', true, false], ['delivery', '外送對帳', true, false],
+  ['expense', '固定/其他支出', true, false], ['deduct', '分紅扣除', true, false], ['settings', '裝置', false, false]
 ];
+var SHORT = { daily: '結帳', purchase: '進貨', summary: '月結', year: '年度', settings: '裝置' };
+function svg(d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; }
+var ICONS = {
+  daily: svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
+  purchase: svg('<path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>'),
+  summary: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  year: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2"/>'),
+  payroll: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14.6c2.6-.3 4.6 1.6 5 4.4"/>'),
+  delivery: svg('<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>'),
+  expense: svg('<path d="M4 6h16v13H4z"/><path d="M4 10h16M8 15h3"/>'),
+  deduct: svg('<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>'),
+  settings: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+  more: svg('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
+  sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  moon: svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
+  auto: svg('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>')
+};
+
+/* ---------- 亮／暗切換（右下角） ---------- */
+var THEMES = [['auto', '自動'], ['light', '亮色'], ['dark', '暗色']];
+function applyTheme() {
+  var m = LS.get('fw_theme', 'auto');
+  if (m === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', m);
+  var t = THEMES.filter(function (x) { return x[0] === m; })[0] || THEMES[0];
+  $('themeBtn').innerHTML = ICONS[m === 'light' ? 'sun' : m === 'dark' ? 'moon' : 'auto'] + '<small>' + t[1] + '</small>';
+}
+function cycleTheme() {
+  var m = LS.get('fw_theme', 'auto'), i = THEMES.map(function (x) { return x[0]; }).indexOf(m);
+  var next = THEMES[(i + 1) % THEMES.length];
+  LS.set('fw_theme', next[0]); applyTheme(); toast('顯示模式：' + next[1] + (next[0] === 'auto' ? '（跟著裝置設定）' : ''));
+}
 
 /* ---------- 本機儲存 ---------- */
 var LS = {
@@ -86,17 +118,20 @@ function api(action, body) {
 function showView(name) {
   ['setup', 'login', 'app'].forEach(function (x) { $('v-' + x).classList.toggle('hide', x !== name); });
   $('tabs').classList.toggle('hide', name !== 'app');
+  $('bottombar').classList.toggle('hide', name !== 'app');
+  document.body.classList.toggle('has-bar', name === 'app');
   $('sync').classList.toggle('hide', name !== 'app');
   $('menuBtn').classList.toggle('hide', name !== 'app');
   if (name === 'setup') {
     $('cfg-url').value = ST.cfg ? ST.cfg.url : '';
     $('cfg-device').value = ST.cfg ? ST.cfg.device : '';
-    $('title').textContent = '風味記帳｜裝置設定';
+    $('title').textContent = '裝置設定';
   }
-  if (name === 'login') { $('title').textContent = '風味記帳'; loadStores(); }
+  if (name === 'login') { $('title').textContent = '登入'; loadStores(); }
 }
 
 function boot() {
+  applyTheme();
   $('ver').textContent = '風味記帳 版本 ' + APP_VERSION;
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
   if ('serviceWorker' in navigator) {
@@ -200,19 +235,31 @@ function enterApp() {
   if (!ST.snap) loadLocal();
   if (!ST.snap) { showView('login'); return; }
   showView('app');
-  $('title').textContent = ST.sess.store + (isAdmin() ? '｜管理' : '｜店長');
+  $('title').textContent = ST.sess.store + '・' + (isAdmin() ? '管理' : '店長');
   var t = todayStr(), m = t.slice(0, 7);
   ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
   ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });
   $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
-  $('tabs').innerHTML = TABS.filter(function (x) { return !x[2] || isAdmin(); }).map(function (x) {
-    return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + x[1] + '</button>';
+  var mine = TABS.filter(function (x) { return !x[2] || isAdmin(); });
+  $('tabs').innerHTML = mine.map(function (x) {
+    return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
   }).join('');
+  var main = mine.filter(function (x) { return x[3]; }), rest = mine.filter(function (x) { return !x[3]; });
+  if (rest.length === 1) { main = mine; rest = []; }
+  $('bottombar').innerHTML = main.map(function (x) {
+    return '<button id="bb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + (SHORT[x[0]] || x[1]) + '</button>';
+  }).join('') + (rest.length ? '<button id="bb-more" onclick="openMore()">' + ICONS.more + '更多</button>' : '');
+  $('moregrid').innerHTML = rest.map(function (x) {
+    return '<button onclick="closeMore();showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
+  }).join('');
+  ST.moreTabs = rest.map(function (x) { return x[0]; });
   if (TABS.some(function (x) { return x[0] === ST.tab && x[2]; }) && !isAdmin()) ST.tab = 'daily';
   showTab(ST.tab);
   renderStatus();
 }
 function openSettings() { showTab('settings'); }
+function openMore() { $('moresheet').classList.remove('hide'); }
+function closeMore() { $('moresheet').classList.add('hide'); }
 
 function showTab(name) {
   ST.tab = name;
@@ -220,7 +267,10 @@ function showTab(name) {
   TABS.forEach(function (x) {
     $('tab-' + x[0]).classList.toggle('hide', x[0] !== name);
     var b = $('tb-' + x[0]); if (b) b.classList.toggle('on', x[0] === name);
+    var bb = $('bb-' + x[0]); if (bb) bb.classList.toggle('on', x[0] === name);
   });
+  var more = $('bb-more'); if (more) more.classList.toggle('on', (ST.moreTabs || []).indexOf(name) >= 0);
+  window.scrollTo(0, 0);
   if (name === 'daily') loadDaily();
   refreshTab(true);
 }
@@ -407,7 +457,7 @@ function dailyCalc() {
   var typed = $('d-cash').value.trim() !== '';
   var diff = v('d-cash') - expected, lim = ST.snap.config.store.cashWarn || 500;
   var el = $('d-diff');
-  el.className = 'auto big2' + (typed ? (Math.abs(diff) > lim ? ' bad' : (diff === 0 ? ' ok' : ' warn')) : '');
+  el.className = 'big2' + (typed ? (Math.abs(diff) > lim ? ' bad' : (diff === 0 ? ' ok' : ' warn')) : '');
   el.textContent = typed ? (diff > 0 ? '+' : '') + money(diff) : '—';
   el.title = typed && Math.abs(diff) > lim ? '差太多，請再點一次現金' : '';
 }
@@ -676,26 +726,18 @@ function saveDelivery() {
 
 /* ---------- 固定/其他支出 ---------- */
 /* 固定／其他支出的常用項目：內建＋過去用過的（用越多次越前面） */
-var EXP_PRESETS = [['房租', '固定'], ['電費', '固定'], ['水費', '固定'], ['電話費', '固定'], ['網路費', '固定'], ['瓦斯費', '固定'], ['拜拜', '固定'],
-  ['修繕', '其他'], ['清潔', '其他'], ['廣告費', '其他'], ['試菜', '其他'], ['聚餐', '其他']];
+var EXP_PRESETS = [['房租', '固定'], ['電費', '固定'], ['水費', '固定'], ['電話費', '固定'], ['網路費', '固定'], ['瓦斯費', '固定'],
+  ['拜拜', '固定'], ['聚餐', '其他'], ['外送費用', '其他']];
+// 只顯示固定的常用項目；旁邊附上次的金額
 function expensePresets() {
-  var stat = {};
+  var last = {};
   view().expense.slice().sort(function (a, b) { return a.month < b.month ? -1 : 1; }).forEach(function (x) {
-    if (/^E\d{8}/.test(x.id || '')) return;                // 每日結帳自動產生的不算
-    var n = String(x.item || '').trim(); if (!n) return;
-    if (!stat[n]) stat[n] = { n: 0 };
-    stat[n].n++; stat[n].type = x.type; stat[n].last = x.amount; stat[n].month = x.month;
+    var n = String(x.item || '').trim(); if (n) last[n] = { amount: x.amount, month: x.month };
   });
-  var seen = {}, out = [];
-  EXP_PRESETS.filter(function (p) { return p[1] === '固定'; }).concat(
-    Object.keys(stat).sort(function (a, b) { return stat[b].n - stat[a].n; }).map(function (n) { return [n, stat[n].type]; }),
-    EXP_PRESETS.filter(function (p) { return p[1] === '其他'; })
-  ).forEach(function (p) {
-    if (seen[p[0]]) return; seen[p[0]] = true;
-    var st = stat[p[0]];
-    out.push({ name: p[0], type: st ? st.type : p[1], last: st ? st.last : null, lastMonth: st ? st.month : '' });
+  return EXP_PRESETS.map(function (p) {
+    var l = last[p[0]];
+    return { name: p[0], type: p[1], last: l ? l.amount : null, lastMonth: l ? l.month : '' };
   });
-  return out;
 }
 function pickExpense(i) {
   var p = ST.expPresets[i];
@@ -766,6 +808,10 @@ function addDeduct() {
 function delDeduct(id) { if (confirm('確定刪除？')) { enqueue('deduct.del', { id: id }); renderDeductTab(); } }
 
 /* ---------- 月結總覽（在裝置上計算，離線也能看） ---------- */
+function kpi(label, v, sub, main) {
+  return '<div class="kpi' + (main ? ' main' : '') + '"><div class="k">' + label + '</div><div class="v' + (typeof v === 'number' ? sgn(v) : '') + '">' +
+    (typeof v === 'number' ? money(v) : v) + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
+}
 function computeLocal() {
   var store = ST.sess.store, V = view(), C = ST.snap.config;
   var emps = {}; emps[store] = (C.employees || []).map(function (e) { return e.name; });
@@ -800,7 +846,10 @@ function renderYearTab() {
       td(sum(list, function (m) { return m.dist; }), 'em') +
       partners.map(function (p) { return td(sum(list, function (m) { return share[m.month + '|' + p] || 0; }), 'em'); }).join('') + '</tr>';
   };
-  var h = '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th>' +
+  var yDays = sum(months, function (m) { return m.days; }), yAct = sum(months, function (m) { return m.actual; });
+  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', sum(months, function (m) { return m.profit; }), months.length + ' 個月', true) +
+    kpi('可分配給股東', sum(months, function (m) { return m.dist; })) + kpi('實際營收', yAct, '工作 ' + yDays + ' 天') +
+    kpi('日均營收', yDays ? Math.round(yAct / yDays) : 0) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th>' +
     cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
@@ -858,7 +907,8 @@ function renderSummaryTab() {
   var shares = R.shares.filter(function (x) { return x.month === month; });
   var warns = R.warns.filter(function (x) { return x.month === month || x.month === ''; });
   var cats = R.cats.filter(function (x) { return x.month === month; }).sort(function (a, b) { return b.amount - a.amount; });
-  var h = note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
+  var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('盈餘', m.profit, '扣完所有成本', true) +
+    kpi('可分配給股東', m.dist, '扣員工分紅、年終後') + kpi('人事佔比', pct(m.staffPct), '進貨佔比 ' + pct(m.purchasePct)) + '</div>' + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
     '　工作天 ' + m.days + '　日均營收 ' + money(m.avg) + '　現金差額累計 ' + money(m.cashDiff) + '</p>';
   h += '<table>' + rows.map(function (x) {
     return '<tr' + (x[2] ? ' style="font-weight:700"' : '') + '><td>' + x[0] + '</td><td class="n">' +

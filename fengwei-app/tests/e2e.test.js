@@ -12,7 +12,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   const g = createGas(); const S = g.ctx.__S;
   const b = await chromium.launch();
   async function device(name) {
-    const ctx = await b.newContext({ viewport: { width: 820, height: 1180 } });
+    const ctx = await b.newContext({ viewport: { width: 1100, height: 1300 } });
     await ctx.route(URL_, async (route) => { const body = JSON.parse(route.request().postData()); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(g.post(body)) }); });
     const pg = await ctx.newPage(); pg.on('pageerror', e => console.log(name, 'PAGEERROR', e.message)); pg.on('dialog', d => d.accept());
     await pg.goto('http://localhost:8765/');
@@ -107,6 +107,17 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   const tabsA = await A.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent));
   assert.ok(!tabsA.includes('人事') && !tabsA.includes('月結總覽'));
   console.log('多裝置 + 權限 ✓');
+  // 手機：下方分頁列、「更多」、右下角亮／暗切換
+  await B.pg.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await B.pg.isVisible('#bottombar') && !(await B.pg.isVisible('#tabs')), '手機要用下方分頁列');
+  await B.pg.click('#bb-more'); await B.pg.click('#moregrid button:has-text("人事")');
+  assert.ok(await B.pg.isVisible('#tab-payroll') && (await B.pg.getAttribute('#bb-more', 'class')).includes('on'));
+  await B.pg.click('#bb-daily');
+  await B.pg.click('#themeBtn'); assert.strictEqual(await B.pg.getAttribute('html', 'data-theme'), 'light');
+  await B.pg.click('#themeBtn'); assert.strictEqual(await B.pg.getAttribute('html', 'data-theme'), 'dark');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-phone-dark.png'), fullPage: true });
+  await B.pg.click('#themeBtn'); assert.strictEqual(await B.pg.getAttribute('html', 'data-theme'), null);
+  console.log('手機分頁列 + 亮暗切換 ✓');
   await b.close(); srv.close();
   console.log('E2E 全部通過 ✓');
 })().catch(e => { console.error(e); process.exit(1); });

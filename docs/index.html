@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>風味記帳</title>
-<meta name="theme-color" content="#b5532a">
+<meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="風味記帳">
@@ -13,122 +13,238 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <style>
+  /* ===== 色彩：取自風味食堂 Logo（墨黑、火焰紅、火焰橘黃） ===== */
   :root {
-    --bg: #faf7f1; --card: #ffffff; --ink: #2b2620; --muted: #7a7064; --line: #e6dfd3;
-    --brand: #b5532a; --ok: #2f7d4f; --warn: #b26f00; --bad: #c0392b; --soft: #f3efe6;
+    --bg: #f6f2ec; --card: #ffffff; --ink: #1b1b1b; --muted: #776f66; --line: #e7e0d6; --soft: #f1ebe2; --field: #ffffff;
+    --brand: #dd4b2a; --brand-2: #c43d1f; --amber: #f5b340; --head: #1b1b1b; --head-ink: #ffffff;
+    --ok: #2e7d4f; --warn: #b26f00; --bad: #c8372d; --zero: #b7ada1;
+    --qrow: #faf3e7; --yrow: #f3e6d1; --sheet: #3b342c; --tag-bg: #ffe2a8; --tag-ink: #5a3a00;
+    --banner: #fff4df; --banner-line: #f0d49c; --banner-ink: #5a3a00;
+    --bad-bg: #fdecea; --bad-line: #f2b8b0; --bad-ink: #7a1b10;
+    --shadow: 0 1px 2px rgba(27,27,27,.05), 0 6px 20px rgba(27,27,27,.05);
+    color-scheme: light;
   }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121110; --card: #1c1a18; --ink: #f2ede6; --muted: #a39a8f; --line: #312d29; --soft: #27241f; --field: #23201d;
+      --brand: #ec5a37; --brand-2: #ff6d48; --head: #0b0a09;
+      --ok: #5cc48a; --warn: #f0b450; --bad: #ff6f5b; --zero: #6e665d;
+      --qrow: #24211d; --yrow: #2d2924; --sheet: #6b6259; --tag-bg: #4a3812; --tag-ink: #ffd88a;
+      --banner: #2c2414; --banner-line: #5c4a22; --banner-ink: #ffd88a;
+      --bad-bg: #3a1a16; --bad-line: #6e2c24; --bad-ink: #ffb4a8;
+      --shadow: none; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121110; --card: #1c1a18; --ink: #f2ede6; --muted: #a39a8f; --line: #312d29; --soft: #27241f; --field: #23201d;
+    --brand: #ec5a37; --brand-2: #ff6d48; --head: #0b0a09;
+    --ok: #5cc48a; --warn: #f0b450; --bad: #ff6f5b; --zero: #6e665d;
+    --qrow: #24211d; --yrow: #2d2924; --sheet: #6b6259; --tag-bg: #4a3812; --tag-ink: #ffd88a;
+    --banner: #2c2414; --banner-line: #5c4a22; --banner-ink: #ffd88a;
+    --bad-bg: #3a1a16; --bad-line: #6e2c24; --bad-ink: #ffb4a8;
+    --shadow: none; color-scheme: dark;
+  }
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45;
     font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; font-size: 18px; }
-  header { position: sticky; top: 0; z-index: 5; background: var(--brand); color: #fff;
+
+  /* ===== 標題列 ===== */
+  header { position: sticky; top: 0; z-index: 6; background: var(--head); color: var(--head-ink);
     padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; }
-  header h1 { font-size: 19px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  header button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6); padding: 6px 12px; font-size: 15px; }
-  #sync { background: rgba(255,255,255,.18); border: 0; border-radius: 999px; font-size: 14px; padding: 6px 12px; white-space: nowrap; }
-  #sync.pending { background: #ffd28a; color: #5a3a00; }
-  #sync.err { background: #ffd6d0; color: #7a1b10; }
-  nav { display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: calc(52px + env(safe-area-inset-top)); z-index: 4; }
-  nav button { flex: none; background: var(--soft); color: var(--ink); border: 0; padding: 10px 16px; font-size: 17px; border-radius: 999px; }
-  nav button.on { background: var(--ink); color: #fff; }
-  main { max-width: 860px; margin: 0 auto; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
-  .card h2 { margin: 0 0 12px; font-size: 19px; }
-  label { display: block; font-size: 15px; color: var(--muted); margin: 10px 0 4px; }
-  input, select { width: 100%; font-size: 20px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
-  input[type=checkbox] { width: 26px; height: 26px; vertical-align: middle; }
+  header .logo { height: 30px; width: auto; display: block; }
+  body:not(.has-bar) header .logo { display: none; }
+  body:not(.has-bar) header h1 { border-left: 0; padding-left: 0; }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: rgba(255,255,255,.75); padding-left: 10px; border-left: 1px solid rgba(255,255,255,.2); }
+  header button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.3); padding: 6px 12px; font-size: 15px; border-radius: 999px; }
+  #sync { background: rgba(255,255,255,.12); border: 0; font-size: 14px; padding: 7px 12px; white-space: nowrap; }
+  #sync.pending { background: var(--amber); color: #3d2600; }
+  #sync.err { background: #ff8a75; color: #3d0b04; }
+
+  /* ===== 分頁：電腦在上方，手機在下方 ===== */
+  nav#tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; background: var(--card); border-bottom: 1px solid var(--line);
+    position: sticky; top: calc(50px + env(safe-area-inset-top)); z-index: 5; justify-content: center; }
+  nav#tabs button { flex: none; display: flex; align-items: center; gap: 6px; background: transparent; color: var(--muted);
+    border: 0; padding: 9px 14px; font-size: 16px; border-radius: 10px; font-weight: 500; }
+  nav#tabs button svg { width: 18px; height: 18px; }
+  nav#tabs button:hover { background: var(--soft); color: var(--ink); }
+  nav#tabs button.on { background: var(--ink); color: var(--card); }
+  #bottombar { display: none; }
+  @media (max-width: 899px) {
+    nav#tabs { display: none !important; }
+    #bottombar:not(.hide) { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--card);
+      border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,.06); }
+    #bottombar button { flex: 1; background: transparent; border: 0; padding: 6px 2px; color: var(--muted); font-size: 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 10px; }
+    #bottombar button svg { width: 24px; height: 24px; }
+    #bottombar button.on { color: var(--brand); font-weight: 700; }
+    body.has-bar main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  }
+  #moresheet { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; }
+  #moresheet .panel { background: var(--card); width: 100%; border-radius: 20px 20px 0 0; padding: 10px 16px calc(20px + env(safe-area-inset-bottom)); }
+  #moresheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 14px; }
+  #moresheet .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  #moresheet button { background: var(--soft); color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 6px; font-size: 15px; border-radius: 14px; }
+  #moresheet button svg { width: 26px; height: 26px; color: var(--brand); }
+
+  /* ===== 版面 ===== */
+  main { max-width: 900px; margin: 0 auto; padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); }
+  body.wide main { max-width: 1400px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 14px; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+  .card h2::before { content: ""; width: 4px; height: 18px; border-radius: 2px; background: var(--brand); }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 5px; font-weight: 500; }
+  input, select { width: 100%; font-size: 19px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--field); color: var(--ink); font-family: inherit; }
+  input:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+  input[type=checkbox] { width: 24px; height: 24px; vertical-align: middle; accent-color: var(--brand); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 14px; }
   @media (max-width: 560px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
-  button { font-size: 18px; border-radius: 10px; border: 0; padding: 14px 18px; cursor: pointer; font-family: inherit; }
-  .primary { background: var(--brand); color: #fff; width: 100%; margin-top: 14px; font-size: 20px; }
+  button { font-size: 17px; border-radius: 12px; border: 0; padding: 13px 18px; cursor: pointer; font-family: inherit; color: var(--ink); }
+  button:active { transform: scale(.98); }
+  .primary { background: var(--brand); color: #fff; width: 100%; margin-top: 16px; font-size: 19px; font-weight: 700; letter-spacing: .05em;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--brand) 30%, transparent); }
+  .primary:hover { background: var(--brand-2); }
   .ghost { background: var(--soft); color: var(--ink); }
   .wide { width: 100%; margin-top: 10px; }
   .danger { background: transparent; color: var(--bad); padding: 6px 10px; font-size: 15px; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chips button { background: var(--soft); color: var(--ink); padding: 12px 14px; font-size: 17px; }
-  .chips button.on { background: var(--brand); color: #fff; }
+  .chips button { background: var(--soft); color: var(--ink); padding: 11px 14px; font-size: 16px; border: 1.5px solid transparent; }
+  .chips button.on { background: color-mix(in srgb, var(--brand) 12%, var(--card)); border-color: var(--brand); color: var(--brand); font-weight: 700; }
   #s-presets { margin-bottom: 10px; }
-  #e-presets button { padding: 9px 12px; font-size: 16px; }
+  #s-presets button, #e-presets button { padding: 8px 12px; font-size: 15px; }
   #e-presets button small { color: var(--muted); margin-left: 4px; }
-  #s-presets button { padding: 9px 12px; font-size: 16px; }
   #s-presets button.neg { color: var(--bad); }
-  body.wide main { max-width: 1400px; }
+
+  /* ===== 重點數字卡 ===== */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+  .kpi::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--amber); }
+  .kpi.main::after { background: var(--brand); }
+  .kpi .k { font-size: 13px; color: var(--muted); }
+  .kpi .v { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -.01em; }
+  .kpi .s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ===== 年度表格 ===== */
   .swipe { display: none; margin: -6px 0 6px; }
   @media (max-width: 900px) { .swipe { display: block; } }
-  .xscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+  .xscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; }
   .ytable { border-collapse: separate; border-spacing: 0; font-size: 15px; white-space: nowrap; }
-  .ytable th, .ytable td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
-  .ytable thead th { background: var(--soft); position: sticky; top: 0; font-weight: 600; }
+  .ytable th, .ytable td { padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .ytable thead th { background: var(--soft); position: sticky; top: 0; font-weight: 700; font-size: 14px; }
   .ytable thead th.cat { color: var(--muted); font-weight: 500; }
   .ytable tbody th, .ytable thead th:first-child { position: sticky; left: 0; background: var(--card); text-align: left; z-index: 1; border-right: 1px solid var(--line); }
   .ytable thead th:first-child { background: var(--soft); z-index: 2; }
   .ytable td.em { font-weight: 700; }
-  .ytable tr.qrow th, .ytable tr.qrow td { background: #f8f3e9; font-weight: 700; }
-  .ytable tr.yrow th, .ytable tr.yrow td { background: #efe6d4; font-weight: 700; border-top: 2px solid #d9cdb4; }
-  .slip-top { display: flex; justify-content: space-between; align-items: center; }
+  .ytable tr.qrow th, .ytable tr.qrow td { background: var(--qrow); font-weight: 700; }
+  .ytable tr.yrow th, .ytable tr.yrow td { background: var(--yrow); font-weight: 800; border-top: 2px solid var(--amber); }
+
+  /* ===== 每日結帳 ===== */
+  .slip-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
   .slip-top h2 { margin: 0; }
-  .closed { margin: 0; font-size: 17px; color: var(--ink); }
-  .sheet { width: 100%; border-collapse: collapse; margin-top: 12px; table-layout: fixed; }
-  .sheet th, .sheet td { border: 1.5px solid #3b342c; padding: 6px; vertical-align: middle; }
-  .sheet th { background: var(--soft); font-size: 17px; font-weight: 700; text-align: center; }
-  .sheet th.lbl { text-align: left; }
-  .sheet input { border: 0; border-radius: 6px; background: #fffdf8; font-size: 20px; padding: 8px; text-align: right; }
-  .sheet input[type=date] { text-align: left; font-size: 17px; }
-  .sheet td.auto { text-align: right; font-size: 21px; font-weight: 700; padding-right: 12px; font-variant-numeric: tabular-nums; }
-  .sheet td.big2 { font-size: 24px; }
-  .lines-h { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 6px; border-bottom: 1.5px solid #3b342c; padding-bottom: 4px; }
+  .slip-ctl { display: flex; align-items: center; gap: 10px; }
+  .slip-ctl input[type=date] { width: auto; font-size: 16px; padding: 9px 12px; }
+  .closed { margin: 0; font-size: 16px; color: var(--ink); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .sec { margin-top: 18px; }
+  .sec-h { font-size: 15px; font-weight: 800; margin-bottom: 8px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sec-h.sub { font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 12px; }
+  .sec-h .muted { font-weight: 400; font-size: 13px; }
+  .tiles { display: grid; gap: 10px; }
+  .tiles.t3 { grid-template-columns: repeat(3, 1fr); }
+  .tiles.t2 { grid-template-columns: repeat(2, 1fr); }
+  .tile { margin: 0; background: var(--soft); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 12px 6px; display: block; cursor: text; transition: border-color .15s; }
+  .tile:focus-within { border-color: var(--brand); background: var(--card); }
+  .tile span { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .tile input { border: 0; background: transparent; padding: 2px 0 4px; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: none !important; }
+  .tile input::placeholder, .cp input::placeholder { color: var(--zero); }
+  .totalbar { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 14px;
+    background: color-mix(in srgb, var(--amber) 18%, var(--card)); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); }
+  .totalbar span { font-weight: 700; }
+  .totalbar b { font-size: 28px; font-variant-numeric: tabular-nums; }
   .line { display: grid; grid-template-columns: 1.5fr 1fr 1.7fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
-  .line input, .line select { font-size: 17px; padding: 10px; }
-  .line input.amt { text-align: right; }
-  .paybtn { padding: 10px 10px; font-size: 15px; white-space: nowrap; background: #e7f3ec; color: var(--ok); }
-  .paybtn.credit { background: #fdecea; color: var(--bad); }
-  .line.credit input { color: var(--bad); }
+  .line input, .line select { font-size: 16px; padding: 10px 12px; }
+  .line input.amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .addline { width: 100%; border: 1.5px dashed var(--line); background: transparent; color: var(--muted); }
+  .cashpanel { margin-top: 20px; background: var(--head); color: #fff; border-radius: 18px; padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .cp { margin: 0; padding: 12px 14px; border-radius: 13px; display: block; }
+  .cp span { display: block; font-size: 13px; color: rgba(255,255,255,.65); font-weight: 600; }
+  .cp b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .cp.in { background: rgba(255,255,255,.1); cursor: text; }
+  .cp.in:focus-within { background: rgba(255,255,255,.16); outline: 2px solid var(--amber); }
+  .cp input { border: 0; background: transparent; color: #fff; padding: 2px 0 0; font-size: 24px; font-weight: 700; box-shadow: none !important; }
+  .cp b.big2 { font-size: 28px; }
+  .cp b.ok { color: #7ee2a8; } .cp b.warn { color: var(--amber); } .cp b.bad { color: #ff8a75; }
+  .formula { font-size: 12px; margin: 8px 4px 0; }
+  @media (max-width: 700px) { .cashpanel { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 560px) {
-    .sheet input { font-size: 17px; padding: 6px; }
-    .sheet th { font-size: 14px; }
+    .tiles.t3 { grid-template-columns: 1fr 1fr; }
+    .tiles.t3 .tile:first-child { grid-column: 1 / -1; }
+    .tile input { font-size: 23px; }
     .line { grid-template-columns: 1fr 1fr auto; }
     .line select { grid-column: 1 / 3; grid-row: 2; }
   }
-  .neg-in { color: var(--bad); border-color: #f2b8b0 !important; }
+
+  /* ===== 其他元件 ===== */
+  .neg-in { color: var(--bad); border-color: var(--bad-line) !important; }
   .calc { background: var(--soft); border-radius: 12px; padding: 12px 14px; margin-top: 14px; font-size: 17px; line-height: 1.8; }
   .calc b { font-size: 20px; }
-  .pos { color: var(--ok); } .neg { color: var(--bad); } .zero { color: #b3aa9d; }
+  .pos { color: var(--ok); } .neg { color: var(--bad); } .zero { color: var(--zero); }
   .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
   table { width: 100%; border-collapse: collapse; font-size: 16px; }
-  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
-  .muted { color: var(--muted); font-size: 15px; }
+  .muted { color: var(--muted); font-size: 14px; }
   .hide { display: none !important; }
-  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #ffd28a; color: #5a3a00; margin-left: 6px; vertical-align: middle; }
-  #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: #fff;
-    padding: 12px 20px; border-radius: 999px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; z-index: 30; }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--tag-bg); color: var(--tag-ink); margin-left: 6px; vertical-align: middle; font-weight: 600; }
+  #toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--card);
+    padding: 12px 20px; border-radius: 999px; font-size: 16px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; z-index: 30; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
   #toast.show { opacity: 1; }
-  #busy { position: fixed; inset: 0; background: rgba(250,247,241,.7); display: none; align-items: center; justify-content: center; font-size: 20px; z-index: 20; }
+  #busy { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 70%, transparent); display: none; align-items: center; justify-content: center; font-size: 20px; z-index: 20; }
   .item-row { display: grid; grid-template-columns: 2fr 1.4fr 1.2fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
   @media (max-width: 560px) { .item-row { grid-template-columns: 1fr 1fr; } .item-row select { grid-column: 1; } }
-  .item-row input, .item-row select { font-size: 17px; padding: 10px; }
+  .item-row input, .item-row select { font-size: 16px; padding: 10px; }
   .hours { display: flex; gap: 6px; align-items: center; font-size: 15px; }
   .hours input { padding: 10px; }
-  .emp-list button { display: flex; justify-content: space-between; width: 100%; background: var(--soft); color: var(--ink); margin-bottom: 8px; text-align: left; }
-  .emp-list button.on { outline: 3px solid var(--brand); }
-  .big { font-size: 26px; font-weight: 700; }
+  .emp-list button { display: flex; justify-content: space-between; width: 100%; background: var(--soft); color: var(--ink); margin-bottom: 8px; text-align: left; border: 1.5px solid transparent; }
+  .emp-list button.on { border-color: var(--brand); }
+  .big { font-size: 26px; font-weight: 800; }
   .grp { margin-bottom: 10px; }
-  .grp-h { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--line); }
-  .banner { background: #fff4df; border: 1px solid #f0d49c; color: #5a3a00; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 16px; }
-  .banner.err { background: #fdecea; border-color: #f2b8b0; color: #7a1b10; }
+  .grp-h { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
+  .banner { background: var(--banner); border: 1px solid var(--banner-line); color: var(--banner-ink); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 15px; }
+  .banner.err { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad-ink); }
+  .banner a { color: inherit; font-weight: 700; }
+
+  /* ===== 登入／設定 ===== */
+  .hero { text-align: center; padding: 26px 10px 10px; }
+  .hero img { max-width: min(360px, 80%); height: auto; }
+  .hero p { color: var(--muted); margin: 10px 0 0; font-size: 15px; letter-spacing: .2em; }
+  .logo-dark { display: none; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo-light { display: none; } :root:not([data-theme="light"]) .logo-dark { display: inline; } }
+  :root[data-theme="dark"] .logo-light { display: none; } :root[data-theme="dark"] .logo-dark { display: inline; }
+
+  /* ===== 右下角：亮／暗切換 ===== */
+  #themeBtn { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 7; width: 48px; height: 48px; padding: 0;
+    border-radius: 50%; background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15);
+    display: flex; align-items: center; justify-content: center; }
+  #themeBtn svg { width: 22px; height: 22px; }
+  #themeBtn small { position: absolute; bottom: -18px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  @media (max-width: 899px) { body.has-bar #themeBtn { bottom: calc(86px + env(safe-area-inset-bottom)); } }
 </style>
 </head>
 <body>
 
 <header>
-  <h1 id="title">風味記帳</h1>
+  <img class="logo" src="logo-white.png" alt="風味食堂">
+  <h1 id="title">記帳</h1>
   <button id="sync" class="hide" onclick="onSyncClick()">—</button>
   <button id="menuBtn" class="hide" onclick="openSettings()">⋯</button>
 </header>
 
 <!-- 第一次設定 -->
 <main id="v-setup" class="hide">
+  <div class="hero"><img class="logo-light" src="logo-ink.png" alt="風味食堂"><img class="logo-dark" src="logo-white.png" alt="風味食堂"><p>每日結帳・進貨・分紅</p></div>
   <div class="card">
     <h2>第一次設定這台裝置</h2>
     <label>同步網址（Google Apps Script 部署後的網址，請管理者提供）</label>
@@ -142,6 +258,7 @@
 
 <!-- 登入 -->
 <main id="v-login" class="hide">
+  <div class="hero"><img class="logo-light" src="logo-ink.png" alt="風味食堂"><img class="logo-dark" src="logo-white.png" alt="風味食堂"><p>每日結帳・進貨・分紅</p></div>
   <div class="card">
     <h2>選擇店別</h2>
     <div class="chips" id="storeChips"><span class="muted">載入中…</span></div>
@@ -162,50 +279,44 @@
     <div class="card slip">
       <div class="slip-top">
         <h2>每日結帳</h2>
-        <label class="closed"><input id="d-closed" type="checkbox" onchange="dailyCalc()"> 今天公休</label>
+        <div class="slip-ctl">
+          <input id="d-date" type="date" onchange="loadDaily()">
+          <label class="closed"><input id="d-closed" type="checkbox" onchange="dailyCalc()"> 公休</label>
+        </div>
       </div>
       <p id="d-exist" class="muted hide"></p>
-      <table class="sheet">
-        <tr>
-          <th class="lbl">日期</th>
-          <th>現場</th><th>Panda</th><th>Uber</th>
-        </tr>
-        <tr>
-          <td><input id="d-date" type="date" onchange="loadDaily()"></td>
-          <td><input id="d-site" inputmode="decimal" oninput="dailyCalc()"></td>
-          <td><input id="d-panda" inputmode="decimal" oninput="dailyCalc()"></td>
-          <td><input id="d-uber" inputmode="decimal" oninput="dailyCalc()"></td>
-        </tr>
-        <tr class="d-body">
-          <th class="lbl">全支付</th><td><input id="d-allpay" inputmode="decimal" oninput="dailyCalc()"></td>
-          <th class="lbl">LINE Pay</th><td><input id="d-line" inputmode="decimal" oninput="dailyCalc()"></td>
-        </tr>
-        <tr class="d-body">
-          <th class="lbl" colspan="2" style="text-align:right">總營收（自動）</th>
-          <td colspan="2" class="auto" id="d-total">0</td>
-        </tr>
-      </table>
 
-      <div class="d-body">
-        <div class="lines-h"><b>支出明細</b><span class="muted">當天付錢的貨和任何支出，每筆都會從現金扣</span></div>
-        <datalist id="d-names"></datalist>
-        <div id="d-lines"></div>
-        <button class="ghost" onclick="addLine()">＋ 新增一行</button>
+      <div class="sec d-body">
+        <div class="sec-h">營業額</div>
+        <div class="tiles t3">
+          <label class="tile"><span>現場</span><input id="d-site" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+          <label class="tile"><span>Panda</span><input id="d-panda" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+          <label class="tile"><span>Uber</span><input id="d-uber" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+        </div>
+        <div class="sec-h sub">現場收款中的非現金</div>
+        <div class="tiles t2">
+          <label class="tile"><span>全支付</span><input id="d-allpay" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+          <label class="tile"><span>LINE Pay</span><input id="d-line" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+        </div>
+        <div class="totalbar"><span>總營收</span><b id="d-total">0</b></div>
       </div>
 
-      <table class="sheet d-body" style="margin-top:14px">
-        <tr>
-          <th class="lbl">總支出</th><td class="auto" id="d-spendv">0</td>
-          <th class="lbl">現金盈餘</th><td class="auto" id="d-expected">0</td>
-        </tr>
-        <tr>
-          <th class="lbl">現場現金</th><td><input id="d-cash" inputmode="decimal" oninput="dailyCalc()" placeholder="數到的現金"></td>
-          <th class="lbl">現金差額</th><td class="auto big2" id="d-diff">—</td>
-        </tr>
-      </table>
-      <p class="muted d-body">現金盈餘＝現場 − 全支付 − LINE Pay − 總支出；現金差額＝現場現金 − 現金盈餘</p>
+      <div class="sec d-body">
+        <div class="sec-h">支出明細 <span class="muted">當天付錢的貨和任何支出，每筆都從現金扣</span></div>
+        <datalist id="d-names"></datalist>
+        <div id="d-lines"></div>
+        <button class="ghost addline" onclick="addLine()">＋ 新增一行</button>
+      </div>
 
-      <label>備註</label><input id="d-note">
+      <div class="cashpanel d-body">
+        <div class="cp"><span>總支出</span><b id="d-spendv">0</b></div>
+        <div class="cp"><span>現金盈餘</span><b id="d-expected">0</b></div>
+        <label class="cp in"><span>現場現金（數到的）</span><input id="d-cash" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+        <div class="cp"><span>現金差額</span><b id="d-diff" class="big2">—</b></div>
+      </div>
+      <p class="muted d-body formula">現金盈餘 = 現場 − 全支付 − LINE Pay − 總支出　｜　現金差額 = 現場現金 − 現金盈餘</p>
+
+      <label>備註</label><input id="d-note" placeholder="例：冷氣維修、提早打烊">
       <button class="primary" onclick="saveDaily()">儲存今日結帳</button>
     </div>
   </section>
@@ -324,6 +435,9 @@
   </section>
 </main>
 
+<nav id="bottombar" class="hide"></nav>
+<div id="moresheet" class="hide" onclick="if(event.target===this)closeMore()"><div class="panel"><div class="grab"></div><div class="grid" id="moregrid"></div></div></div>
+<button id="themeBtn" onclick="cycleTheme()" aria-label="切換亮色／暗色"></button>
 <p id="ver" class="muted" style="text-align:center;margin:8px 0 24px;font-size:13px"></p>
 <div id="toast"></div>
 <div id="busy">處理中…</div>
