@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.6';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.7';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -23,21 +23,22 @@ var ICONS = {
   more: svg('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   moon: svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
-  auto: svg('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>')
 };
 
 /* ---------- 亮／暗切換（右下角） ---------- */
-var THEMES = [['auto', '自動'], ['light', '亮色'], ['dark', '暗色']];
+var THEMES = [['light', '亮色'], ['dark', '暗色']];
+// 沒選過：照裝置目前的亮／暗決定一次，之後只在亮色、暗色之間切換
+function curTheme() { var m = LS.get('fw_theme', ''); if (m === 'light' || m === 'dark') return m; return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
 function applyTheme() {
-  var m = LS.get('fw_theme', 'auto');
-  if (m === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', m);
+  var m = curTheme();
+  document.documentElement.setAttribute('data-theme', m);
   var t = THEMES.filter(function (x) { return x[0] === m; })[0] || THEMES[0];
-  $('themeBtn').innerHTML = ICONS[m === 'light' ? 'sun' : m === 'dark' ? 'moon' : 'auto']; $('themeBtn').title = '顯示模式：' + t[1];
+  $('themeBtn').innerHTML = ICONS[m === 'light' ? 'sun' : 'moon']; $('themeBtn').title = '顯示模式：' + t[1];
 }
 function cycleTheme() {
-  var m = LS.get('fw_theme', 'auto'), i = THEMES.map(function (x) { return x[0]; }).indexOf(m);
+  var m = curTheme(), i = THEMES.map(function (x) { return x[0]; }).indexOf(m);
   var next = THEMES[(i + 1) % THEMES.length];
-  LS.set('fw_theme', next[0]); applyTheme(); toast('顯示模式：' + next[1] + (next[0] === 'auto' ? '（跟著裝置設定）' : ''));
+  LS.set('fw_theme', next[0]); applyTheme(); toast('顯示模式：' + next[1]);
 }
 
 /* ---------- 本機儲存 ---------- */
