@@ -12,7 +12,7 @@
 const TZ = 'Asia/Taipei';
 
 const S = {
-  STORE: '設定_店家', PARTNER: '設定_股東', CAT: '設定_進貨分類', EMP: '設定_員工', PRESET: '設定_常用項目',
+  STORE: '設定_店家', PARTNER: '設定_股東', CAT: '設定_進貨分類', EMP: '設定_員工', PRESET: '設定_常用項目', ACCOUNT: '設定_帳號',
   DAILY: '每日營收', PURCHASE: '進貨', EXPENSE: '其他支出', PAYROLL: '人事明細',
   DELIVERY: '外送對帳', DEDUCT: '分配前扣除',
   R_MONTH: '報表_月結', R_SHARE: '報表_分紅', R_CAT: '報表_進貨分類', R_WARN: '警示'
@@ -23,6 +23,7 @@ HEAD[S.STORE] = ['店別', '店長PIN', '管理PIN', '手續費率(%)', '現金�
 HEAD[S.PARTNER] = ['店別', '股東', '比例(%)'];
 HEAD[S.CAT] = ['店別(全部/店名)', '分類', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 HEAD[S.EMP] = ['店別', '姓名', '類型(正職/計時)', '月薪', '時薪', '員工自付健保', '員工自付勞保', '公司勞退', '公司健保', '公司勞保', '在職(是/否)'];
+HEAD[S.ACCOUNT] = ['帳號', '角色(管理/店長)', '店別(全部 或 店名,店名)', '啟用(是/否)', '臨時PIN', 'PIN(加密，勿改)', '最後登入'];
 HEAD[S.PRESET] = ['店別', '用途', '名稱', '分類', '加扣'];   // 用途：每日結帳／固定支出／人事
 HEAD[S.DAILY] = ['輸入時間', '日期', '店別', '公休', '現場', 'Panda', 'Uber', '全支付', 'LINE Pay', '現場支出', '點收現金', '應有現金', '現金差額', '備註', '裝置', '支出明細'];
 HEAD[S.PURCHASE] = ['編號', '輸入時間', '日期', '店別', '分類', '金額', '備註', '裝置'];
@@ -37,7 +38,7 @@ HEAD[S.R_SHARE] = ['店別', '月份', '狀態', '股東', '比例(%)', '分紅�
 HEAD[S.R_CAT] = ['店別', '月份', '分類', '金額', '佔實際營收'];
 HEAD[S.R_WARN] = ['店別', '月份', '類型', '說明'];
 
-const TEXT_COLS = ['日期', '月份', '店長PIN', '管理PIN', '編號', '輸入時間', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
+const TEXT_COLS = ['日期', '月份', '店長PIN', '管理PIN', '編號', '輸入時間', '帳號', '臨時PIN', 'PIN(加密，勿改)', '最後登入', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 const PAYROLL_KINDS = ['薪資', '公司負擔', '預支'];
 const EXPENSE_TYPES = ['固定', '其他'];
 const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除'];
@@ -93,6 +94,7 @@ function setup() {
     ['大埔店', '範例計時(請改名)', '計時', '', 250, '', '', '', '', '', '是']
   ]);
 
+  seed_(S.ACCOUNT, [['管理員', '管理', '全部', '是', 'Funway#2026', '', '']]);
   seed_(S.PRESET, DEFAULT_PRESETS.map(function (p) { return ['全部'].concat(p); }));
   secret_();   // 建立登入用的密鑰
   MailApp.getRemainingDailyQuota();   // 先要求寄信權限，之後鎖定通知才寄得出去
@@ -103,7 +105,7 @@ function setup() {
   if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(def);
 
   buildReports();
-  SpreadsheetApp.getUi().alert('初始化完成！\n\n1. 到「設定_店家」改 PIN 碼（建議 6 位數以上，店長和管理要不同）\n2. 到「設定_員工」填入真實員工\n3. 部署成網頁應用程式，把網址貼到 App');
+  SpreadsheetApp.getUi().alert('初始化完成！\n\n1. 到「設定_帳號」把「管理員」改成你的名字；第一次登入用臨時 PIN「Funway#2026」，登入後會要求設定自己的 PIN\n2. 到「設定_員工」填入真實員工\n3. 部署成網頁應用程式，把網址貼到 App');
 }
 
 function seed_(name, rows) {
@@ -188,8 +190,8 @@ function doPost(e) {
     const req = JSON.parse(e.postData.contents || '{}');
     switch (req.action) {
       case 'ping': return json_({ ok: true, app: '風味記帳同步服務', time: now_() });
-      case 'stores': return json_({ ok: true, stores: stores_().map(function (s) { return s.name; }) });
       case 'login': return json_(login_(req));
+      case 'changePin': return json_(changePin_(req));
       case 'sync': return json_(sync_(req));
       default: return json_({ ok: false, error: '未知的動作' });
     }
@@ -202,50 +204,118 @@ function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// 猜錯 5 次就鎖 15 分鐘，防止有人拿到網址後一直猜 PIN
+// 猜錯 5 次就鎖 15 分鐘（每個帳號分開算），並寄信通知
 const MAX_FAIL = 5, LOCK_SECONDS = 15 * 60;
 
+/* ---------- 帳號：在試算表「設定_帳號」管理 ---------- */
+
+function accounts_() {
+  return rows_(S.ACCOUNT).filter(function (r) { return str_(r['帳號']); }).map(function (r) {
+    return { name: str_(r['帳號']), role: str_(r['角色(管理/店長)']) === '管理' ? 'admin' : 'manager',
+      stores: str_(r['店別(全部 或 店名,店名)']) || '全部', active: str_(r['啟用(是/否)']) !== '否',
+      temp: str_(r['臨時PIN']), hash: str_(r['PIN(加密，勿改)']), _row: r._row };
+  });
+}
+function account_(name) {
+  return accounts_().filter(function (a) { return a.name === str_(name); })[0] || null;
+}
+// 這個帳號可以用哪些店（管理＝全部；店長＝設定裡列的店）
+function storesOf_(acc) {
+  const all = stores_().map(function (s) { return s.name; });
+  if (acc.role === 'admin' || acc.stores === '全部') return all;
+  const mine = acc.stores.split(/[,，、\s]+/).map(str_).filter(Boolean);
+  return all.filter(function (n) { return mine.indexOf(n) >= 0; });
+}
+function setAccountCells_(acc, obj) {
+  const sh = sheet_(S.ACCOUNT), h = HEAD[S.ACCOUNT];
+  Object.keys(obj).forEach(function (k) {
+    const c = sh.getRange(acc._row, h.indexOf(k) + 1); c.setNumberFormat('@'); c.setValue(obj[k]);
+  });
+}
+
+// PIN 規則：至少 8 個字元，要有英文字母＋數字＋符號
+function pinRule_(pin) {
+  pin = String(pin || '');
+  if (pin.length < 8) return 'PIN 至少要 8 個字元';
+  if (!/[A-Za-z]/.test(pin)) return 'PIN 要包含英文字母';
+  if (!/[0-9]/.test(pin)) return 'PIN 要包含數字';
+  if (!/[^A-Za-z0-9]/.test(pin)) return 'PIN 要包含符號（例如 # ! @ $）';
+  return '';
+}
+function hashPin_(pin, salt) {
+  salt = salt || Utilities.getUuid().slice(0, 12);
+  let d = salt + '|' + pin;
+  for (let i = 0; i < 500; i++) {
+    d = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, d + '|' + secret_()));
+  }
+  return salt + '$' + d;
+}
+function checkPin_(acc, pin) {
+  if (!acc.hash || acc.hash.indexOf('$') < 0) return false;
+  return hashPin_(pin, acc.hash.split('$')[0]) === acc.hash;
+}
+
+function fail_(acc, name, device) {
+  const cache = CacheService.getScriptCache(), key = 'fail_' + name;
+  const fails = Number(cache.get(key) || 0) + 1;
+  cache.put(key, String(fails), LOCK_SECONDS);
+  if (fails === MAX_FAIL) alertLock_(name, device, !!acc);
+  return '帳號或 PIN 錯誤' + (fails < MAX_FAIL ? '（再錯 ' + (MAX_FAIL - fails) + ' 次會鎖定 15 分鐘）' : '');
+}
+
 function login_(req) {
-  const store = str_(req.store), pin = str_(req.pin);
-  const s = storeByName_(store);
-  const cache = CacheService.getScriptCache();
-  const key = 'fail_' + s.name;
-  const fails = Number(cache.get(key) || 0);
-  if (fails >= MAX_FAIL) throw new Error('PIN 錯太多次，已鎖定 15 分鐘，請稍後再試');
-  let role = '';
-  if (pin && pin === s.admin) role = 'admin';
-  else if (pin && pin === s.pin) role = 'manager';
-  else {
-    cache.put(key, String(fails + 1), LOCK_SECONDS);
-    if (fails + 1 === MAX_FAIL) alertLock_(s.name, str_(req.device));
-    throw new Error('PIN 碼錯誤（再錯 ' + (MAX_FAIL - fails - 1) + ' 次會鎖定 15 分鐘）');
+  const name = str_(req.account), pin = String(req.pin || '');
+  const cache = CacheService.getScriptCache(), key = 'fail_' + name;
+  if (Number(cache.get(key) || 0) >= MAX_FAIL) throw new Error('錯太多次，這個帳號已鎖定 15 分鐘，請稍後再試');
+  const acc = account_(name);
+  if (!acc || !acc.active) throw new Error(fail_(acc, name, req.device));
+  // 第一次登入（或管理者重設）：用臨時 PIN，並且一定要設定新的 PIN
+  if (acc.temp && pin === acc.temp) {
+    if (!req.newPin) return { ok: false, needNewPin: true, error: '第一次登入，請設定你自己的 PIN' };
+    const bad = pinRule_(req.newPin);
+    if (bad) return { ok: false, needNewPin: true, error: bad };
+    if (req.newPin === acc.temp) return { ok: false, needNewPin: true, error: '新 PIN 不能和臨時 PIN 一樣' };
+    acc.hash = hashPin_(req.newPin);
+    setAccountCells_(acc, { '臨時PIN': '', 'PIN(加密，勿改)': acc.hash });
+  } else if (!checkPin_(acc, pin)) {
+    throw new Error(fail_(acc, name, req.device));
   }
   cache.remove(key);
-  return Object.assign({ ok: true, role: role, token: token_(s, role) }, pull_(s, role));
+  const list = storesOf_(acc);
+  if (!list.length) throw new Error('這個帳號還沒有可以用的店，請管理者到「設定_帳號」設定店別');
+  const store = list.indexOf(str_(req.store)) >= 0 ? str_(req.store) : list[0];
+  setAccountCells_(acc, { '最後登入': now_() + (req.device ? '（' + str_(req.device) + '）' : '') });
+  return Object.assign({ ok: true, account: acc.name, role: acc.role, stores: list, store: store, token: token_(acc) },
+    pull_(storeByName_(store), acc.role));
+}
+
+function changePin_(req) {
+  const acc = verify_(str_(req.account), str_(req.token));
+  if (!checkPin_(acc, String(req.oldPin || ''))) throw new Error('舊 PIN 不對');
+  const bad = pinRule_(req.newPin);
+  if (bad) throw new Error(bad);
+  acc.hash = hashPin_(req.newPin);
+  setAccountCells_(acc, { 'PIN(加密，勿改)': acc.hash, '臨時PIN': '' });
+  return { ok: true, token: token_(acc) };
 }
 
 // 被鎖定時寄 Gmail 給試算表擁有者（同一次鎖定只寄一封）
-function alertLock_(store, device) {
+function alertLock_(name, device, exists) {
   try {
     const to = Session.getEffectiveUser().getEmail();
     if (!to) return;
-    const time = now_();
     MailApp.sendEmail({
       to: to,
-      subject: '⚠ 風味記帳：' + store + ' PIN 連續錯 ' + MAX_FAIL + ' 次，已鎖定 15 分鐘',
+      subject: '⚠ 風味記帳：帳號「' + name + '」PIN 連續錯 ' + MAX_FAIL + ' 次，已鎖定 15 分鐘',
       body: [
-        '風味記帳偵測到有人連續輸入錯誤的 PIN。',
+        '風味記帳偵測到有人連續輸入錯誤的帳號或 PIN。',
         '',
-        '店別：' + store,
-        '時間：' + time,
-        '裝置名字：' + (device || '（沒有提供，可能不是用 App 登入）'),
+        '帳號：' + name + (exists ? '' : '（這個帳號不存在，可能是有人在亂試）'),
+        '時間：' + now_(),
+        '裝置：' + (device || '（沒有提供，可能不是用 App 登入）'),
         '',
-        '這家店已鎖定 15 分鐘，期間連正確的 PIN 也無法登入。',
-        '',
-        '如果是員工自己打錯：不用處理，15 分鐘後就能再試。',
-        '如果不是你們的人：可能有人拿到了同步網址，建議：',
-        '  1. 到試算表「設定_店家」把 PIN 改成新的 6 位數以上（已登入的裝置要重新登入）',
-        '  2. 必要時到 Apps Script 重新部署一個新網址，並更新每台裝置的同步網址',
+        '如果是員工自己打錯：不用處理，15 分鐘後就能再試；忘記 PIN 的話，到「設定_帳號」幫他填一個臨時PIN。',
+        '如果不是你們的人：可能有人拿到了同步網址，必要時到 Apps Script 重新部署新網址，並更新每台裝置。',
         '',
         '（這封信由風味記帳系統自動寄出）'
       ].join('\n')
@@ -256,8 +326,10 @@ function alertLock_(store, device) {
 }
 
 function sync_(req) {
-  const s = storeByName_(str_(req.store));
-  const role = verify_(s, str_(req.token));
+  const acc = verify_(str_(req.account), str_(req.token));
+  const list = storesOf_(acc);
+  if (list.indexOf(str_(req.store)) < 0) { const e = new Error('這個帳號沒有「' + str_(req.store) + '」的權限'); e.auth = true; throw e; }
+  const s = storeByName_(str_(req.store)), role = acc.role;
   const ops = Array.isArray(req.ops) ? req.ops : [];
   const results = [];
   let changed = 0;
@@ -266,7 +338,7 @@ function sync_(req) {
       ops.forEach(function (op) {
         try {
           const fromSlip = /^expense\.(add|del)$/.test(op.type) && /^E\d{8}/.test(str_((op.data || {}).id));   // 每日結帳自動產生的其他支出
-          if (role !== 'admin' && MANAGER_OPS.indexOf(op.type) < 0 && !fromSlip) throw new Error('店長 PIN 沒有權限：' + op.type);
+          if (role !== 'admin' && MANAGER_OPS.indexOf(op.type) < 0 && !fromSlip) throw new Error('店長沒有權限：' + op.type);
           const st = applyServerOp_(s.name, op);
           if (st === 'ok') changed++;
           results.push({ id: op.id, status: st });
@@ -277,10 +349,10 @@ function sync_(req) {
     });
     if (changed) buildReports();
   }
-  return Object.assign({ ok: true, role: role, results: results }, pull_(s, role));
+  return Object.assign({ ok: true, account: acc.name, role: role, stores: list, results: results }, pull_(s, role));
 }
 
-/* ---------- 登入權杖：PIN 改了，舊權杖就自動失效 ---------- */
+/* ---------- 登入權杖：改 PIN、停用帳號，舊權杖就自動失效 ---------- */
 
 function secret_() {
   const p = PropertiesService.getScriptProperties();
@@ -289,16 +361,15 @@ function secret_() {
   return k;
 }
 
-function token_(s, role) {
-  const pin = role === 'admin' ? s.admin : s.pin;
-  const sig = Utilities.computeHmacSha256Signature(s.name + '|' + role + '|' + pin, secret_());
-  return role + '.' + Utilities.base64EncodeWebSafe(sig).replace(/=+$/, '');
+function token_(acc) {
+  const sig = Utilities.computeHmacSha256Signature(acc.name + '|' + acc.hash, secret_());
+  return Utilities.base64EncodeWebSafe(sig).replace(/=+$/, '');
 }
 
-function verify_(s, token) {
-  const role = token.split('.')[0];
-  if ((role === 'admin' || role === 'manager') && token === token_(s, role)) return role;
-  const e = new Error('登入已失效（PIN 可能改過），請重新登入');
+function verify_(name, token) {
+  const acc = account_(name);
+  if (acc && acc.active && acc.hash && token && token === token_(acc)) return acc;
+  const e = new Error('登入已失效（PIN 改過或帳號停用），請重新登入');
   e.auth = true;
   throw e;
 }

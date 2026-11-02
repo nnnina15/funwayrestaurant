@@ -16,13 +16,30 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
     await ctx.route(URL_, async (route) => { const body = JSON.parse(route.request().postData()); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(g.post(body)) }); });
     const pg = await ctx.newPage(); pg.on('pageerror', e => console.log(name, 'PAGEERROR', e.message)); pg.on('dialog', d => d.accept());
     await pg.goto('http://localhost:8765/');
-    await pg.fill('#cfg-url', URL_); await pg.fill('#cfg-device', name); await pg.click('text=測試連線並儲存');
-    await pg.waitForSelector('#storeChips button'); await pg.click('#storeChips button:has-text("大埔店")');
+    await pg.fill('#cfg-url', URL_); await pg.click('text=測試連線並儲存');
+    await pg.waitForSelector('#login-acc');
     return { ctx, pg };
+  }
+  // 帳號：在試算表「設定_帳號」新增（管理者做的事）
+  g.sheets['設定_帳號'].cells.push(['大埔平板', '店長', '大埔店', '是', 'Tablet#001', '', '']);
+  g.sheets['設定_帳號'].cells[1][0] = 'Nina手機';
+  // 第一次登入：臨時 PIN → 一定要設新 PIN（規則不符會被擋）
+  async function firstLogin(D, acc, temp, newPin) {
+    await D.pg.fill('#login-acc', acc); await D.pg.fill('#login-pin', temp); await D.pg.click('#v-login .primary');
+    await D.pg.waitForSelector('#newpin-box:not(.hide)');
+    await D.pg.fill('#login-new', 'weak'); await D.pg.fill('#login-new2', 'weak'); await D.pg.dispatchEvent('#login-new', 'input');
+    assert.ok(!(await D.pg.textContent('#login-new-hint')).includes('✓ 符號'));
+    await D.pg.click('#v-login .primary'); assert.ok(await D.pg.isVisible('#v-login'), '弱 PIN 不能登入');
+    await D.pg.fill('#login-new', newPin); await D.pg.fill('#login-new2', newPin); await D.pg.click('#v-login .primary');
+    await D.pg.waitForSelector('#tab-daily:not(.hide)');
   }
   // 平板（店長）
   const A = await device('大埔平板');
-  await A.pg.fill('#pin', '1234'); await A.pg.click('#v-login .primary'); await A.pg.waitForSelector('#tab-daily:not(.hide)');
+  // 帳號打錯進不了
+  await A.pg.fill('#login-acc', '大埔平版'); await A.pg.fill('#login-pin', 'Tablet#001'); await A.pg.click('#v-login .primary');
+  await A.pg.waitForTimeout(300); assert.ok(await A.pg.isVisible('#v-login') && (await A.pg.isHidden('#newpin-box')), '帳號打錯不能進');
+  await firstLogin(A, '大埔平板', 'Tablet#001', 'Shop#2026a');
+  assert.strictEqual(await A.pg.$('#storeSel'), null, '只有一家店的店長沒有切換選單');
   await A.pg.waitForFunction(() => navigator.serviceWorker.controller !== null, null, { timeout: 5000 }).catch(() => A.pg.reload());
   await A.pg.waitForTimeout(500);
   // 斷網
@@ -82,7 +99,8 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
 
   // 手機（管理）：看得到平板的資料、填人事、看月結
   const B = await device('Nina手機');
-  await B.pg.fill('#pin', '9999'); await B.pg.click('#v-login .primary'); await B.pg.waitForSelector('#tab-daily:not(.hide)');
+  await firstLogin(B, 'Nina手機', 'Funway#2026', 'Nina#2026x');
+  assert.deepStrictEqual(await B.pg.$$eval('#storeSel option', o => o.map(x => x.textContent)), ['大埔店', '中正店'], '管理可以切兩家店');
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
   assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 3, '手機要看到平板的進貨（手動 2 + 結帳單 1）');
   await B.pg.click('#tb-payroll'); await B.pg.click('text=範例正職(請改名)');
@@ -179,6 +197,18 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await A.pg.click('#tb-daily');
   assert.strictEqual((await A.pg.textContent('#d-presets')).replace(/[0-9,]/g, ''), '＋豬肉＋米', '平板的按鈕要照新清單');
   assert.ok(!(await A.pg.isVisible('#set-presets-card')), '店長看不到常用項目設定');
+
+  // 管理切換到中正店：資料分開，再切回大埔店資料還在
+  await B.pg.selectOption('#storeSel', '中正店'); await B.pg.waitForFunction(() => ST.sess.store === '中正店' && ST.snap);
+  await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
+  assert.ok((await B.pg.textContent('#p-list')).includes('還沒有進貨紀錄'), '中正店看不到大埔店的進貨');
+  await B.pg.selectOption('#storeSel', '大埔店'); await B.pg.waitForFunction(() => ST.sess.store === '大埔店');
+  await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
+  assert.ok(!(await B.pg.textContent('#p-list')).includes('還沒有進貨紀錄'), '切回大埔店資料還在');
+  // 更改 PIN（規則要符合）
+  await B.pg.click('#tb-settings'); await B.pg.fill('#cp-old', 'Nina#2026x'); await B.pg.fill('#cp-new', 'Nina#2027y'); await B.pg.fill('#cp-new2', 'Nina#2027y');
+  await B.pg.click('#set-pin-card .primary'); await B.pg.waitForFunction(() => /PIN 已更改/.test(document.getElementById('toast').textContent));
+  console.log('帳號登入、切店、改 PIN ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
   await B.pg.setViewportSize({ width: 390, height: 844 });

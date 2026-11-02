@@ -14,6 +14,7 @@ function makeSheet(name) {
   sh.deleteRow = (r) => { sh.cells.splice(r - 1, 1); };
   sh.getRange = (r, c, nr = 1, nc = 1) => {
     const rg = {
+      setValue(v) { sh.cells[r - 1] = sh.cells[r - 1] || []; sh.cells[r - 1][c - 1] = v; return rg; },
       setValues(vals) { vals.forEach((row, i) => { const rr = r - 1 + i; sh.cells[rr] = sh.cells[rr] || []; row.forEach((v, j) => { sh.cells[rr][c - 1 + j] = v; }); }); return rg; },
       getValues() { const out = []; for (let i = 0; i < nr; i++) { const row = []; for (let j = 0; j < nc; j++) { const v = (sh.cells[r - 1 + i] || [])[c - 1 + j]; row.push(v === undefined ? '' : v); } out.push(row); } return out; },
       clearContent() { for (let i = 0; i < nr; i++) { const row = sh.cells[r - 1 + i]; if (row) for (let j = 0; j < nc; j++) row[c - 1 + j] = ''; } return rg; },
@@ -55,6 +56,8 @@ function createGas() {
     Utilities: {
       formatDate: fmt,
       getUuid: () => crypto.randomUUID(),
+      DigestAlgorithm: { SHA_256: 'sha256' },
+      computeDigest: (alg, v) => Array.from(crypto.createHash('sha256').update(v).digest()),
       computeHmacSha256Signature: (v, k) => Array.from(crypto.createHmac('sha256', k).update(v).digest()),
       base64EncodeWebSafe: (b) => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_')
     }

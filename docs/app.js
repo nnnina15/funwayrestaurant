@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.9.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -57,7 +57,7 @@ var ST = {
   pickStore: '', selCat: '', emp: '', items: []
 };
 
-function k_(name) { return 'fw_' + name + '_' + (ST.sess ? ST.sess.store : ''); }
+function k_(name, store) { return 'fw_' + name + '_' + (ST.sess ? ST.sess.account + '@' + (store || ST.sess.store) : ''); }
 function loadLocal() {
   ST.snap = LS.get(k_('snap'), null);
   ST.outbox = LS.get(k_('outbox'), []);
@@ -105,7 +105,7 @@ function api(action, body) {
     body: JSON.stringify(Object.assign({ action: action }, body || {}))
   }).then(function (r) { return r.json(); }).then(function (res) {
     clearTimeout(timer);
-    if (!res.ok) { var e = new Error(res.error || '伺服器錯誤'); e.server = true; e.auth = !!res.auth; throw e; }
+    if (!res.ok) { var e = new Error(res.error || '伺服器錯誤'); e.server = true; e.auth = !!res.auth; e.data = res; throw e; }
     return res;
   }, function (err) {
     clearTimeout(timer);
@@ -123,10 +123,9 @@ function showView(name) {
   $('menuBtn').classList.toggle('hide', name !== 'app');
   if (name === 'setup') {
     $('cfg-url').value = ST.cfg ? ST.cfg.url : '';
-    $('cfg-device').value = ST.cfg ? ST.cfg.device : '';
     $('title').textContent = '裝置設定';
   }
-  if (name === 'login') { $('title').textContent = '登入'; loadStores(); }
+  if (name === 'login') { $('title').textContent = '登入'; if (!$('login-acc').value) $('login-acc').value = LS.get('fw_lastAcc', ''); }
 }
 
 /* ---------- 日期／月份／年份左右的 ‹ › ---------- */
@@ -180,17 +179,16 @@ function boot() {
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && ST.swReg) ST.swReg.update().catch(function () {}); });
   }
   if (!ST.cfg) return showView('setup');
-  if (!ST.sess) return showView('login');
+  if (!ST.sess || !ST.sess.account) { ST.sess = null; return showView('login'); }
   enterApp();
 }
 
 /* ---------- 第一次設定 ---------- */
 function saveSetup() {
-  var url = $('cfg-url').value.trim(), device = $('cfg-device').value.trim();
+  var url = $('cfg-url').value.trim();
   if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) return toast('同步網址格式不對，應該是 https://script.google.com/… 開頭');
-  if (!device) return toast('請幫這台裝置取個名字');
   var old = ST.cfg;
-  ST.cfg = { url: url, device: device };
+  ST.cfg = { url: url, device: old ? old.device : '' };
   busy(true);
   api('ping').then(function () {
     busy(false);
@@ -204,57 +202,102 @@ function saveSetup() {
   });
 }
 
-/* ---------- 登入 ---------- */
-function loadStores() {
-  var cached = LS.get('fw_stores', []);
-  renderStoreChips(cached);
-  if (!ST.cfg) return;
-  api('stores').then(function (r) { LS.set('fw_stores', r.stores); renderStoreChips(r.stores); }, function (e) {
-    if (!cached.length) $('storeChips').innerHTML = '<span class="bad">' + esc(e.network ? '第一次登入需要網路' : e.message) + '</span>';
-  });
+/* ---------- 登入（帳號＋PIN） ---------- */
+function pinRule(pin) {
+  pin = String(pin || '');
+  return [['8 個字元以上', pin.length >= 8], ['英文字母', /[A-Za-z]/.test(pin)], ['數字', /[0-9]/.test(pin)], ['符號', /[^A-Za-z0-9]/.test(pin)]];
 }
-function renderStoreChips(list) {
-  if (!list.length) return;
-  var last = ST.pickStore || LS.get('fw_lastStore', '');
-  if (list.indexOf(last) >= 0) ST.pickStore = last;
-  $('storeChips').innerHTML = list.map(function (s) {
-    return '<button class="' + (s === ST.pickStore ? 'on' : '') + '" onclick="pickStore(\'' + jsq(s) + '\')">' + esc(s) + '</button>';
-  }).join('');
+function pinHint(id, hintId) {
+  $(hintId).innerHTML = pinRule($(id).value).map(function (r) { return '<span class="' + (r[1] ? 'ok' : '') + '">' + (r[1] ? '✓ ' : '') + r[0] + '</span>'; }).join('');
 }
-function pickStore(s) { ST.pickStore = s; renderStoreChips(LS.get('fw_stores', [s])); }
+function pinOk(pin) { return pinRule(pin).every(function (r) { return r[1]; }); }
+function deviceKind() {
+  var u = navigator.userAgent;
+  return /iPad/.test(u) ? 'iPad' : /iPhone/.test(u) ? 'iPhone' : /Android/.test(u) ? (/Mobile/.test(u) ? 'Android 手機' : 'Android 平板') : '電腦';
+}
 function login() {
-  if (!ST.pickStore) return toast('請先選店別');
-  var pin = $('pin').value;
+  var account = $('login-acc').value.trim(), pin = $('login-pin').value;
+  if (!account || !pin) return toast('請輸入帳號和 PIN');
+  var body = { account: account, pin: pin, device: deviceKind(), store: LS.get('fw_lastStore_' + account, '') };
+  if (!$('newpin-box').classList.contains('hide')) {
+    var n1 = $('login-new').value, n2 = $('login-new2').value;
+    if (!pinOk(n1)) return toast('新 PIN 不符合規則：8 個字元以上，要有英文、數字、符號');
+    if (n1 !== n2) return toast('兩次輸入的新 PIN 不一樣');
+    body.newPin = n1;
+  }
   busy(true);
-  api('login', { store: ST.pickStore, pin: pin, device: ST.cfg.device }).then(function (r) {
+  api('login', body).then(function (r) {
     busy(false);
-    $('pin').value = '';
-    var sameStore = ST.sess && ST.sess.store === ST.pickStore;
-    ST.sess = { store: ST.pickStore, role: r.role, token: r.token };
-    LS.set('fw_sess', ST.sess);
-    LS.set('fw_lastStore', ST.pickStore);
-    if (!sameStore) loadLocal();           // 換店就讀那家店的本機資料
+    ['login-pin', 'login-new', 'login-new2'].forEach(function (id) { $(id).value = ''; });
+    $('newpin-box').classList.add('hide');
+    var same = ST.sess && ST.sess.account === r.account;
+    var keepStore = same ? ST.sess.store : null;
+    ST.sess = { account: r.account, token: r.token, role: r.role, stores: r.stores, store: r.store };
+    ST.cfg.device = r.account; LS.set('fw_cfg', ST.cfg);
+    LS.set('fw_sess', ST.sess); LS.set('fw_lastAcc', r.account); LS.set('fw_lastStore_' + r.account, r.store);
+    if (!same || keepStore !== r.store) loadLocal();
     acceptPull(r);
     ST.authLost = false;
     enterApp();
     if (ST.outbox.length) trySync();
+    toast('歡迎，' + r.account + (body.newPin ? '（新 PIN 已設定）' : ''));
   }, function (e) {
     busy(false);
+    if (e.data && e.data.needNewPin) {
+      $('newpin-box').classList.remove('hide'); pinHint('login-new', 'login-new-hint');
+      if ($('login-new').value) toast('⚠ ' + e.message); else { toast(e.message); $('login-new').focus(); }
+      return;
+    }
     toast(e.network ? '第一次登入（或重新登入）需要網路' : '⚠ ' + e.message);
   });
 }
+function changePin() {
+  var o = $('cp-old').value, n1 = $('cp-new').value, n2 = $('cp-new2').value;
+  if (!o) return toast('請輸入目前的 PIN');
+  if (!pinOk(n1)) return toast('新 PIN 不符合規則：8 個字元以上，要有英文、數字、符號');
+  if (n1 !== n2) return toast('兩次輸入的新 PIN 不一樣');
+  busy(true);
+  api('changePin', { account: ST.sess.account, token: ST.sess.token, oldPin: o, newPin: n1 }).then(function (r) {
+    busy(false);
+    ST.sess.token = r.token; LS.set('fw_sess', ST.sess);
+    ['cp-old', 'cp-new', 'cp-new2'].forEach(function (id) { $(id).value = ''; }); pinHint('cp-new', 'cp-hint');
+    toast('PIN 已更改 ✓');
+  }, function (e) { busy(false); toast(e.network ? '更改 PIN 需要網路' : '⚠ ' + e.message); });
+}
+// 切換店別：管理可以切任何店；店長只能切有權限的店
+function switchStore(name) {
+  if (!ST.sess || name === ST.sess.store) return;
+  if ((ST.sess.stores || []).indexOf(name) < 0) return toast('沒有這家店的權限');
+  var prev = ST.sess.store;
+  saveOutbox();
+  ST.sess.store = name; LS.set('fw_sess', ST.sess); LS.set('fw_lastStore_' + ST.sess.account, name);
+  loadLocal();
+  if (ST.snap) { enterApp(); trySync(); return; }
+  if (navigator.onLine === false) { ST.sess.store = prev; LS.set('fw_sess', ST.sess); loadLocal(); enterApp(); return toast('「' + name + '」還沒下載過，請先連上網路'); }
+  busy(true);
+  api('sync', { account: ST.sess.account, token: ST.sess.token, store: name, ops: [] }).then(function (r) {
+    busy(false); acceptPull(r); enterApp(); toast('已切換到 ' + name);
+  }, function (e) {
+    busy(false); ST.sess.store = prev; LS.set('fw_sess', ST.sess); loadLocal(); enterApp();
+    toast('⚠ ' + (e.network ? '切換需要網路' : e.message));
+  });
+}
 function logout() {
-  var n = ST.outbox.length;
+  var stores = (ST.sess && ST.sess.stores) || [], n = 0;
+  stores.forEach(function (st) { n += (LS.get(k_('outbox', st), []) || []).length; });
   if (n && !confirm('還有 ' + n + ' 筆資料沒有上傳！\n登出會把它們刪掉，確定嗎？\n\n（建議先連上網路按「立即同步」）')) return;
   if (!n && !confirm('確定登出並清除這台裝置上的資料？（雲端資料不受影響）')) return;
-  ['snap', 'outbox', 'failed', 'last'].forEach(function (x) { LS.del(k_(x)); });
+  stores.forEach(function (st) { ['snap', 'outbox', 'failed', 'last'].forEach(function (x) { LS.del(k_(x, st)); }); });
   LS.del('fw_sess');
   ST.sess = null; ST.snap = null; ST.outbox = []; ST.failed = [];
   showView('login');
 }
 
-function acceptPull(r) {
-  ST.snap = { config: r.config, data: r.data, serverTime: r.serverTime };
+function acceptPull(r, store) {
+  var snap = { config: r.config, data: r.data, serverTime: r.serverTime };
+  if (r.stores && ST.sess) { ST.sess.stores = r.stores; if (r.role) ST.sess.role = r.role; LS.set('fw_sess', ST.sess); }
+  if (store && store !== ST.sess.store) { LS.set(k_('snap', store), snap); LS.set(k_('last', store), nowStr()); return; }
+  ST.snap = snap;
   ST.lastSync = nowStr();
   LS.set(k_('snap'), ST.snap);
   LS.set(k_('last'), ST.lastSync);
@@ -265,7 +308,9 @@ function enterApp() {
   if (!ST.snap) loadLocal();
   if (!ST.snap) { showView('login'); return; }
   showView('app');
-  $('title').textContent = ST.sess.store + '・' + (isAdmin() ? '管理' : '店長');
+  var sts = ST.sess.stores || [ST.sess.store];
+  $('title').innerHTML = (sts.length > 1 ? '<select id="storeSel" onchange="switchStore(this.value)">' + sts.map(function (n) { return '<option' + (n === ST.sess.store ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>' : esc(ST.sess.store)) +
+    '<span class="acc">・' + esc(ST.sess.account) + '</span>';
   var t = todayStr(), m = t.slice(0, 7);
   ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
   ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });
@@ -385,7 +430,7 @@ function trySync(manual) {
   if (navigator.onLine === false) { renderStatus(); if (manual) toast('目前沒有網路，資料已存在這台裝置'); return; }
   ST.syncing = true; renderStatus();
   var batch = ST.outbox.slice(0, 40);
-  api('sync', { store: ST.sess.store, token: ST.sess.token, ops: batch }).then(function (r) {
+  api('sync', { account: ST.sess.account, store: ST.sess.store, token: ST.sess.token, ops: batch }).then(function (r) {
     var done = {};
     (r.results || []).forEach(function (x) {
       done[x.id] = true;
@@ -396,8 +441,8 @@ function trySync(manual) {
     ST.outbox = ST.outbox.filter(function (o) { return !done[o.id]; });
     if (ST.failed.length > 50) ST.failed = ST.failed.slice(-50);
     saveOutbox();
-    if (r.role && r.role !== ST.sess.role) { ST.sess.role = r.role; LS.set('fw_sess', ST.sess); }
     acceptPull(r);
+    syncOtherStores();
     ST.syncing = false;
     renderStatus(); refreshTab(false);
     if (manual) toast('同步完成 ✓');
@@ -409,8 +454,27 @@ function trySync(manual) {
     renderStatus(); renderBanner();
   });
 }
+// 其他店還沒上傳的資料（切換店之前記的），背景一起送出
+function syncOtherStores() {
+  (ST.sess.stores || []).forEach(function (st) {
+    if (st === ST.sess.store) return;
+    var ob = LS.get(k_('outbox', st), []);
+    if (!ob.length) return;
+    var batch = ob.slice(0, 40);
+    api('sync', { account: ST.sess.account, store: st, token: ST.sess.token, ops: batch }).then(function (r) {
+      var done = {}, failed = LS.get(k_('failed', st), []);
+      (r.results || []).forEach(function (x) {
+        done[x.id] = true;
+        if (x.status === 'error') failed.push({ at: nowStr(), op: batch.filter(function (o) { return o.id === x.id; })[0], msg: st + '：' + x.error });
+      });
+      LS.set(k_('outbox', st), LS.get(k_('outbox', st), []).filter(function (o) { return !done[o.id]; }));
+      LS.set(k_('failed', st), failed.slice(-50));
+      acceptPull(r, st);
+    }, function () { /* 下次再試 */ });
+  });
+}
 function relogin() {
-  ST.pickStore = ST.sess.store;
+  $('login-acc').value = ST.sess.account;
   showView('login');
   toast('請重新輸入 PIN，沒上傳的資料會保留');
 }
@@ -1254,8 +1318,8 @@ function renderSettingsTab() {
   renderPresetEditor();
   if (!ST.swVersion && navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
   $('set-info').innerHTML =
-    '店別：<b>' + esc(ST.sess.store) + '</b>（' + (isAdmin() ? '管理' : '店長') + '）<br>' +
-    '裝置名字：' + esc(ST.cfg.device) + '<br>' +
+    '帳號：<b>' + esc(ST.sess.account) + '</b>（' + (isAdmin() ? '管理' : '店長') + '）<br>' +
+    '可用的店：' + esc((ST.sess.stores || [ST.sess.store]).join('、')) + '｜目前：<b>' + esc(ST.sess.store) + '</b><br>' +
     'App 版本：' + APP_VERSION + (ST.swVersion && ST.swVersion !== APP_VERSION ? '（離線快取 ' + esc(ST.swVersion) + '）' : '') + '<br>' +
     '網路：' + (navigator.onLine === false ? '<span class="warn">離線</span>' : '<span class="ok">連線中</span>') + '<br>' +
     '最後同步：' + esc(ST.lastSync || '—') + '<br>' +
