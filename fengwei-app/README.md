@@ -135,4 +135,4 @@ node fengwei-app/tests/server.test.js    # 同步服務（模擬 Google 試算�
 node fengwei-app/tests/e2e.test.js       # 瀏覽器：離線記帳 → 恢復網路 → 自動同步 → 多裝置（需要 Playwright）
 ```
 
-改版 App 時，把 `docs/sw.js` 裡的版本號加 1，所有裝置下次打開就會自動更新。
+改版 App 時，把 `docs/sw.js` 裡的 VERSION 加 1。有網路時打開 App 一律先拿最新版，所以下次打開就是新的；在「⚙ 裝置」可以看到目前版本，也可以按「檢查 App 更新」。

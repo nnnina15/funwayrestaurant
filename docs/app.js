@@ -98,7 +98,19 @@ function showView(name) {
 function boot() {
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(function () {});
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+      ST.swReg = reg;
+      reg.update().catch(function () {});
+    }).catch(function () {});
+    // 新版接手時自動重新整理一次（第一次安裝不用）
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!hadController || ST.reloading) return;
+      if (ST.outbox) saveOutbox();
+      ST.reloading = true; location.reload();
+    });
+    navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.version) { ST.swVersion = e.data.version; if (ST.tab === 'settings') renderSettingsTab(); } });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && ST.swReg) ST.swReg.update().catch(function () {}); });
   }
   if (!ST.cfg) return showView('setup');
   if (!ST.sess) return showView('login');
@@ -751,10 +763,19 @@ function opLabel(op) {
   return (OP_NAMES[op.type] || op.type) + ' ' + (d.date || d.month || '') + ' ' + (d.cat || d.item || d.name || d.platform || d.type || '') +
     (d.amount !== undefined && d.amount !== '' ? ' ' + money(d.amount) : '');
 }
+function checkUpdate() {
+  if (!ST.swReg) { location.reload(); return; }
+  toast('檢查更新中…');
+  ST.swReg.update().then(function () {
+    setTimeout(function () { if (!ST.reloading) { saveOutbox(); location.reload(); } }, 1500);
+  }, function () { toast('沒有網路，無法檢查更新'); });
+}
 function renderSettingsTab() {
+  if (!ST.swVersion && navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
   $('set-info').innerHTML =
     '店別：<b>' + esc(ST.sess.store) + '</b>（' + (isAdmin() ? '管理' : '店長') + '）<br>' +
     '裝置名字：' + esc(ST.cfg.device) + '<br>' +
+    'App 版本：' + esc(ST.swVersion || '—') + '<br>' +
     '網路：' + (navigator.onLine === false ? '<span class="warn">離線</span>' : '<span class="ok">連線中</span>') + '<br>' +
     '最後同步：' + esc(ST.lastSync || '—') + '<br>' +
     '待上傳：<b>' + ST.outbox.length + '</b> 筆' +
