@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.8.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.9.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -290,8 +290,44 @@ function openSettings() { showTab('settings'); }
 function openMore() { $('moresheet').classList.remove('hide'); }
 function closeMore() { $('moresheet').classList.add('hide'); }
 
+/* ---------- 日期／月份置頂：切換分頁時，把那頁的日期／月份搬到上方固定列 ---------- */
+var PIN_MAP = { daily: [['d-date', '日期']], purchase: [['p-date', '日期']], expense: [['e-month', '月份']],
+  overview: [['ov-month-pick'], ['ov-year-pick']], payroll: [['s-month', '月份']], delivery: [['v-month', '月份']], deduct: [['x-month', '月份']] };
+function pinPickers(name) {
+  (ST.pinned || []).forEach(function (p) { p.ph.parentNode.insertBefore(p.node, p.ph); p.ph.remove(); if (p.cap) p.cap.remove(); });
+  ST.pinned = [];
+  var bar = $('pickbar'); bar.innerHTML = '';
+  (PIN_MAP[name] || []).forEach(function (spec) {
+    var el = $(spec[0]); if (!el) return;
+    var node = el.closest('.stepper') || el;
+    if (spec[1] === undefined) node = el;
+    var ph = document.createComment('pin'); node.parentNode.insertBefore(ph, node);
+    var wrap = node, cap = null;
+    if (spec[1]) {                                        // 單一欄位：加上小標題「日期／月份」
+      wrap = document.createElement('div'); wrap.className = 'pin';
+      cap = document.createElement('div'); cap.className = 'pin-cap'; cap.textContent = spec[1];
+      wrap.appendChild(cap); wrap.appendChild(node); cap = wrap;
+      var lbl = ph.previousElementSibling; if (lbl && lbl.tagName === 'LABEL') { lbl.classList.add('hide'); ST.pinned.lbl = (ST.pinned.lbl || []).concat(lbl); }
+    }
+    bar.appendChild(wrap);
+    ST.pinned.push({ node: node, ph: ph, cap: cap });
+  });
+  bar.classList.toggle('hide', !ST.pinned.length);
+  updateStickyTop();
+}
+function updateStickyTop() {
+  var h = document.querySelector('header').offsetHeight, t = $('tabs');
+  var tabsOn = t && !t.classList.contains('hide') && getComputedStyle(t).display !== 'none';
+  if (t) t.style.top = h + 'px';                               // 分頁列緊貼標題列，不留縫
+  document.documentElement.style.setProperty('--sticky-top', (h + (tabsOn ? t.offsetHeight : 0)) + 'px');
+}
+window.addEventListener('resize', function () { if (ST.sess) updateStickyTop(); });
+
 function showTab(name) {
   ST.tab = name;
+  (ST.hiddenLbls || []).forEach(function (l) { l.classList.remove('hide'); });
+  pinPickers(name);
+  ST.hiddenLbls = ST.pinned.lbl || [];
   document.body.classList.toggle('page-wide', name === 'overview' && ST.ov !== 'month');
   TABS.forEach(function (x) {
     $('tab-' + x[0]).classList.toggle('hide', x[0] !== name);

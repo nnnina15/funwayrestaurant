@@ -166,6 +166,17 @@
   .emp-t { flex: 1; text-align: center; font-size: 21px; }
   .emp-t small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; margin-top: 2px; }
 
+  /* 日期／月份置頂 */
+  #pickbar { position: sticky; top: var(--sticky-top, 50px); z-index: 4; margin: -18px -16px 14px; padding: 10px 16px;
+    background: var(--bg); box-shadow: 0 6px 12px -8px rgba(0,0,0,.15);
+    border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  #pickbar .pin { flex: 1; min-width: 240px; }
+  #pickbar .pin-cap { font-size: 12px; color: var(--muted); font-weight: 600; margin: 0 0 4px 2px; }
+  #pickbar #ov-month-pick, #pickbar #ov-year-pick { flex: 1; }
+  #pickbar #ov-year-pick label, #pickbar #ov-month-pick label { margin-top: 0; font-size: 12px; }
+  #pickbar input, #pickbar select { padding: 10px 12px; font-size: 17px; background: var(--card); }
+  #pickbar .step { height: auto; min-height: 44px; background: var(--card); border: 1px solid var(--line); }
+
   /* ===== 重點數字卡 ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
@@ -321,6 +332,7 @@
 <nav id="tabs" class="hide"></nav>
 
 <main id="v-app" class="hide">
+  <div id="pickbar" class="hide"></div>
   <div id="banner"></div>
 
   <section id="tab-daily">

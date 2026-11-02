@@ -148,6 +148,11 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.fill('#op-1', '3640'); await B.pg.dispatchEvent('#op-1', 'input');
   await B.pg.click('#tab-delivery .primary');
   await B.pg.click('#tb-overview');
+  // 日期／月份置頂：捲到下面時，月份列仍貼在分頁列下方
+  await B.pg.evaluate(() => window.scrollTo(0, 2000)); await B.pg.waitForTimeout(200);
+  const pin = await B.pg.evaluate(() => { const b = document.getElementById('pickbar').getBoundingClientRect(), t = document.getElementById('tabs').getBoundingClientRect(); return [Math.round(b.top), Math.round(t.bottom), !!document.querySelector('#pickbar #m-month')]; });
+  assert.ok(pin[2] && Math.abs(pin[0] - pin[1]) <= 1, '月份要置頂：' + pin);
+  await B.pg.evaluate(() => window.scrollTo(0, 0));
   // 總覽：月
   await B.pg.click('#ov-seg button[data-v="month"]');
   assert.ok((await B.pg.textContent('#m-body')).includes('可分配給股東'));
