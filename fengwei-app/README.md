@@ -160,6 +160,7 @@
 ```
 node fengwei-app/tests/compute.test.js   # 計算邏輯
 node fengwei-app/tests/server.test.js    # 同步服務（模擬 Google 試算表）
+node fengwei-app/tests/reorder.test.js   # 試算表欄位自己換順序也照欄名讀寫
 node fengwei-app/tests/e2e.test.js       # 瀏覽器：離線記帳 → 恢復網路 → 自動同步 → 多裝置（需要 Playwright）
 node fengwei-app/tests/offline-root.test.js  # 瀏覽器：網址離線也打得開
 ```

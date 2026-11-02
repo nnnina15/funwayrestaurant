@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.4';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -489,8 +489,12 @@ function renderStatus() {
   if (n) { b.textContent = (navigator.onLine === false ? '離線｜' : '') + n + ' 筆待上傳'; b.classList.add('pending'); return; }
   b.textContent = navigator.onLine === false ? '離線｜已全部上傳' : '✓ 已同步 ' + (ST.lastSync ? ST.lastSync.slice(11, 16) : '');
 }
+var NEED_SERVER = '4.0.4';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
+  var sv = ST.snap && ST.snap.config && ST.snap.config.serverVersion;
+  if (ST.snap && verNum(sv) < verNum(NEED_SERVER)) h += '<div class="banner err">試算表的程式還是舊版（' + esc(sv || '舊版') + '），資料可能讀錯。請到 Apps Script 貼上最新 Code.gs，再按「部署 → 管理部署作業 → 編輯 → 版本選『新版本』→ 部署」。</div>';
   if (ST.authLost) h += '<div class="banner err">登入已失效（PIN 可能改過）。<a href="#" onclick="relogin();return false">按這裡重新登入</a>，還沒上傳的 ' + ST.outbox.length + ' 筆都會保留。</div>';
   else if (ST.outbox.length && navigator.onLine === false) h += '<div class="banner">目前離線：有 ' + ST.outbox.length + ' 筆存在這台裝置，連上網路會自動上傳。</div>';
   var recent = ST.failed.filter(function (f) { return !f.seen; });

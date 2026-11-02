@@ -1,3 +1,4 @@
+const SERVER_VERSION = '4.0.4';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有重新部署
 /**
  * 風味記帳系統 v2（離線版的同步服務）
  * ------------------------------------------------------------
@@ -86,9 +87,10 @@ function setup() {
     const h = HEAD[name];
     if (name === S.DELIVERY) migrateDelivery_(sh);   // 舊版「明細」文字欄 → 每期一列、每項一欄
     realign_(sh, h);                        // 欄位有增減時，舊資料照欄名搬到新位置，不會錯位
-    sh.getRange(1, 1, 1, h.length).setValues([h]).setFontWeight('bold').setBackground('#f3efe6');
+    const hc = cols_(sh, name);             // 你自己換過欄位順序也沒關係：照第一列的欄名讀寫
+    sh.getRange(1, 1, 1, hc.length).setValues([hc]).setFontWeight('bold').setBackground('#f3efe6');
     sh.setFrozenRows(1);
-    h.forEach(function (k, i) {
+    hc.forEach(function (k, i) {
       if (TEXT_COLS.indexOf(k) >= 0) sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat('@');
     });
   });
@@ -122,6 +124,8 @@ function realign_(sh, h) {
   const vals = sh.getRange(1, 1, lr, lc).getValues();
   const old = vals[0].map(str_);
   if (old.join('|') === h.join('|')) return;
+  const used = old.filter(Boolean);
+  if (used.length === h.length && h.every(function (k) { return used.indexOf(k) >= 0; })) return;      // 欄位一樣、只是順序不同：照你的順序
   if (!old.some(function (k) { return h.indexOf(k) >= 0; })) return;      // 完全不認得的表頭：不動
   const rows = vals.slice(1).filter(function (r) { return r.some(function (v) { return v !== '' && v !== null; }); })
     .map(function (r) { return h.map(function (k) { const i = old.indexOf(k); return i >= 0 ? r[i] : ''; }); });
@@ -305,7 +309,7 @@ function storesOf_(acc) {
   return all.filter(function (n) { return mine.indexOf(n) >= 0; });
 }
 function setAccountCells_(acc, obj) {
-  const sh = sheet_(S.ACCOUNT), h = HEAD[S.ACCOUNT];
+  const sh = sheet_(S.ACCOUNT), h = cols_(sh, S.ACCOUNT);
   Object.keys(obj).forEach(function (k) {
     const c = sh.getRange(acc._row, h.indexOf(k) + 1); c.setNumberFormat('@'); c.setValue(obj[k]);
   });
@@ -619,6 +623,7 @@ function pull_(s, role) {
     presets: rows_(S.PRESET).map(rec_.preset).filter(function (r) { return r.name && (r.store === s.name || r.store === '全部'); })
   };
   const config = {
+    serverVersion: SERVER_VERSION,
     store: { name: s.name, fee: s.fee, cashIn: s.cashIn, cashWarn: s.cashWarn },
     categories: rows_(S.CAT).filter(function (r) { return str_(r['分類']); }).map(function (r) {
       return { store: str_(r['店別(全部/店名)']) || '全部', cat: str_(r['分類']),
@@ -749,11 +754,21 @@ function sheet_(name) {
   return sh;
 }
 
+// 試算表第一列的欄名（順序以試算表為準）；欄名不齊全時才用預設順序
+function cols_(sh, name) {
+  const h = HEAD[name], lc = sh.getLastColumn();
+  if (lc < 1) return h;
+  const top = sh.getRange(1, 1, 1, lc).getValues()[0].map(str_);
+  if (!h.every(function (k) { return top.indexOf(k) >= 0; })) return h;
+  let last = top.length; while (last > 0 && !top[last - 1]) last--;
+  return top.slice(0, last);
+}
+
 function rows_(name) {
   const sh = sheet_(name);
   const n = sh.getLastRow();
   if (n < 2) return [];
-  const h = HEAD[name];
+  const h = cols_(sh, name);
   return sh.getRange(2, 1, n - 1, h.length).getValues().map(function (r, i) {
     const o = { _row: i + 2 };
     h.forEach(function (k, j) { o[k] = r[j]; });
@@ -764,7 +779,7 @@ function rows_(name) {
 function append_(name, objs) {
   if (!objs.length) return;
   const sh = sheet_(name);
-  const h = HEAD[name];
+  const h = cols_(sh, name);
   const start = sh.getLastRow() + 1;
   h.forEach(function (k, i) {
     if (TEXT_COLS.indexOf(k) >= 0) sh.getRange(start, i + 1, objs.length, 1).setNumberFormat('@');
@@ -779,7 +794,7 @@ function deleteWhere_(name, pred) {
   const rs = all.filter(pred).map(function (r) { return r._row; }).sort(function (a, b) { return b - a; });
   if (rs.length <= 20) { rs.forEach(function (r) { sh.deleteRow(r); }); return rs.length; }
   // 大量刪除：一次重寫，比一列一列刪快很多
-  const h = HEAD[name], keep = all.filter(function (r) { return !pred(r); }).map(function (r) { return h.map(function (k) { return r[k]; }); });
+  const h = cols_(sh, name), keep = all.filter(function (r) { return !pred(r); }).map(function (r) { return h.map(function (k) { return r[k]; }); });
   sh.getRange(2, 1, all.length, h.length).clearContent();
   h.forEach(function (k, i) { if (TEXT_COLS.indexOf(k) >= 0 && keep.length) sh.getRange(2, i + 1, keep.length, 1).setNumberFormat('@'); });
   if (keep.length) sh.getRange(2, 1, keep.length, h.length).setValues(keep);
