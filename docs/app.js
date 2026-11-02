@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.3';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -869,8 +869,7 @@ function savePayroll() {
 // 對帳單項目：[代號, 名稱, 是否為扣項]
 var DV_ROWS = [['gross', '費用明細（訂單金額）', false], ['commission', '佣金', true], ['monthly', '月費', true], ['reject', '拒單費用', true], ['other', '其他調整', false]];
 function dvPeriods(platform, month, split) {
-  var last = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate(), m = Number(month.slice(5, 7));
-  return split ? [m + '/1-' + m + '/15', m + '/16-' + m + '/' + last] : [m + '/1-' + m + '/' + last];
+  return split ? ['上半月', '下半月'] : ['整月'];
 }
 function renderDeliveryTab() {
   var month = $('v-month').value, V = view();
