@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.12';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.13';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -40,6 +40,15 @@ function cycleTheme() {
   var next = THEMES[(i + 1) % THEMES.length];
   LS.set('fw_theme', next[0]); applyTheme(); toast('顯示模式：' + next[1]);
 }
+
+/* ---------- 字體大小（每台裝置自己設） ---------- */
+function applyFont() {
+  var f = Number(LS.get('fw_font', 1)) || 1;
+  document.documentElement.style.setProperty('--fz', f);   // 只放大內容，標題列和下方分頁不變
+  Array.prototype.forEach.call(document.querySelectorAll('#font-seg button'), function (b) { b.classList.toggle('on', Number(b.getAttribute('data-v')) === f); });
+  if (ST.sess) { try { updateStickyTop(); } catch (e) {} }
+}
+function setFont(f) { LS.set('fw_font', f); applyFont(); }
 
 /* ---------- 本機儲存 ---------- */
 var LS = {
@@ -174,6 +183,7 @@ function stepField(id, d) {
 function boot() {
   addSteppers();
   applyTheme();
+  applyFont();
   $('ver').textContent = '風味記帳 版本 ' + APP_VERSION;
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
   if ('serviceWorker' in navigator) {
@@ -1371,6 +1381,7 @@ function peSave() {
 
 function renderSettingsTab() {
   renderPresetEditor();
+  applyFont();
   if (!ST.swVersion && navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
   $('set-info').innerHTML =
     '帳號：<b>' + esc(ST.sess.account) + '</b>（' + (isAdmin() ? '管理' : '店長') + '）<br>' +

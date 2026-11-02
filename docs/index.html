@@ -172,7 +172,7 @@
   .emp-t small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; margin-top: 2px; }
 
   /* 日期／月份置頂：小小一條、置中 */
-  #pickbar { position: sticky; top: var(--sticky-top, 50px); z-index: 4; margin: -14px auto 12px; padding: 6px 0;
+  #pickbar { position: sticky; top: calc(var(--sticky-top, 50px) / var(--fz, 1)); z-index: 4; margin: -14px auto 12px; padding: 6px 0;
     display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap; pointer-events: none; }
   #pickbar > * { pointer-events: auto; }
   #pickbar .pin, #pickbar #ov-month-pick, #pickbar #ov-year-pick { background: var(--card); border: 1px solid var(--line); border-radius: 999px;
@@ -210,6 +210,8 @@
   .pk input { position: absolute; inset: 0; width: 100% !important; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: 0; }
   #pickbar .pk-label { font-size: 16px; min-width: 96px; text-align: center; }
   @media (max-width: 899px) { header #pickbar .pk-label { font-size: 15px; min-width: 84px; padding: 4px 4px; } }
+  main { zoom: var(--fz, 1); }
+  #font-seg button { white-space: nowrap; padding: 8px 16px; }
   .pinrule { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .pinrule span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
   .pinrule span.ok { background: color-mix(in srgb, var(--ok) 15%, var(--card)); color: var(--ok); font-weight: 700; }
@@ -576,6 +578,13 @@
       <button class="ghost wide" onclick="checkUpdate()">檢查 App 更新</button>
       <button class="ghost wide" onclick="showView('setup')">修改同步網址</button>
       <button class="ghost wide" onclick="logout()" style="color:var(--bad)">登出並清除這台裝置的資料</button>
+    </div>
+    <div class="card">
+      <h2>字體大小</h2>
+      <div class="seg" id="font-seg">
+        <button data-v="0.9" onclick="setFont(0.9)">小</button><button data-v="1" onclick="setFont(1)">標準</button><button data-v="1.12" onclick="setFont(1.12)">大</button><button data-v="1.25" onclick="setFont(1.25)">特大</button>
+      </div>
+      <p class="muted">只改這台裝置，其他裝置不受影響。</p>
     </div>
     <div class="card" id="set-pin-card">
       <h2>更改 PIN</h2>
