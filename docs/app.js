@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.1.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.2.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理, 手機下方列常駐]
 var TABS = [
@@ -130,7 +130,38 @@ function showView(name) {
   if (name === 'login') { $('title').textContent = '登入'; loadStores(); }
 }
 
+/* ---------- 日期／月份／年份左右的 ‹ › ---------- */
+var STEP_IDS = ['d-date', 'p-date', 's-month', 'v-month', 'e-month', 'x-month', 'm-month', 'y-year'];
+function addSteppers() {
+  STEP_IDS.forEach(function (id) {
+    var el = $(id); if (!el || el.parentNode.classList.contains('stepper')) return;
+    var w = document.createElement('div'); w.className = 'stepper';
+    el.parentNode.insertBefore(w, el);
+    w.innerHTML = '<button type="button" class="step" aria-label="上一個" onclick="stepField(\'' + id + '\',-1)">‹</button>';
+    w.appendChild(el);
+    w.insertAdjacentHTML('beforeend', '<button type="button" class="step" aria-label="下一個" onclick="stepField(\'' + id + '\',1)">›</button>');
+  });
+}
+function stepField(id, d) {
+  var el = $(id), v = el.value;
+  if (el.tagName === 'SELECT') {
+    var i = el.selectedIndex + d;
+    if (i < 0 || i >= el.options.length) return toast(d < 0 ? '已經是最早的了' : '已經是最新的了');
+    el.selectedIndex = i;
+  } else if (el.type === 'date') {
+    var t = v ? new Date(v + 'T12:00:00') : new Date();
+    t.setDate(t.getDate() + d);
+    el.value = t.getFullYear() + '-' + p2(t.getMonth() + 1) + '-' + p2(t.getDate());
+  } else {
+    var y = Number((v || todayStr()).slice(0, 4)), m = Number((v || todayStr()).slice(5, 7)) + d;
+    if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
+    el.value = y + '-' + p2(m);
+  }
+  el.dispatchEvent(new Event('change'));
+}
+
 function boot() {
+  addSteppers();
   applyTheme();
   $('ver').textContent = '風味記帳 版本 ' + APP_VERSION;
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});

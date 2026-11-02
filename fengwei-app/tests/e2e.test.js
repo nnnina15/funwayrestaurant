@@ -29,6 +29,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await A.ctx.setOffline(true);
   await A.pg.reload(); await A.pg.waitForSelector('#tab-daily:not(.hide)');            // 沒網路也能打開
   await A.pg.fill('#d-date', '2026-11-01'); await A.pg.dispatchEvent('#d-date', 'change');
+  // 日期左右的 ‹ ›：往前一天再往後一天，回到原本那天
+  await A.pg.click('#d-date ~ .step'); assert.strictEqual(await A.pg.inputValue('#d-date'), '2026-11-02');
+  await A.pg.locator('.stepper:has(#d-date) .step').first().click(); assert.strictEqual(await A.pg.inputValue('#d-date'), '2026-11-01');
   // 照紙本結帳單輸入（10/26 那張）
   for (const [id, v] of [['d-site', '29125'], ['d-panda', '6358'], ['d-uber', '4562'], ['d-allpay', '575'], ['d-line', '3713']]) await A.pg.fill('#' + id, v);
   const slip = [['燉滷', '500', '其他支出'], ['油條', '400', '其他支出'], ['蔥', '140', '菜'], ['PT', '800', '薪資／預支'], ['淳', '420', '其他支出']];
@@ -96,6 +99,8 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('text=儲存這位員工');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 26140);
+  await B.pg.click('#tb-expense'); await B.pg.fill('#e-month', '2026-01'); await B.pg.dispatchEvent('#e-month', 'change');
+  await B.pg.locator('.stepper:has(#e-month) .step').first().click(); assert.strictEqual(await B.pg.inputValue('#e-month'), '2025-12', '月份 ‹ 要能跨年');
   // 固定支出常用項目：點「房租」帶入名稱和類型，記過就不再顯示；下個月會顯示上次金額
   await B.pg.click('#tb-expense'); await B.pg.fill('#e-month', '2026-11'); await B.pg.dispatchEvent('#e-month', 'change');
   await B.pg.click('#e-presets button:has-text("房租")');

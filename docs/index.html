@@ -121,6 +121,12 @@
   .presets-h { font-size: 13px; color: var(--muted); font-weight: 600; margin: 10px 0 6px; }
   #s-presets button.neg { color: var(--bad); }
 
+  .stepper { display: flex; align-items: stretch; gap: 6px; }
+  .stepper > input, .stepper > select { flex: 1; min-width: 0; }
+  .step { flex: none; width: 46px; padding: 0; font-size: 26px; line-height: 1; background: var(--soft); color: var(--ink); border-radius: 12px; font-weight: 400; }
+  .step:hover { background: color-mix(in srgb, var(--brand) 12%, var(--soft)); color: var(--brand); }
+  .slip-ctl .stepper .step { width: 40px; }
+
   /* ===== 重點數字卡 ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
