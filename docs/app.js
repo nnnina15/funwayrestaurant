@@ -39,6 +39,8 @@ function $(id) { return document.getElementById(id); }
 function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('show'); }, 3000); }
 function busy(on) { $('busy').style.display = on ? 'flex' : 'none'; }
 function money(n) { if (n === null || n === undefined || n === '') return '—'; return (Math.round(Number(n)) || 0).toLocaleString('en-US'); }
+// 正數綠色、負數紅色、0 灰色
+function sgn(v) { v = Math.round(Number(v)) || 0; return v > 0 ? ' pos' : (v < 0 ? ' neg' : ' zero'); }
 function pct(n) { return (n * 100).toFixed(1) + '%'; }
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function jsq(s) { return esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
@@ -652,7 +654,7 @@ function renderYearTab() {
   var partners = (L.C.partners || []).map(function (p) { return p.name; });
   var share = {}; R.shares.forEach(function (s) { share[s.month + '|' + s.name] = s.amount; });
   function sum(list, f) { return list.reduce(function (a, m) { return a + f(m); }, 0); }
-  function td(v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + (v < 0 ? ' bad' : '') + '">' + money(v) + '</td>'; }
+  function td(v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + sgn(v) + '">' + money(v) + '</td>'; }
   function label(m) { return Number(m.month.slice(5, 7)) + '月' + (m.status === '進行中' ? '<span class="tag">進行中</span>' : ''); }
 
   // 表一：盈餘與分紅
@@ -690,7 +692,7 @@ function renderYearTab() {
   var dv = function (list, f) { var days = sum(list, function (m) { return m.days; }); var t = sum(list, f); return perDay ? (days ? t / days : 0) : t; };
   var drow = function (list, name, cls) {
     return '<tr class="' + cls + '"><th>' + name + '</th><td class="n">' + sum(list, function (m) { return m.days; }) + '</td>' +
-      dcols.map(function (c, i) { return '<td class="n' + (i === 0 ? ' em' : '') + '">' + money(dv(list, c[1])) + '</td>'; }).join('') + '</tr>';
+      dcols.map(function (c, i) { var v = dv(list, c[1]) * (i === 0 ? 1 : -1); return '<td class="n' + (i === 0 ? ' em' : '') + sgn(v) + '">' + money(v) + '</td>'; }).join('') + '</tr>';
   };
   h += '<h2 style="margin-top:22px">平均細項（' + (perDay ? '每個工作天平均' : '每月合計') + '）</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
     dcols.map(function (c, i) { return '<th class="n' + (i >= 5 ? ' cat' : '') + '">' + esc(c[0]) + '</th>'; }).join('') + '</tr></thead><tbody>';
@@ -727,7 +729,7 @@ function renderSummaryTab() {
     '　工作天 ' + m.days + '　日均營收 ' + money(m.avg) + '　現金差額累計 ' + money(m.cashDiff) + '</p>';
   h += '<table>' + rows.map(function (x) {
     return '<tr' + (x[2] ? ' style="font-weight:700"' : '') + '><td>' + x[0] + '</td><td class="n">' +
-      (typeof x[1] === 'number' ? money(x[1]) : '<span class="warn">' + x[1] + '</span>') + '</td><td class="n muted">' + (x[3] || '') + '</td></tr>';
+      (typeof x[1] === 'number' ? '<span class="' + sgn(x[1]) + '">' + money(x[1]) + '</span>' : '<span class="warn">' + x[1] + '</span>') + '</td><td class="n muted">' + (x[3] || '') + '</td></tr>';
   }).join('') + '</table>';
   h += '<h2 style="margin-top:18px">股東分紅</h2><table>' + shares.map(function (s) {
     return '<tr><td>' + esc(s.name) + '</td><td class="n muted">' + s.pct + '%</td><td class="n big">' + money(s.amount) + '</td></tr>';
