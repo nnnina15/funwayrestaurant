@@ -4,8 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>風味記帳</title>
-<meta http-equiv="refresh" content="0; url=./docs/">
-<script>location.replace('./docs/');</script>
+<meta name="theme-color" content="#1b1b1b">
+<link rel="manifest" href="docs/manifest.json">
+<link rel="apple-touch-icon" href="docs/apple-touch-icon.png">
+<noscript><meta http-equiv="refresh" content="0; url=./docs/"></noscript>
+<script>
+  // GitHub Pages 用「根目錄」發布時，這頁負責轉到 App；先註冊離線快取，沒網路也能轉過去
+  (function () {
+    var done = false;
+    function go() { if (!done) { done = true; location.replace('./docs/' + location.search + location.hash); } }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./root-sw.js').then(function () { setTimeout(go, 150); }, go);
+      setTimeout(go, 1500);
+    } else go();
+  })();
+</script>
 </head>
-<body style="font-family:sans-serif;padding:24px">正在前往風味記帳… <a href="./docs/">沒有自動跳轉請按這裡</a></body>
+<body style="font-family:sans-serif;padding:24px;background:#f6f2ec;color:#1b1b1b">正在打開風味記帳… <a href="./docs/">沒有自動跳轉請按這裡</a></body>
 </html>

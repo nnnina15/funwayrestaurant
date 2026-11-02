@@ -88,6 +88,10 @@
 
 ---
 
+## 常用項目
+
+每日結帳、固定／其他支出、人事的「常用項目」按鈕，在 App「裝置 → 常用項目設定」修改（只有管理 PIN）：改名稱、分類、順序、刪除、新增。存在試算表 `設定_常用項目`，每家店可以有自己的清單（沒設定就用「全部」）。
+
 ## 初始化後要先改的設定（在 Google 試算表）
 
 | 分頁 | 要做的事 |
@@ -133,6 +137,7 @@
 node fengwei-app/tests/compute.test.js   # 計算邏輯
 node fengwei-app/tests/server.test.js    # 同步服務（模擬 Google 試算表）
 node fengwei-app/tests/e2e.test.js       # 瀏覽器：離線記帳 → 恢復網路 → 自動同步 → 多裝置（需要 Playwright）
+node fengwei-app/tests/offline-root.test.js  # 瀏覽器：網址離線也打得開
 ```
 
 改版 App 時，把 `docs/sw.js` 裡的 VERSION 加 1。有網路時打開 App 一律先拿最新版，所以下次打開就是新的；在「⚙ 裝置」可以看到目前版本，也可以按「檢查 App 更新」。

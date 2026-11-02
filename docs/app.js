@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.3.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.4.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -440,32 +440,37 @@ function renderDailyExist() {
     pendTag('daily', d.date) + '，修改後再儲存會覆蓋。';
 }
 var LINE_OTHER = '其他支出', LINE_WAGE = '薪資／預支';
-/* 支出明細的常用項目：預設＋店長最常用的（最多 12 個），帶入上次選的分類和金額 */
-var LINE_PRESETS = [['米', '米'], ['菜', '菜'], ['蔥', '菜'], ['油條', LINE_OTHER], ['燉滷', LINE_OTHER], ['PT', LINE_WAGE]];
+
+/* ---------- 常用項目：存在試算表「設定_常用項目」，在「裝置 → 常用項目設定」修改 ---------- */
+var PRESET_DEFAULTS = {
+  '每日結帳': [['米', '米'], ['菜', '菜'], ['蔥', '菜'], ['油條', '其他支出'], ['燉滷', '其他支出'], ['PT', '薪資／預支']],
+  '固定支出': [['房租', '固定'], ['電費', '固定'], ['水費', '固定'], ['電話費', '固定'], ['網路費', '固定'], ['瓦斯費', '固定'],
+    ['拜拜', '固定'], ['聚餐', '其他'], ['外送費用', '其他']],
+  '人事': [['加班費', '薪資', '加'], ['多加班', '薪資', '加'], ['全勤獎金', '薪資', '加'], ['責任津貼', '薪資', '加'], ['職務加給', '薪資', '加'],
+    ['銷假上班', '薪資', '加'], ['節日獎金', '薪資', '加'], ['早退', '薪資', '扣'], ['請假扣薪', '薪資', '扣'],
+    ['扣健保(自付)', '薪資', '扣'], ['扣勞保(自付)', '薪資', '扣'], ['已預支', '預支', '扣'],
+    ['勞退(公司)', '公司負擔', '加'], ['健保(公司)', '公司負擔', '加'], ['勞保(公司)', '公司負擔', '加']]
+};
+// 這家店自己設定過就用自己的；沒有就用「全部」；試算表還沒有這張表就用內建預設
+function presetsFor(use) {
+  var all = (view().presets || []).filter(function (r) { return r.use === use; });
+  var mine = all.filter(function (r) { return r.store === ST.sess.store; });
+  var list = mine.length ? mine : all.filter(function (r) { return r.store === '全部'; });
+  if (!list.length && !(view().presets || []).some(function (r) { return r.use === use && r.store === ST.sess.store; }))
+    list = (PRESET_DEFAULTS[use] || []).map(function (p) { return { name: p[0], cat: p[1], sign: p[2] || '' }; });
+  return list.map(function (r) { return { name: r.name, cat: r.cat, sign: r.sign || '' }; });
+}
+/* 支出明細的常用項目：照設定的清單顯示，附上次金額 */
 function linePresets() {
-  var stat = {};
+  var last = {};
   view().daily.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (r) {
-    (r.lines || []).forEach(function (l) {
-      var n = String(l.name || '').trim();
-      if (!n || /舊資料|未命名/.test(n)) return;
-      if (!stat[n]) stat[n] = { n: 0 };
-      stat[n].n++; stat[n].cat = l.cat || stat[n].cat; stat[n].last = l.amount;
-    });
+    (r.lines || []).forEach(function (l) { var n = String(l.name || '').trim(); if (n) last[n] = l.amount; });
   });
-  var out = [], seen = {};
-  function push(n, cat) {
-    if (seen[n]) return; seen[n] = true;
-    var st = stat[n], c = (st && st.cat) || cat;
-    if (c !== LINE_OTHER && c !== LINE_WAGE && ST.lineCats.indexOf(c) < 0) c = ST.lineCats.indexOf(n) >= 0 ? n : LINE_OTHER;
-    out.push({ name: n, cat: c, last: st ? st.last : null });
-  }
-  Object.keys(stat).sort(function (a, b) { return stat[b].n - stat[a].n; }).forEach(function (n) { push(n); });
-  LINE_PRESETS.forEach(function (p) { push(p[0], p[1]); });
-  // 用過的排前面，但預設項目一定要在，總數最多 12
-  var defaults = LINE_PRESETS.map(function (p) { return p[0]; });
-  var learned = out.filter(function (x) { return defaults.indexOf(x.name) < 0; }).slice(0, Math.max(0, 12 - defaults.length));
-  return out.filter(function (x) { return defaults.indexOf(x.name) >= 0 || learned.indexOf(x) >= 0; })
-    .sort(function (a, b) { return ((stat[b.name] || {}).n || 0) - ((stat[a.name] || {}).n || 0); });
+  return presetsFor('每日結帳').map(function (p) {
+    var c = p.cat;
+    if (c !== LINE_OTHER && c !== LINE_WAGE && ST.lineCats.indexOf(c) < 0) c = ST.lineCats.indexOf(p.name) >= 0 ? p.name : LINE_OTHER;
+    return { name: p.name, cat: c, last: last[p.name] === undefined ? null : last[p.name] };
+  });
 }
 function renderLineChips() {
   var have = {}; ST.lines.forEach(function (l) { have[String(l.name || '').trim()] = true; });
@@ -682,29 +687,9 @@ function openEmp(name) {
 }
 function hasRate(it) { return it.rate !== '' && it.rate !== undefined && it.rate !== null; }
 
-/* 常用項目：[名稱, 類別, 1=加項 / -1=扣項] */
-var PAY_PRESETS = [
-  ['加班費', '薪資', 1], ['多加班', '薪資', 1], ['全勤獎金', '薪資', 1], ['責任津貼', '薪資', 1], ['職務加給', '薪資', 1],
-  ['銷假上班', '薪資', 1], ['節日獎金', '薪資', 1], ['早退', '薪資', -1], ['請假扣薪', '薪資', -1],
-  ['扣健保(自付)', '薪資', -1], ['扣勞保(自付)', '薪資', -1], ['已預支', '預支', -1],
-  ['勞退(公司)', '公司負擔', 1], ['健保(公司)', '公司負擔', 1], ['勞保(公司)', '公司負擔', 1]
-];
-// 從過去的人事紀錄學習：用越多次的排越前面，類別和正負也照過去的習慣
+/* 人事常用項目：[名稱, 類別, 1=加項 / -1=扣項]，照設定的清單 */
 function payPresets() {
-  var stat = {};
-  view().payroll.forEach(function (x) {
-    var n = String(x.item || '').trim();
-    if (!n || n === '月薪' || n === '時薪' || n === '薪資' || hasRate(x)) return;
-    if (!stat[n]) stat[n] = { n: 0, kind: x.kind || '薪資', neg: 0 };
-    stat[n].n++; stat[n].kind = x.kind || stat[n].kind;
-    if (Number(x.amount) < 0) stat[n].neg++;
-  });
-  var learned = Object.keys(stat).sort(function (a, b) { return stat[b].n - stat[a].n; }).slice(0, 12).map(function (n) {
-    return [n, stat[n].kind, stat[n].neg * 2 > stat[n].n ? -1 : 1];
-  });
-  var seen = {}, out = [];
-  learned.concat(PAY_PRESETS).forEach(function (p) { if (!seen[p[0]]) { seen[p[0]] = true; out.push(p); } });
-  return out;
+  return presetsFor('人事').map(function (p) { return [p.name, p.cat || '薪資', p.sign === '扣' ? -1 : 1]; });
 }
 function renderPresetChips() {
   var have = {}; ST.items.forEach(function (it) { have[String(it.item || '').trim()] = true; });
@@ -801,18 +786,15 @@ function saveDelivery() {
 }
 
 /* ---------- 固定/其他支出 ---------- */
-/* 固定／其他支出的常用項目：內建＋過去用過的（用越多次越前面） */
-var EXP_PRESETS = [['房租', '固定'], ['電費', '固定'], ['水費', '固定'], ['電話費', '固定'], ['網路費', '固定'], ['瓦斯費', '固定'],
-  ['拜拜', '固定'], ['聚餐', '其他'], ['外送費用', '其他']];
-// 只顯示固定的常用項目；旁邊附上次的金額
+/* 固定／其他支出的常用項目：照設定的清單，附上次金額 */
 function expensePresets() {
   var last = {};
   view().expense.slice().sort(function (a, b) { return a.month < b.month ? -1 : 1; }).forEach(function (x) {
     var n = String(x.item || '').trim(); if (n) last[n] = { amount: x.amount, month: x.month };
   });
-  return EXP_PRESETS.map(function (p) {
-    var l = last[p[0]];
-    return { name: p[0], type: p[1], last: l ? l.amount : null, lastMonth: l ? l.month : '' };
+  return presetsFor('固定支出').map(function (p) {
+    var l = last[p.name];
+    return { name: p.name, type: p.cat === '其他' ? '其他' : '固定', last: l ? l.amount : null, lastMonth: l ? l.month : '' };
   });
 }
 function pickExpense(i) {
@@ -1002,7 +984,7 @@ function renderSummaryTab() {
 }
 
 /* ---------- 裝置設定 ---------- */
-var OP_NAMES = { 'daily.upsert': '每日結帳', 'purchase.add': '新增進貨', 'purchase.del': '刪除進貨', 'expense.add': '新增支出',
+var OP_NAMES = { 'presets.set': '常用項目設定', 'daily.upsert': '每日結帳', 'purchase.add': '新增進貨', 'purchase.del': '刪除進貨', 'expense.add': '新增支出',
   'expense.del': '刪除支出', 'deduct.add': '新增扣除', 'deduct.del': '刪除扣除', 'payroll.upsert': '人事', 'delivery.upsert': '外送對帳' };
 function opLabel(op) {
   if (!op) return '';
@@ -1017,7 +999,65 @@ function checkUpdate() {
     setTimeout(function () { if (!ST.reloading) { saveOutbox(); location.reload(); } }, 1500);
   }, function () { toast('沒有網路，無法檢查更新'); });
 }
+/* ---------- 常用項目設定（管理） ---------- */
+var PE_USES = [['每日結帳', '每日結帳・支出明細'], ['固定支出', '固定／其他支出'], ['人事', '人事']];
+function peCatOptions(use) {
+  if (use === '每日結帳') return [['進貨', categoriesFor(todayStr().slice(0, 7))], ['其他', [LINE_OTHER, LINE_WAGE]]];
+  if (use === '固定支出') return [['', ['固定', '其他']]];
+  return [['', ['薪資', '公司負擔', '預支']]];
+}
+function renderPresetEditor() {
+  if (!isAdmin()) { $('set-presets-card').classList.add('hide'); return; }
+  $('set-presets-card').classList.remove('hide');
+  if (!ST.pe) ST.pe = { use: '每日結帳', items: null, dirty: false };
+  if (!ST.pe.items) ST.pe.items = presetsFor(ST.pe.use);
+  $('pe-uses').innerHTML = PE_USES.map(function (u) {
+    return '<button class="' + (u[0] === ST.pe.use ? 'on' : '') + '" onclick="peUse(\'' + u[0] + '\')">' + u[1] + '</button>';
+  }).join('');
+  var groups = peCatOptions(ST.pe.use), isPay = ST.pe.use === '人事';
+  $('pe-list').innerHTML = ST.pe.items.map(function (it, i) {
+    var sel = '<select onchange="peSet(' + i + ',\'cat\',this.value)">' + groups.map(function (g) {
+      var opts = g[1].map(function (c) { return '<option' + (c === it.cat ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
+      return g[0] ? '<optgroup label="' + g[0] + '">' + opts + '</optgroup>' : opts;
+    }).join('') + '</select>';
+    var sign = isPay ? '<select class="pe-sign" onchange="peSet(' + i + ',\'sign\',this.value)"><option' + (it.sign !== '扣' ? ' selected' : '') + '>加</option><option' + (it.sign === '扣' ? ' selected' : '') + '>扣</option></select>' : '';
+    return '<div class="pe-row' + (isPay ? ' pay' : '') + '"><input value="' + esc(it.name) + '" placeholder="名稱" oninput="peSet(' + i + ',\'name\',this.value)">' + sel + sign +
+      '<button class="pe-mv" onclick="peMove(' + i + ',-1)" aria-label="上移">↑</button><button class="pe-mv" onclick="peMove(' + i + ',1)" aria-label="下移">↓</button>' +
+      '<button class="danger" onclick="peDel(' + i + ')">✕</button></div>';
+  }).join('') || '<p class="muted">清單是空的，按下面「＋新增項目」</p>';
+  $('pe-save').disabled = !ST.pe.dirty;
+  $('pe-save').textContent = ST.pe.dirty ? '儲存「' + PE_USES.filter(function (u) { return u[0] === ST.pe.use; })[0][1] + '」常用項目' : '沒有變更';
+}
+function peUse(u) {
+  if (ST.pe.dirty && !confirm('這一類還沒儲存，確定要切換？（改的內容會不見）')) return;
+  ST.pe = { use: u, items: null, dirty: false }; renderPresetEditor();
+}
+function peSet(i, k, v) { ST.pe.items[i][k] = v; ST.pe.dirty = true; $('pe-save').disabled = false; $('pe-save').textContent = '儲存變更'; }
+function peMove(i, d) { var j = i + d; if (j < 0 || j >= ST.pe.items.length) return; var t = ST.pe.items[i]; ST.pe.items[i] = ST.pe.items[j]; ST.pe.items[j] = t; ST.pe.dirty = true; renderPresetEditor(); }
+function peDel(i) { ST.pe.items.splice(i, 1); ST.pe.dirty = true; renderPresetEditor(); }
+function peAdd() {
+  var g = peCatOptions(ST.pe.use);
+  ST.pe.items.push({ name: '', cat: ST.pe.use === '每日結帳' ? LINE_OTHER : g[0][1][0], sign: ST.pe.use === '人事' ? '加' : '' });
+  ST.pe.dirty = true; renderPresetEditor();
+  var rows = $('pe-list').querySelectorAll('.pe-row'); rows[rows.length - 1].querySelector('input').focus();
+}
+function peReset() {
+  if (!confirm('恢復成原本的預設項目？')) return;
+  ST.pe.items = (PRESET_DEFAULTS[ST.pe.use] || []).map(function (p) { return { name: p[0], cat: p[1], sign: p[2] || '' }; });
+  ST.pe.dirty = true; renderPresetEditor();
+}
+function peSave() {
+  var items = ST.pe.items.map(function (it) { return { name: String(it.name || '').trim(), cat: it.cat, sign: it.sign || '' }; }).filter(function (it) { return it.name; });
+  var names = items.map(function (it) { return it.name; });
+  if (names.some(function (n, i) { return names.indexOf(n) !== i; })) return toast('有重複的名稱，請改掉');
+  enqueue('presets.set', { use: ST.pe.use, items: items });
+  ST.pe = { use: ST.pe.use, items: null, dirty: false };
+  renderPresetEditor();
+  toast('常用項目已儲存 ✓（所有裝置同步後都會更新）');
+}
+
 function renderSettingsTab() {
+  renderPresetEditor();
   if (!ST.swVersion && navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
   $('set-info').innerHTML =
     '店別：<b>' + esc(ST.sess.store) + '</b>（' + (isAdmin() ? '管理' : '店長') + '）<br>' +

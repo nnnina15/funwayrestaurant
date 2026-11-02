@@ -12,7 +12,7 @@
 const TZ = 'Asia/Taipei';
 
 const S = {
-  STORE: '設定_店家', PARTNER: '設定_股東', CAT: '設定_進貨分類', EMP: '設定_員工',
+  STORE: '設定_店家', PARTNER: '設定_股東', CAT: '設定_進貨分類', EMP: '設定_員工', PRESET: '設定_常用項目',
   DAILY: '每日營收', PURCHASE: '進貨', EXPENSE: '其他支出', PAYROLL: '人事明細',
   DELIVERY: '外送對帳', DEDUCT: '分配前扣除',
   R_MONTH: '報表_月結', R_SHARE: '報表_分紅', R_CAT: '報表_進貨分類', R_WARN: '警示'
@@ -23,6 +23,7 @@ HEAD[S.STORE] = ['店別', '店長PIN', '管理PIN', '手續費率(%)', '現金�
 HEAD[S.PARTNER] = ['店別', '股東', '比例(%)'];
 HEAD[S.CAT] = ['店別(全部/店名)', '分類', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 HEAD[S.EMP] = ['店別', '姓名', '類型(正職/計時)', '月薪', '時薪', '員工自付健保', '員工自付勞保', '公司勞退', '公司健保', '公司勞保', '在職(是/否)'];
+HEAD[S.PRESET] = ['店別', '用途', '名稱', '分類', '加扣'];   // 用途：每日結帳／固定支出／人事
 HEAD[S.DAILY] = ['輸入時間', '日期', '店別', '公休', '現場', 'Panda', 'Uber', '全支付', 'LINE Pay', '現場支出', '點收現金', '應有現金', '現金差額', '備註', '裝置', '支出明細'];
 HEAD[S.PURCHASE] = ['編號', '輸入時間', '日期', '店別', '分類', '金額', '備註', '裝置'];
 HEAD[S.EXPENSE] = ['編號', '輸入時間', '月份', '店別', '類型', '項目', '金額', '備註', '裝置'];
@@ -41,6 +42,19 @@ const PAYROLL_KINDS = ['薪資', '公司負擔', '預支'];
 const EXPENSE_TYPES = ['固定', '其他'];
 const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除'];
 const PLATFORMS = ['Panda', 'Uber'];
+// 常用項目的預設值（App 裡「裝置 → 常用項目設定」可以改）
+const DEFAULT_PRESETS = [
+  ['每日結帳', '米', '米', ''], ['每日結帳', '菜', '菜', ''], ['每日結帳', '蔥', '菜', ''], ['每日結帳', '油條', '其他支出', ''],
+  ['每日結帳', '燉滷', '其他支出', ''], ['每日結帳', 'PT', '薪資／預支', ''],
+  ['固定支出', '房租', '固定', ''], ['固定支出', '電費', '固定', ''], ['固定支出', '水費', '固定', ''], ['固定支出', '電話費', '固定', ''],
+  ['固定支出', '網路費', '固定', ''], ['固定支出', '瓦斯費', '固定', ''], ['固定支出', '拜拜', '固定', ''], ['固定支出', '聚餐', '其他', ''],
+  ['固定支出', '外送費用', '其他', ''],
+  ['人事', '加班費', '薪資', '加'], ['人事', '多加班', '薪資', '加'], ['人事', '全勤獎金', '薪資', '加'], ['人事', '責任津貼', '薪資', '加'],
+  ['人事', '職務加給', '薪資', '加'], ['人事', '銷假上班', '薪資', '加'], ['人事', '節日獎金', '薪資', '加'], ['人事', '早退', '薪資', '扣'],
+  ['人事', '請假扣薪', '薪資', '扣'], ['人事', '扣健保(自付)', '薪資', '扣'], ['人事', '扣勞保(自付)', '薪資', '扣'], ['人事', '已預支', '預支', '扣'],
+  ['人事', '勞退(公司)', '公司負擔', '加'], ['人事', '健保(公司)', '公司負擔', '加'], ['人事', '勞保(公司)', '公司負擔', '加']
+];
+const PRESET_USES = ['每日結帳', '固定支出', '人事'];
 const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del'];
 
 /* ============================================================
@@ -79,6 +93,7 @@ function setup() {
     ['大埔店', '範例計時(請改名)', '計時', '', 250, '', '', '', '', '', '是']
   ]);
 
+  seed_(S.PRESET, DEFAULT_PRESETS.map(function (p) { return ['全部'].concat(p); }));
   secret_();   // 建立登入用的密鑰
   MailApp.getRemainingDailyQuota();   // 先要求寄信權限，之後鎖定通知才寄得出去
   const has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'buildReports'; });
@@ -335,6 +350,15 @@ function applyServerOp_(store, op) {
     case 'purchase.del': deleteWhere_(S.PURCHASE, byId_(store, d.id)); return 'ok';
     case 'expense.del': deleteWhere_(S.EXPENSE, byId_(store, d.id)); return 'ok';
     case 'deduct.del': deleteWhere_(S.DEDUCT, byId_(store, d.id)); return 'ok';
+    case 'presets.set': {
+      const use = str_(d.use);
+      if (PRESET_USES.indexOf(use) < 0) throw new Error('常用項目用途錯誤');
+      deleteWhere_(S.PRESET, function (x) { return str_(x['店別']) === store && str_(x['用途']) === use; });
+      append_(S.PRESET, (d.items || []).filter(function (it) { return str_(it.name); }).map(function (it) {
+        return { '店別': store, '用途': use, '名稱': str_(it.name), '分類': str_(it.cat), '加扣': str_(it.sign) === '扣' ? '扣' : (use === '人事' ? '加' : '') };
+      }));
+      return 'ok';
+    }
     case 'payroll.upsert': {
       const month = monthKey_(d.month), name = str_(d.name);
       if (!month || !name) throw new Error('人事缺月份或姓名');
@@ -412,7 +436,8 @@ function pull_(s, role) {
     expense: all ? rows_(S.EXPENSE).map(rec_.expense).filter(mine) : [],
     payroll: all ? rows_(S.PAYROLL).map(rec_.payroll).filter(mine) : [],
     delivery: all ? rows_(S.DELIVERY).map(rec_.delivery).filter(mine) : [],
-    deduct: all ? rows_(S.DEDUCT).map(rec_.deduct).filter(mine) : []
+    deduct: all ? rows_(S.DEDUCT).map(rec_.deduct).filter(mine) : [],
+    presets: rows_(S.PRESET).map(rec_.preset).filter(function (r) { return r.name && (r.store === s.name || r.store === '全部'); })
   };
   const config = {
     store: { name: s.name, fee: s.fee, cashIn: s.cashIn, cashWarn: s.cashWarn },
@@ -428,6 +453,9 @@ function pull_(s, role) {
 }
 
 const rec_ = {
+  preset: function (r) {
+    return { store: str_(r['店別']) || '全部', use: str_(r['用途']), name: str_(r['名稱']), cat: str_(r['分類']), sign: str_(r['加扣']) };
+  },
   daily: function (r) {
     return { store: str_(r['店別']), date: dateKey_(r['日期']), closed: yes_(r['公休']), site: num_(r['現場']),
       panda: num_(r['Panda']), uber: num_(r['Uber']), allpay: num_(r['全支付']), line: num_(r['LINE Pay']),

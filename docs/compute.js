@@ -184,6 +184,12 @@ function applyOp_(state, op, store) {
           kind: it.kind, hours: it.hours, rate: it.rate, editedAt: d.editedAt });
       });
       break;
+    case 'presets.set':
+      state.presets = keep(state.presets || [], function (r) { return r.use === d.use && r.store === store; });
+      (d.items || []).forEach(function (it) {
+        if (it.name) state.presets.push({ store: store, use: d.use, name: it.name, cat: it.cat || '', sign: it.sign || '' });
+      });
+      break;
     case 'delivery.upsert':
       state.delivery = keep(state.delivery, function (r) { return r.month === d.month && r.platform === d.platform; });
       state.delivery.push(Object.assign({ store: store }, d));

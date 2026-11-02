@@ -96,6 +96,16 @@ assert.strictEqual(row26['支出明細'], '燉滷 500｜米 3516（記帳→米#
 assert.strictEqual(row26['應有現金'], 29125 - 575 - 3713 - 1300);
 assert.deepStrictEqual(r.data.daily.find(x => x.date === '2026-10-26').lines, lines);
 
+// 常用項目：預設有資料；管理可以改（只改這家店），店長不行
+assert.ok(adm.data.presets.some(x => x.use === '每日結帳' && x.name === 'PT' && x.cat === '薪資／預支' && x.store === '全部'));
+r = g.post({ action: 'sync', store: '大埔店', token: mgr.token, ops: [op('presets.set', { use: '每日結帳', items: [{ name: 'X', cat: '米' }] })] });
+assert.strictEqual(r.results[0].status, 'error', '店長不能改常用項目');
+r = g.post({ action: 'sync', store: '大埔店', token: adm.token, ops: [op('presets.set', { use: '每日結帳', items: [{ name: '豬肉', cat: '豬肉攤' }, { name: '米', cat: '米' }] })] });
+assert.strictEqual(r.results[0].status, 'ok');
+assert.deepStrictEqual(r.data.presets.filter(x => x.use === '每日結帳' && x.store === '大埔店').map(x => x.name), ['豬肉', '米']);
+const zz = g.post({ action: 'login', store: '中正店', pin: '9999' });
+assert.ok(!zz.data.presets.some(x => x.store === '大埔店'), '中正店看不到大埔店自己的設定');
+
 // 猜錯 5 次鎖定，連正確 PIN 也暫時不能登入
 for (let i = 0; i < 5; i++) assert.strictEqual(g.post({ action: 'login', store: '中正店', pin: '000' + i }).ok, false);
 assert.strictEqual(g.mails.length, 1, '第 5 次錯要寄一封信');

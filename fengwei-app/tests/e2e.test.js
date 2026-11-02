@@ -121,6 +121,22 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok(!tabsA.includes('人事') && !tabsA.includes('月結總覽'));
   assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '裝置'], '店長只有三個分頁');
   console.log('多裝置 + 權限 ✓');
+  // 常用項目設定：把每日結帳的清單改成「豬肉、米」，存檔同步後平板（店長）也看得到
+  await B.pg.click('#tb-settings');
+  assert.ok(await B.pg.isVisible('#set-presets-card'), '管理要看得到常用項目設定');
+  while (await B.pg.locator('#pe-list .pe-row').count() > 1) await B.pg.locator('#pe-list .pe-row .danger').first().click();
+  await B.pg.locator('#pe-list .pe-row input').first().fill('米'); await B.pg.locator('#pe-list .pe-row select').first().selectOption('米');
+  await B.pg.click('#tab-settings .addline'); const nr = B.pg.locator('#pe-list .pe-row').last();
+  await nr.locator('input').fill('豬肉'); await nr.locator('select').selectOption('豬肉攤');
+  await B.pg.locator('#pe-list .pe-row .pe-mv').nth(2).click();   // 豬肉 上移
+  await B.pg.click('#pe-save');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  assert.deepStrictEqual(g.rows('設定_常用項目').filter(r => r['店別'] === '大埔店' && r['用途'] === '每日結帳').map(r => r['名稱'] + '/' + r['分類']), ['豬肉/豬肉攤', '米/米']);
+  await A.pg.evaluate(() => trySync(true)); await A.pg.waitForTimeout(500);
+  await A.pg.click('#tb-daily');
+  assert.strictEqual((await A.pg.textContent('#d-presets')).replace(/[0-9,]/g, ''), '＋豬肉＋米', '平板的按鈕要照新清單');
+  assert.ok(!(await A.pg.isVisible('#set-presets-card')), '店長看不到常用項目設定');
+
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
   await B.pg.setViewportSize({ width: 390, height: 844 });
   assert.ok(await B.pg.isVisible('#bottombar') && !(await B.pg.isVisible('#tabs')), '手機要用下方分頁列');
