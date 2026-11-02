@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.9';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.10';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -144,7 +144,7 @@ function addSteppers() {
       var lab = document.createElement('span'); lab.className = 'pk-label';
       box.appendChild(lab); box.appendChild(el); w.appendChild(box);
       var desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-      var paint = function () { var v = desc.get.call(el), p = v.split('-'); lab.textContent = v ? (p[2] ? p[0] + '/' + Number(p[1]) + '/' + Number(p[2]) : p[0] + '/' + Number(p[1])) : '選擇'; };
+      var paint = function () { var v = desc.get.call(el), p = v.split('-'); lab.textContent = v ? (p[2] ? p[0] + '/' + Number(p[1]) + '/' + Number(p[2]) : p[0] + '/' + Number(p[1]) + '月') : '選擇'; };
       Object.defineProperty(el, 'value', { configurable: true, get: function () { return desc.get.call(el); }, set: function (v) { desc.set.call(el, v); paint(); } });
       el.addEventListener('input', paint); el.addEventListener('change', paint);
       el.addEventListener('click', function () { try { if (el.showPicker) el.showPicker(); } catch (e) {} });
