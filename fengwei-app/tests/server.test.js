@@ -25,6 +25,12 @@ let r = g.post({ action: 'sync', store: '大埔店', token: mgr.token, ops: [
   op('payroll.upsert', { month: '2026-10', name: 'X', items: [], editedAt: '2026-10-01 21:00:00' })
 ]});
 assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'ok', 'error'], '店長不能改人事');
+r = g.post({ action: 'sync', store: '大埔店', token: mgr.token, ops: [
+  op('expense.add', { id: 'E20261001abc', month: '2026-10', type: '其他', item: '燉滷', amount: 500 }),
+  op('expense.add', { id: 'x1', month: '2026-10', type: '固定', item: '房租', amount: 1 })
+]});
+assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'error'], '店長只能記結帳單產生的其他支出');
+g.post({ action: 'sync', store: '大埔店', token: mgr.token, ops: [op('expense.del', { id: 'E20261001abc' })] });
 assert.strictEqual(g.rows(S.DAILY)[0]['應有現金'], 23605);
 assert.strictEqual(g.rows(S.DAILY)[0]['現金差額'], 0);
 
@@ -80,6 +86,15 @@ r = g.post({ action: 'sync', store: '大埔店', token: adm.token, ops: [
 ]});
 assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'stale'], '日期格式的舊紀錄要能正確比較新舊');
 assert.strictEqual(g.rows(S.DAILY).find(x => x['日期'] === '2026-09-20')['現場'], 200);
+
+// 每日結帳的支出明細：存成好讀的文字，讀回來一樣
+const lines = [{ name: '燉滷', amount: 500, cash: true, cat: '' }, { name: '米', amount: 3516, cash: false, cat: '米', pid: 'D20261026ab' },
+  { name: 'PT', amount: 800, cash: true, cat: '' }];
+r = g.post({ action: 'sync', store: '大埔店', token: adm.token, ops: [op('daily.upsert', { date: '2026-10-26', site: 29125, allpay: 575, line: 3713, spend: 1300, cash: 23537, lines, editedAt: '2026-11-02 10:00:00' })] });
+const row26 = g.rows(S.DAILY).find(x => x['日期'] === '2026-10-26');
+assert.strictEqual(row26['支出明細'], '燉滷 500｜米 3516（記帳→米#D20261026ab）｜PT 800');
+assert.strictEqual(row26['應有現金'], 29125 - 575 - 3713 - 1300);
+assert.deepStrictEqual(r.data.daily.find(x => x.date === '2026-10-26').lines, lines);
 
 // 猜錯 5 次鎖定，連正確 PIN 也暫時不能登入
 for (let i = 0; i < 5; i++) assert.strictEqual(g.post({ action: 'login', store: '中正店', pin: '000' + i }).ok, false);

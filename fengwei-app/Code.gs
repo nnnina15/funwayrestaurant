@@ -23,7 +23,7 @@ HEAD[S.STORE] = ['店別', '店長PIN', '管理PIN', '手續費率(%)', '現金�
 HEAD[S.PARTNER] = ['店別', '股東', '比例(%)'];
 HEAD[S.CAT] = ['店別(全部/店名)', '分類', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 HEAD[S.EMP] = ['店別', '姓名', '類型(正職/計時)', '月薪', '時薪', '員工自付健保', '員工自付勞保', '公司勞退', '公司健保', '公司勞保', '在職(是/否)'];
-HEAD[S.DAILY] = ['輸入時間', '日期', '店別', '公休', '現場', 'Panda', 'Uber', '全支付', 'LINE Pay', '現場支出', '點收現金', '應有現金', '現金差額', '備註', '裝置'];
+HEAD[S.DAILY] = ['輸入時間', '日期', '店別', '公休', '現場', 'Panda', 'Uber', '全支付', 'LINE Pay', '現場支出', '點收現金', '應有現金', '現金差額', '備註', '裝置', '支出明細'];
 HEAD[S.PURCHASE] = ['編號', '輸入時間', '日期', '店別', '分類', '金額', '備註', '裝置'];
 HEAD[S.EXPENSE] = ['編號', '輸入時間', '月份', '店別', '類型', '項目', '金額', '備註', '裝置'];
 HEAD[S.PAYROLL] = ['輸入時間', '月份', '店別', '姓名', '項目', '金額', '類別', '時數', '時薪', '裝置'];
@@ -250,7 +250,8 @@ function sync_(req) {
     withLock_(function () {
       ops.forEach(function (op) {
         try {
-          if (role !== 'admin' && MANAGER_OPS.indexOf(op.type) < 0) throw new Error('店長 PIN 沒有權限：' + op.type);
+          const fromSlip = /^expense\.(add|del)$/.test(op.type) && /^E\d{8}/.test(str_((op.data || {}).id));   // 每日結帳自動產生的其他支出
+          if (role !== 'admin' && MANAGER_OPS.indexOf(op.type) < 0 && !fromSlip) throw new Error('店長 PIN 沒有權限：' + op.type);
           const st = applyServerOp_(s.name, op);
           if (st === 'ok') changed++;
           results.push({ id: op.id, status: st });
@@ -305,7 +306,7 @@ function applyServerOp_(store, op) {
       append_(S.DAILY, [{ '輸入時間': at, '日期': date, '店別': store, '公休': d.closed ? '是' : '',
         '現場': site, 'Panda': num_(d.panda), 'Uber': num_(d.uber), '全支付': allpay, 'LINE Pay': line,
         '現場支出': spend, '點收現金': cash, '應有現金': expected, '現金差額': d.closed ? 0 : cash - expected,
-        '備註': str_(d.note), '裝置': dev }]);
+        '備註': str_(d.note), '裝置': dev, '支出明細': linesText_(d.lines) }]);
       return 'ok';
     }
     case 'purchase.add': {
@@ -364,6 +365,27 @@ function applyServerOp_(store, op) {
   throw new Error('未知的操作：' + op.type);
 }
 
+// 支出明細：存成好讀的文字，例如「燉滷 500｜米 3516（記帳→米）」，App 讀回來可以再編輯
+function linesText_(lines) {
+  return (lines || []).filter(function (l) { return str_(l.name) || num_(l.amount); }).map(function (l) {
+    const tag = [];
+    if (l.cash === false) tag.push('記帳');
+    if (str_(l.cat)) tag.push('→' + str_(l.cat) + (str_(l.pid) ? '#' + str_(l.pid) : ''));
+    return str_(l.name).replace(/[｜（）]/g, ' ') + ' ' + num_(l.amount) + (tag.length ? '（' + tag.join('') + '）' : '');
+  }).join('｜');
+}
+function parseLines_(text) {
+  text = str_(text);
+  if (!text) return [];
+  return text.split('｜').map(function (part) {
+    const m = part.match(/^(.*?)\s+(-?[\d.]+)(?:（(記帳)?(?:→([^#）]+)(?:#([^）]+))?)?）)?$/);
+    if (!m) return { name: part, amount: 0, cash: true, cat: '' };
+    const o = { name: m[1], amount: Number(m[2]), cash: !m[3], cat: m[4] || '' };
+    if (m[5]) o.pid = m[5];
+    return o;
+  });
+}
+
 // 別台裝置已經存了「更新」的版本 → 這筆舊的不要蓋掉
 function newer_(name, pred, at) {
   return rows_(name).some(function (x) { return pred(x) && tsKey_(x['輸入時間']) > at; });
@@ -410,7 +432,7 @@ const rec_ = {
     return { store: str_(r['店別']), date: dateKey_(r['日期']), closed: yes_(r['公休']), site: num_(r['現場']),
       panda: num_(r['Panda']), uber: num_(r['Uber']), allpay: num_(r['全支付']), line: num_(r['LINE Pay']),
       spend: num_(r['現場支出']), cash: num_(r['點收現金']), cashDiff: num_(r['現金差額']),
-      note: str_(r['備註']), editedAt: tsKey_(r['輸入時間']), device: str_(r['裝置']) };
+      note: str_(r['備註']), editedAt: tsKey_(r['輸入時間']), device: str_(r['裝置']), lines: parseLines_(r['支出明細']) };
   },
   purchase: function (r) {
     return { store: str_(r['店別']), id: str_(r['編號']), date: dateKey_(r['日期']), cat: str_(r['分類']),

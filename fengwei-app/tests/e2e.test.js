@@ -29,8 +29,24 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await A.ctx.setOffline(true);
   await A.pg.reload(); await A.pg.waitForSelector('#tab-daily:not(.hide)');            // 沒網路也能打開
   await A.pg.fill('#d-date', '2026-11-01'); await A.pg.dispatchEvent('#d-date', 'change');
-  for (const [id, v] of [['d-site', '31455'], ['d-panda', '4974'], ['d-uber', '555'], ['d-allpay', '80'], ['d-line', '1260'], ['d-spend', '6510'], ['d-cash', '23400']]) await A.pg.fill('#' + id, v);
-  await A.pg.dispatchEvent('#d-cash', 'input');
+  // 照紙本結帳單輸入（10/26 那張）
+  for (const [id, v] of [['d-site', '29125'], ['d-panda', '6358'], ['d-uber', '4562'], ['d-allpay', '575'], ['d-line', '3713']]) await A.pg.fill('#' + id, v);
+  const slip = [['燉滷', '500', '其他支出'], ['油條', '400', '其他支出'], ['蔥', '140', '菜'], ['PT', '800', '薪資／預支'], ['淳', '420', '其他支出']];
+  for (let i = 0; i < slip.length; i++) {
+    if (i > 0) await A.pg.click('text=＋ 新增一行');
+    const row = A.pg.locator('#d-lines .line').nth(i);
+    await row.locator('input').nth(0).fill(slip[i][0]); await row.locator('input').nth(1).fill(slip[i][1]);
+    await row.locator('select').selectOption(slip[i][2]);
+  }
+  await A.pg.fill('#d-cash', '22835'); await A.pg.dispatchEvent('#d-cash', 'input');
+  assert.strictEqual(await A.pg.textContent('#d-total'), '40,045');
+  assert.strictEqual(await A.pg.textContent('#d-spendv'), '-2,260');
+  assert.strictEqual(await A.pg.textContent('#d-expected'), '22,577');
+  assert.strictEqual(await A.pg.textContent('#d-diff'), '+258');
+  await A.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-daily.png'), fullPage: true });
+  await A.pg.click('text=儲存今日結帳');
+  // 改一筆再存一次：不能重複記
+  await A.pg.locator('#d-lines .line').nth(2).locator('input').nth(1).fill('150');
   await A.pg.click('text=儲存今日結帳');
   await A.pg.click('#tb-purchase'); await A.pg.fill('#p-date', '2026-11-01'); await A.pg.dispatchEvent('#p-date', 'change');
   await A.pg.click('#p-cats button:has-text("乾貨/配菜")'); await A.pg.fill('#p-amount', '3200+575+140+200'); await A.pg.click('text=新增這筆');
@@ -38,22 +54,27 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   const cats = await A.pg.$$eval('#p-cats button', bs => bs.map(b => b.textContent));
   assert.ok(!cats.includes('牛亨'), '11 月不該出現牛亨');
   const status = await A.pg.textContent('#sync');
-  console.log('離線狀態列：', status); assert.ok(/離線｜3 筆待上傳/.test(status));
-  assert.ok((await A.pg.textContent('#banner')).includes('3 筆'), '提示要和狀態列一致');
+  console.log('離線狀態列：', status); assert.ok(/離線｜\d+ 筆待上傳/.test(status));
+  assert.ok((await A.pg.textContent('#banner')).includes(status.match(/(\d+) 筆/)[1] + ' 筆'), '提示要和狀態列一致');
   await A.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-offline.png') });
   assert.strictEqual(g.rows(S.PURCHASE).length, 0, '離線時伺服器不該有資料');
   // 恢復網路 → 自動同步
   await A.ctx.setOffline(false);
   await A.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
-  assert.strictEqual(g.rows(S.PURCHASE).length, 2); assert.strictEqual(g.rows(S.PURCHASE).find(r => r['分類'] === '乾貨/配菜')['金額'], 4115);
-  assert.strictEqual(g.rows(S.DAILY)[0]['現金差額'], -205); assert.strictEqual(g.rows(S.DAILY)[0]['裝置'], '大埔平板');
+  assert.strictEqual(g.rows(S.PURCHASE).length, 3, '手動 2 筆 + 結帳單的蔥 1 筆（改過也只有 1 筆）');
+  assert.strictEqual(g.rows(S.PURCHASE).find(r => r['分類'] === '乾貨/配菜')['金額'], 4115);
+  assert.strictEqual(g.rows(S.PURCHASE).find(r => r['分類'] === '菜')['金額'], 150);
+  assert.deepStrictEqual(g.rows(S.EXPENSE).map(r => r['項目'] + r['金額']).sort(), ['油條400', '淳420', '燉滷500'], 'PT 是薪資，不另記其他支出');
+  const day = g.rows(S.DAILY)[0];
+  assert.strictEqual(day['現場支出'], 2270); assert.strictEqual(day['現金差額'], 268); assert.strictEqual(day['裝置'], '大埔平板');
+  assert.ok(String(day['支出明細']).startsWith('燉滷 500（→其他支出#E'), day['支出明細']);
   console.log('恢復網路後已同步 ✓');
 
   // 手機（管理）：看得到平板的資料、填人事、看月結
   const B = await device('Nina手機');
   await B.pg.fill('#pin', '9999'); await B.pg.click('#v-login .primary'); await B.pg.waitForSelector('#tab-daily:not(.hide)');
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
-  assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 2, '手機要看到平板的進貨');
+  assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 3, '手機要看到平板的進貨（手動 2 + 結帳單 1）');
   await B.pg.click('#tb-payroll'); await B.pg.click('text=範例計時(請改名)');
   await B.pg.fill('.hours input >> nth=0', '106'); await B.pg.fill('.hours input >> nth=1', '240'); await B.pg.dispatchEvent('.hours input >> nth=0', 'input');
   await B.pg.click('text=＋ 新增項目'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=0', '加班費'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=1', '700'); await B.pg.dispatchEvent('.item-row >> nth=1 >> input >> nth=1', 'input');

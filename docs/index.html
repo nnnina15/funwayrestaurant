@@ -64,6 +64,30 @@
   .ytable td.em { font-weight: 700; }
   .ytable tr.qrow th, .ytable tr.qrow td { background: #f8f3e9; font-weight: 700; }
   .ytable tr.yrow th, .ytable tr.yrow td { background: #efe6d4; font-weight: 700; border-top: 2px solid #d9cdb4; }
+  .slip-top { display: flex; justify-content: space-between; align-items: center; }
+  .slip-top h2 { margin: 0; }
+  .closed { margin: 0; font-size: 17px; color: var(--ink); }
+  .sheet { width: 100%; border-collapse: collapse; margin-top: 12px; table-layout: fixed; }
+  .sheet th, .sheet td { border: 1.5px solid #3b342c; padding: 6px; vertical-align: middle; }
+  .sheet th { background: var(--soft); font-size: 17px; font-weight: 700; text-align: center; }
+  .sheet th.lbl { text-align: left; }
+  .sheet input { border: 0; border-radius: 6px; background: #fffdf8; font-size: 20px; padding: 8px; text-align: right; }
+  .sheet input[type=date] { text-align: left; font-size: 17px; }
+  .sheet td.auto { text-align: right; font-size: 21px; font-weight: 700; padding-right: 12px; font-variant-numeric: tabular-nums; }
+  .sheet td.big2 { font-size: 24px; }
+  .lines-h { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 6px; border-bottom: 1.5px solid #3b342c; padding-bottom: 4px; }
+  .line { display: grid; grid-template-columns: 1.5fr 1fr 1.7fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .line input, .line select { font-size: 17px; padding: 10px; }
+  .line input.amt { text-align: right; }
+  .paybtn { padding: 10px 10px; font-size: 15px; white-space: nowrap; background: #e7f3ec; color: var(--ok); }
+  .paybtn.credit { background: #fdecea; color: var(--bad); }
+  .line.credit input { color: var(--bad); }
+  @media (max-width: 560px) {
+    .sheet input { font-size: 17px; padding: 6px; }
+    .sheet th { font-size: 14px; }
+    .line { grid-template-columns: 1fr 1fr auto; }
+    .line select { grid-column: 1 / 3; grid-row: 2; }
+  }
   .neg-in { color: var(--bad); border-color: #f2b8b0 !important; }
   .calc { background: var(--soft); border-radius: 12px; padding: 12px 14px; margin-top: 14px; font-size: 17px; line-height: 1.8; }
   .calc b { font-size: 20px; }
@@ -133,29 +157,52 @@
   <div id="banner"></div>
 
   <section id="tab-daily">
-    <div class="card">
-      <h2>每日結帳</h2>
-      <div class="grid2">
-        <div><label>日期</label><input id="d-date" type="date" onchange="loadDaily()"></div>
-        <div><label>&nbsp;</label><label style="font-size:18px;color:var(--ink)"><input id="d-closed" type="checkbox" onchange="dailyCalc()"> 今天公休</label></div>
+    <div class="card slip">
+      <div class="slip-top">
+        <h2>每日結帳</h2>
+        <label class="closed"><input id="d-closed" type="checkbox" onchange="dailyCalc()"> 今天公休</label>
       </div>
       <p id="d-exist" class="muted hide"></p>
-      <div id="d-fields">
-        <div class="grid3">
-          <div><label>現場營業額</label><input id="d-site" inputmode="decimal" oninput="dailyCalc()"></div>
-          <div><label>Panda 營業額</label><input id="d-panda" inputmode="decimal" oninput="dailyCalc()"></div>
-          <div><label>Uber 營業額</label><input id="d-uber" inputmode="decimal" oninput="dailyCalc()"></div>
-        </div>
-        <p class="muted">下面三項都是「現場營業額」裡面的錢，用來對現金：</p>
-        <div class="grid3">
-          <div><label>全支付</label><input id="d-allpay" inputmode="decimal" oninput="dailyCalc()"></div>
-          <div><label>LINE Pay</label><input id="d-line" inputmode="decimal" oninput="dailyCalc()"></div>
-          <div><label>現場支出（收銀機付的錢）</label><input id="d-spend" inputmode="decimal" oninput="dailyCalc()"></div>
-        </div>
-        <label>點收現金（實際數到的現金）</label>
-        <input id="d-cash" inputmode="decimal" oninput="dailyCalc()">
-        <div class="calc" id="d-calc"></div>
+      <table class="sheet">
+        <tr>
+          <th class="lbl">日期</th>
+          <th>現場</th><th>Panda</th><th>Uber</th>
+        </tr>
+        <tr>
+          <td><input id="d-date" type="date" onchange="loadDaily()"></td>
+          <td><input id="d-site" inputmode="decimal" oninput="dailyCalc()"></td>
+          <td><input id="d-panda" inputmode="decimal" oninput="dailyCalc()"></td>
+          <td><input id="d-uber" inputmode="decimal" oninput="dailyCalc()"></td>
+        </tr>
+        <tr class="d-body">
+          <th class="lbl">全支付</th><td><input id="d-allpay" inputmode="decimal" oninput="dailyCalc()"></td>
+          <th class="lbl">LINE Pay</th><td><input id="d-line" inputmode="decimal" oninput="dailyCalc()"></td>
+        </tr>
+        <tr class="d-body">
+          <th class="lbl" colspan="2" style="text-align:right">總營收（自動）</th>
+          <td colspan="2" class="auto" id="d-total">0</td>
+        </tr>
+      </table>
+
+      <div class="d-body">
+        <div class="lines-h"><b>支出明細</b><span class="muted">當天付錢的貨和任何支出，每筆都會從現金扣</span></div>
+        <datalist id="d-names"></datalist>
+        <div id="d-lines"></div>
+        <button class="ghost" onclick="addLine()">＋ 新增一行</button>
       </div>
+
+      <table class="sheet d-body" style="margin-top:14px">
+        <tr>
+          <th class="lbl">總支出</th><td class="auto" id="d-spendv">0</td>
+          <th class="lbl">現金盈餘</th><td class="auto" id="d-expected">0</td>
+        </tr>
+        <tr>
+          <th class="lbl">現場現金</th><td><input id="d-cash" inputmode="decimal" oninput="dailyCalc()" placeholder="數到的現金"></td>
+          <th class="lbl">現金差額</th><td class="auto big2" id="d-diff">—</td>
+        </tr>
+      </table>
+      <p class="muted d-body">現金盈餘＝現場 − 全支付 − LINE Pay − 總支出；現金差額＝現場現金 − 現金盈餘</p>
+
       <label>備註</label><input id="d-note">
       <button class="primary" onclick="saveDaily()">儲存今日結帳</button>
     </div>
@@ -273,6 +320,7 @@
   </section>
 </main>
 
+<p id="ver" class="muted" style="text-align:center;margin:8px 0 24px;font-size:13px"></p>
 <div id="toast"></div>
 <div id="busy">處理中…</div>
 

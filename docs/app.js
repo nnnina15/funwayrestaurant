@@ -1,5 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
+var APP_VERSION = '2.5.0';   // 和 sw.js 的 VERSION 一起改
 
 var TABS = [
   ['daily', '每日結帳', false], ['purchase', '進貨', false], ['summary', '月結總覽', true], ['year', '年度總覽', true],
@@ -96,6 +97,7 @@ function showView(name) {
 }
 
 function boot() {
+  $('ver').textContent = '風味記帳 版本 ' + APP_VERSION;
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
   if ('serviceWorker' in navigator) {
     var hadController = !!navigator.serviceWorker.controller;
@@ -326,14 +328,30 @@ setInterval(function () { trySync(); }, 5 * 60000);                          // 
 
 /* ---------- 每日結帳 ---------- */
 function dailyRec(date) { return view().daily.filter(function (r) { return r.date === date; })[0] || null; }
+// 過去用過的支出名稱 → 上次選的分類、付款方式（自動帶入）
+function lineMemory() {
+  var mem = {};
+  view().daily.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (r) {
+    (r.lines || []).forEach(function (l) { if (l.name) mem[l.name] = { cat: l.cat || '' }; });
+  });
+  return mem;
+}
 function loadDaily() {
-  var d = dailyRec($('d-date').value);
+  var date = $('d-date').value;
+  var d = dailyRec(date);
   $('d-closed').checked = !!(d && d.closed);
   setNum('d-site', d && d.site); setNum('d-panda', d && d.panda); setNum('d-uber', d && d.uber);
-  setNum('d-allpay', d && d.allpay); setNum('d-line', d && d.line); setNum('d-spend', d && d.spend);
+  setNum('d-allpay', d && d.allpay); setNum('d-line', d && d.line);
   setNum('d-cash', d && d.cash); $('d-note').value = d ? (d.note || '') : '';
+  if (d && d.lines && d.lines.length) ST.lines = JSON.parse(JSON.stringify(d.lines)).map(function (l) { if (!l.cat) l.cat = LINE_WAGE; return l; });
+  else if (d && d.spend) ST.lines = [{ name: '現場支出（舊資料）', amount: d.spend, cat: LINE_WAGE }];
+  else ST.lines = [{ name: '', amount: '', cat: LINE_OTHER }];
+  ST.lineCats = categoriesFor(date.slice(0, 7));
+  var mem = lineMemory();
+  $('d-names').innerHTML = Object.keys(mem).concat(ST.lineCats).filter(function (x, i, a) { return a.indexOf(x) === i; })
+    .map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
+  renderLines();
   renderDailyExist();
-  dailyCalc();
 }
 function renderDailyExist() {
   var d = dailyRec($('d-date').value);
@@ -341,37 +359,97 @@ function renderDailyExist() {
   if (d) $('d-exist').innerHTML = '這天已經有紀錄（' + esc(d.editedAt || '') + (d.device ? '，' + esc(d.device) : '') + '）' +
     pendTag('daily', d.date) + '，修改後再儲存會覆蓋。';
 }
+var LINE_OTHER = '其他支出', LINE_WAGE = '薪資／預支';
+function renderLines() {
+  $('d-lines').innerHTML = ST.lines.map(function (l, i) {
+    var opt = function (v, t) { return '<option value="' + esc(v) + '"' + (v === l.cat ? ' selected' : '') + '>' + esc(t || v) + '</option>'; };
+    return '<div class="line">' +
+      '<input list="d-names" value="' + esc(l.name) + '" placeholder="名稱（例：米、PT）" oninput="setLine(' + i + ',\'name\',this.value)" onchange="guessLine(' + i + ')">' +
+      '<input class="amt" value="' + esc(l.amount) + '" inputmode="text" placeholder="金額" oninput="setLine(' + i + ',\'amount\',this.value)">' +
+      '<select onchange="setLine(' + i + ',\'cat\',this.value)">' +
+        '<optgroup label="進貨">' + ST.lineCats.map(function (c) { return opt(c); }).join('') + '</optgroup>' +
+        '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + opt(LINE_WAGE, '薪資／預支（月底人事會算）') + '</optgroup>' +
+      '</select>' +
+      '<button class="danger" onclick="delLine(' + i + ')">✕</button></div>';
+  }).join('');
+  dailyCalc();
+}
+function setLine(i, k, val) { ST.lines[i][k] = val; dailyCalc(); }
+function guessLine(i) {
+  var l = ST.lines[i], n = String(l.name || '').trim();
+  if (!n) return;
+  var m = lineMemory()[n];
+  if (m && m.cat) l.cat = m.cat;
+  else if (ST.lineCats.indexOf(n) >= 0) l.cat = n;
+  else return;
+  // 只改這一行的分類，不重畫整個清單（不然正在輸入的金額欄會不見）
+  var sel = $('d-lines').querySelectorAll('.line')[i];
+  if (sel) { sel = sel.querySelector('select'); if (sel) sel.value = l.cat; }
+}
+function delLine(i) { ST.lines.splice(i, 1); if (!ST.lines.length) ST.lines.push({ name: '', amount: '', cat: LINE_OTHER }); renderLines(); }
+function addLine() {
+  ST.lines.push({ name: '', amount: '', cat: LINE_OTHER }); renderLines();
+  var rows = $('d-lines').querySelectorAll('.line'); rows[rows.length - 1].querySelector('input').focus();
+}
+function cashSpend() {
+  return ST.lines.reduce(function (a, l) { var v = expr(l.amount); return a + (!isNaN(v) ? v : 0); }, 0);
+}
 function dailyCalc() {
   var closed = $('d-closed').checked;
-  $('d-fields').classList.toggle('hide', closed);
-  if (closed) { $('d-calc').innerHTML = ''; return; }
+  Array.prototype.forEach.call(document.querySelectorAll('#tab-daily .d-body'), function (x) { x.classList.toggle('hide', closed); });
+  ['d-site', 'd-panda', 'd-uber', 'd-cash'].forEach(function (id) { $(id).disabled = closed; });
   var site = v('d-site'), panda = v('d-panda'), uber = v('d-uber');
-  var expected = site - v('d-allpay') - v('d-line') - v('d-spend');
+  var spend = cashSpend();
+  var expected = site - v('d-allpay') - v('d-line') - spend;
+  $('d-total').textContent = money(site + panda + uber);
+  $('d-spendv').textContent = spend ? '-' + money(spend) : '0';
+  $('d-expected').textContent = money(expected);
   var typed = $('d-cash').value.trim() !== '';
-  var diff = v('d-cash') - expected;
-  var lim = ST.snap.config.store.cashWarn || 500;
-  var cls = 'ok', msg = '✓ 對上了';
-  if (Math.abs(diff) > lim) { cls = 'bad'; msg = '差太多，請再點一次現金'; }
-  else if (diff !== 0) { cls = 'warn'; msg = '有小差額'; }
-  $('d-calc').innerHTML =
-    '今日總營業額：<b>' + money(site + panda + uber) + '</b><br>' +
-    '應有現金＝現場 − 全支付 − LINE − 現場支出＝<b>' + money(expected) + '</b><br>' +
-    (typed ? '現金差額：<b class="' + cls + '">' + (diff > 0 ? '+' : '') + money(diff) + '</b>　<span class="' + cls + '">' + msg + '</span>'
-      : '<span class="muted">填完點收現金就會顯示差額</span>');
+  var diff = v('d-cash') - expected, lim = ST.snap.config.store.cashWarn || 500;
+  var el = $('d-diff');
+  el.className = 'auto big2' + (typed ? (Math.abs(diff) > lim ? ' bad' : (diff === 0 ? ' ok' : ' warn')) : '');
+  el.textContent = typed ? (diff > 0 ? '+' : '') + money(diff) : '—';
+  el.title = typed && Math.abs(diff) > lim ? '差太多，請再點一次現金' : '';
 }
 function saveDaily() {
-  var ids = ['d-site', 'd-panda', 'd-uber', 'd-allpay', 'd-line', 'd-spend', 'd-cash'];
+  var ids = ['d-site', 'd-panda', 'd-uber', 'd-allpay', 'd-line', 'd-cash'];
   if (ids.some(function (id) { return isNaN(v(id)); })) return toast('有欄位格式不對');
+  if (ST.lines.some(function (l) { return String(l.amount).trim() !== '' && isNaN(expr(l.amount)); })) return toast('支出明細有金額看不懂');
   var closed = $('d-closed').checked;
   if (!closed && !v('d-site') && !v('d-panda') && !v('d-uber')) return toast('請輸入營業額，或勾選公休');
   var date = $('d-date').value;
   if (!date) return toast('請選日期');
-  var expected = v('d-site') - v('d-allpay') - v('d-line') - v('d-spend');
+  var old = dailyRec(date);
+  var lines = closed ? [] : ST.lines.filter(function (l) { return String(l.name || '').trim() || expr(l.amount); }).map(function (l) {
+    return { name: String(l.name || '').trim() || '（未命名）', amount: expr(l.amount), cash: true, cat: l.cat || LINE_OTHER };
+  });
+  // 先刪掉這天上次自動產生的進貨／其他支出，再依新的明細重新產生
+  ((old && old.lines) || []).forEach(function (l) {
+    if (!l.pid) return;
+    enqueue(l.pid.charAt(0) === 'E' ? 'expense.del' : 'purchase.del', { id: l.pid });
+  });
+  var tag = date.replace(/-/g, '');
+  lines.forEach(function (l) {
+    if (!l.amount || l.cat === LINE_WAGE) return;
+    if (l.cat === LINE_OTHER) {
+      l.pid = 'E' + tag + uid().slice(0, 6);
+      enqueue('expense.add', { id: l.pid, month: date.slice(0, 7), type: '其他', item: l.name, amount: l.amount, note: '每日結帳 ' + date });
+    } else {
+      l.pid = 'D' + tag + uid().slice(0, 6);
+      enqueue('purchase.add', { id: l.pid, date: date, cat: l.cat, amount: l.amount, note: '每日結帳：' + l.name });
+    }
+  });
+  var spend = lines.reduce(function (a, l) { return a + l.amount; }, 0);
+  var expected = v('d-site') - v('d-allpay') - v('d-line') - spend;
   var diff = closed ? 0 : v('d-cash') - expected;
   enqueue('daily.upsert', { date: date, closed: closed, site: v('d-site'), panda: v('d-panda'), uber: v('d-uber'),
-    allpay: v('d-allpay'), line: v('d-line'), spend: v('d-spend'), cash: v('d-cash'), cashDiff: diff, note: $('d-note').value });
-  renderDailyExist();
-  toast(Math.abs(diff) > (ST.snap.config.store.cashWarn || 500) ? '已儲存，但現金差額偏大，請確認' : '已儲存 ✓');
+    allpay: v('d-allpay'), line: v('d-line'), spend: spend, cash: v('d-cash'), cashDiff: diff, note: $('d-note').value, lines: lines });
+  ST.lines = JSON.parse(JSON.stringify(lines.length ? lines : [{ name: '', amount: '', cat: LINE_OTHER }]));
+  renderLines(); renderDailyExist();
+  var np = lines.filter(function (l) { return l.pid && l.pid.charAt(0) === 'D'; }).length;
+  var ne = lines.filter(function (l) { return l.pid && l.pid.charAt(0) === 'E'; }).length;
+  toast((Math.abs(diff) > (ST.snap.config.store.cashWarn || 500) ? '已儲存，但現金差額偏大，請確認' : '已儲存 ✓') +
+    (np || ne ? '（自動記 ' + (np ? '進貨 ' + np + ' 筆' : '') + (np && ne ? '、' : '') + (ne ? '其他支出 ' + ne + ' 筆' : '') + '）' : ''));
 }
 
 /* ---------- 進貨 ---------- */
@@ -392,7 +470,7 @@ function renderPurchaseTab() {
   $('p-list-title').textContent = date + ' 進貨（合計 ' + money(total) + '）';
   $('p-list').innerHTML = list.map(function (x) {
     return '<tr><td>' + esc(x.cat) + pendTag('purchase', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
-      '</td><td class="n"><button class="danger" onclick="delPurchase(\'' + jsq(x.id) + '\')">刪除</button></td></tr>';
+      '</td><td class="n">' + (/^D\d{8}/.test(x.id) ? '<span class="muted" style="font-size:13px">在每日結帳改</span>' : '<button class="danger" onclick="delPurchase(\'' + jsq(x.id) + '\')">刪除</button>') + '</td></tr>';
   }).join('') || '<tr><td class="muted">還沒有進貨紀錄</td></tr>';
 }
 function selCat(c) { ST.selCat = c; renderPurchaseTab(); $('p-amount').focus(); }
@@ -603,7 +681,7 @@ function renderExpenseTab() {
   var total = list.reduce(function (a, x) { return a + Number(x.amount || 0); }, 0);
   $('e-list').innerHTML = list.map(function (x) {
     return '<tr><td>' + esc(x.type) + '</td><td>' + esc(x.item) + pendTag('expense', x.id) + ' <span class="muted">' + esc(x.note) + '</span></td><td class="n">' + money(x.amount) +
-      '</td><td class="n"><button class="danger" onclick="delExpense(\'' + jsq(x.id) + '\')">刪除</button></td></tr>';
+      '</td><td class="n">' + (/^E\d{8}/.test(x.id) ? '<span class="muted" style="font-size:13px">在每日結帳改</span>' : '<button class="danger" onclick="delExpense(\'' + jsq(x.id) + '\')">刪除</button>') + '</td></tr>';
   }).join('') + (list.length ? '<tr><td></td><td><b>合計</b></td><td class="n"><b>' + money(total) + '</b></td><td></td></tr>' : '<tr><td class="muted">還沒有支出</td></tr>');
 }
 function addExpense() {
@@ -775,7 +853,7 @@ function renderSettingsTab() {
   $('set-info').innerHTML =
     '店別：<b>' + esc(ST.sess.store) + '</b>（' + (isAdmin() ? '管理' : '店長') + '）<br>' +
     '裝置名字：' + esc(ST.cfg.device) + '<br>' +
-    'App 版本：' + esc(ST.swVersion || '—') + '<br>' +
+    'App 版本：' + APP_VERSION + (ST.swVersion && ST.swVersion !== APP_VERSION ? '（離線快取 ' + esc(ST.swVersion) + '）' : '') + '<br>' +
     '網路：' + (navigator.onLine === false ? '<span class="warn">離線</span>' : '<span class="ok">連線中</span>') + '<br>' +
     '最後同步：' + esc(ST.lastSync || '—') + '<br>' +
     '待上傳：<b>' + ST.outbox.length + '</b> 筆' +
