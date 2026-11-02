@@ -10,6 +10,9 @@ function makeSheet(name) {
   sh.getLastRow = lastRow;
   sh.getMaxRows = () => sh.maxRows;
   sh.getMaxColumns = () => sh.maxCols;
+  sh.getLastColumn = () => sh.cells.reduce((m, r) => { if (!r) return m; for (let i = r.length; i > 0; i--) if (r[i - 1] !== '' && r[i - 1] !== undefined) return Math.max(m, i); return m; }, 0);
+  sh.clearContents = () => { sh.cells = []; };
+  sh.deleteColumns = (from, n) => { sh.cells.forEach(r => r && r.splice(from - 1, n)); };
   sh.setFrozenRows = () => {};
   sh.deleteRow = (r) => { sh.cells.splice(r - 1, 1); };
   sh.getRange = (r, c, nr = 1, nc = 1) => {

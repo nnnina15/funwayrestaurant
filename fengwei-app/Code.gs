@@ -19,7 +19,7 @@ const S = {
 };
 
 const HEAD = {};
-HEAD[S.STORE] = ['店別', '店長PIN', '管理PIN', '手續費率(%)', '現金差額計入盈餘(是/否)', '現金差額警示門檻'];
+HEAD[S.STORE] = ['店別', '手續費率(%)', '現金差額計入盈餘(是/否)', '現金差額警示門檻'];   // 手續費率：全支付／LINE Pay 還沒對帳時的估計值
 HEAD[S.PARTNER] = ['店別', '股東', '比例(%)'];
 HEAD[S.CAT] = ['店別(全部/店名)', '分類', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 HEAD[S.EMP] = ['店別', '姓名', '類型(正職/計時)', '月薪', '時薪', '員工自付健保', '員工自付勞保', '公司勞退', '公司健保', '公司勞保', '在職(是/否)'];
@@ -32,13 +32,14 @@ HEAD[S.PAYROLL] = ['輸入時間', '月份', '店別', '姓名', '項目', '金�
 HEAD[S.DELIVERY] = ['輸入時間', '月份', '店別', '平台', '實際入帳', '備註', '裝置', '明細'];
 HEAD[S.DEDUCT] = ['編號', '輸入時間', '月份', '店別', '類型', '金額', '備註', '裝置'];
 HEAD[S.R_MONTH] = ['店別', '月份', '狀態', '工作天', '現場營收', 'Panda營業額', 'Panda入帳', 'Uber營業額', 'Uber入帳',
-  '實際營收', '日均營收', '進貨', '人事成本', '固定支出', '其他支出', '線上手續費', '現金差額', '盈餘',
+  '實際營收', '日均營收', '進貨', '人事成本', '固定支出', '其他支出', '全支付收款', '全支付入帳', 'LINE Pay收款', 'LINE Pay入帳',
+  '線上手續費', '手續費是估計', '現金差額', '盈餘',
   '員工分紅', '年終預留', '其他扣除', '可分配', '進貨佔比', '人事佔比', '警示數'];
 HEAD[S.R_SHARE] = ['店別', '月份', '狀態', '股東', '比例(%)', '分紅金額'];
 HEAD[S.R_CAT] = ['店別', '月份', '分類', '金額', '佔實際營收'];
 HEAD[S.R_WARN] = ['店別', '月份', '類型', '說明'];
 
-const TEXT_COLS = ['日期', '月份', '店長PIN', '管理PIN', '編號', '輸入時間', '帳號', '臨時PIN', 'PIN(加密，勿改)', '最後登入', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
+const TEXT_COLS = ['日期', '月份', '編號', '輸入時間', '帳號', '臨時PIN', 'PIN(加密，勿改)', '最後登入', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 const PAYROLL_KINDS = ['薪資', '公司負擔', '預支'];
 const EXPENSE_TYPES = ['固定', '其他'];
 const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除'];
@@ -67,6 +68,7 @@ function onOpen() {
     .addItem('① 初始化（第一次使用）', 'setup')
     .addItem('② 重新計算報表', 'buildReports')
     .addItem('③ 匯入舊資料', 'importOldData')
+    .addItem('④ 清除舊表匯入的資料（重新匯入前用）', 'clearImported')
     .addToUi();
 }
 
@@ -76,6 +78,7 @@ function setup() {
     let sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
     const h = HEAD[name];
+    realign_(sh, h);                        // 欄位有增減時，舊資料照欄名搬到新位置，不會錯位
     sh.getRange(1, 1, 1, h.length).setValues([h]).setFontWeight('bold').setBackground('#f3efe6');
     sh.setFrozenRows(1);
     h.forEach(function (k, i) {
@@ -83,7 +86,7 @@ function setup() {
     });
   });
 
-  seed_(S.STORE, [['大埔店', '1234', '9999', 2, '否', 500], ['中正店', '1234', '9999', 2, '否', 500]]);
+  seed_(S.STORE, [['大埔店', 2, '否', 500], ['中正店', 2, '否', 500]]);
   seed_(S.PARTNER, [['大埔店', '豐吉', 60], ['大埔店', '浩勤', 20], ['大埔店', '呀肥', 20],
     ['中正店', '浩勤', 65], ['中正店', '豐吉', 35]]);
   const cats = ['麵', '雞蛋', '菜', '洋蔥/火腿丁', '瓦斯', '萬昌肉品', '豬肉攤', '牛亨', '雞肉', '海鮮/蒜', '蝦仁',
@@ -106,6 +109,38 @@ function setup() {
 
   buildReports();
   SpreadsheetApp.getUi().alert('初始化完成！\n\n1. 到「設定_帳號」把「管理員」改成你的名字；第一次登入用臨時 PIN「Funway#2026」，登入後會要求設定自己的 PIN\n2. 到「設定_員工」填入真實員工\n3. 部署成網頁應用程式，把網址貼到 App');
+}
+
+// 依欄名重新排列整張表（程式改版、欄位增減時用）；不認得的舊欄位會刪掉
+function realign_(sh, h) {
+  const lr = sh.getLastRow(), lc = sh.getLastColumn();
+  if (lr < 1 || lc < 1) return;
+  const vals = sh.getRange(1, 1, lr, lc).getValues();
+  const old = vals[0].map(str_);
+  if (old.join('|') === h.join('|')) return;
+  if (!old.some(function (k) { return h.indexOf(k) >= 0; })) return;      // 完全不認得的表頭：不動
+  const rows = vals.slice(1).filter(function (r) { return r.some(function (v) { return v !== '' && v !== null; }); })
+    .map(function (r) { return h.map(function (k) { const i = old.indexOf(k); return i >= 0 ? r[i] : ''; }); });
+  sh.clearContents();
+  if (sh.getMaxColumns() > h.length) sh.deleteColumns(h.length + 1, sh.getMaxColumns() - h.length);
+  h.forEach(function (k, i) { if (TEXT_COLS.indexOf(k) >= 0) sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat('@'); });
+  sh.getRange(1, 1, 1, h.length).setValues([h]);
+  if (rows.length) sh.getRange(2, 1, rows.length, h.length).setValues(rows);
+}
+
+// ④ 清除舊表匯入的資料：只刪「裝置＝舊表匯入」的列，App 輸入的資料不動（重新匯入前用）
+function clearImported() {
+  const ui = SpreadsheetApp.getUi();
+  if (ui.alert('清除舊表匯入的資料', '會刪掉每日營收、進貨、其他支出、人事明細、外送對帳、分配前扣除裡「裝置＝舊表匯入」的資料。\n用 App 輸入的資料不會動。確定嗎？', ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
+  const msg = withLock_(function () { return clearImported_(); });
+  buildReports();
+  ui.alert('已清除：\n' + msg + '\n\n接著用「③ 匯入舊資料」匯入新的檔案。');
+}
+function clearImported_() {
+  return [S.DAILY, S.PURCHASE, S.EXPENSE, S.PAYROLL, S.DELIVERY, S.DEDUCT].map(function (name) {
+    const n = deleteWhere_(name, function (x) { return str_(x['裝置']) === '舊表匯入'; });
+    return name + '：' + n + ' 筆';
+  }).join('\n');
 }
 
 function seed_(name, rows) {
@@ -585,7 +620,7 @@ const rec_ = {
 
 function stores_() {
   return rows_(S.STORE).filter(function (r) { return str_(r['店別']); }).map(function (r) {
-    return { name: str_(r['店別']), pin: str_(r['店長PIN']), admin: str_(r['管理PIN']),
+    return { name: str_(r['店別']),
       fee: num_(r['手續費率(%)']), cashIn: yes_(r['現金差額計入盈餘(是/否)']),
       cashWarn: num_(r['現金差額警示門檻']) || 500 };
   });
@@ -635,10 +670,11 @@ function buildReports() {
   writeTable_(S.R_MONTH, R.months.map(function (m) {
     return [m.store, m.month, m.status, m.days, m.site, m.pandaG, m.pandaN === null ? '未填' : m.pandaN,
       m.uberG, m.uberN === null ? '未填' : m.uberN, m.actual, m.avg, m.purchase, m.staff, m.fixed, m.other,
-      m.fee, m.cashDiff, m.profit, m.bonus, m.reserve, m.deductOther, m.dist, m.purchasePct, m.staffPct, m.warnCount];
+      m.allpay, m.allpayN === null ? '未填' : m.allpayN, m.line, m.lineN === null ? '未填' : m.lineN,
+      m.fee, m.feeEst ? '是' : '', m.cashDiff, m.profit, m.bonus, m.reserve, m.deductOther, m.dist, m.purchasePct, m.staffPct, m.warnCount];
   }), { '現場營收': money, 'Panda營業額': money, 'Panda入帳': money, 'Uber營業額': money, 'Uber入帳': money,
     '實際營收': money, '日均營收': money, '進貨': money, '人事成本': money, '固定支出': money, '其他支出': money,
-    '線上手續費': money, '現金差額': money, '盈餘': money, '員工分紅': money, '年終預留': money, '其他扣除': money,
+    '全支付收款': money, '全支付入帳': money, 'LINE Pay收款': money, 'LINE Pay入帳': money, '線上手續費': money, '現金差額': money, '盈餘': money, '員工分紅': money, '年終預留': money, '其他扣除': money,
     '可分配': money, '進貨佔比': '0.0%', '人事佔比': '0.0%' });
   writeTable_(S.R_SHARE, R.shares.map(function (s) { return [s.store, s.month, s.status, s.name, s.pct, s.amount]; }), { '分紅金額': money });
   writeTable_(S.R_CAT, R.cats.map(function (c) { return [c.store, c.month, c.cat, c.amount, c.pct]; }), { '金額': money, '佔實際營收': '0.0%' });
@@ -682,8 +718,14 @@ function append_(name, objs) {
 
 function deleteWhere_(name, pred) {
   const sh = sheet_(name);
-  const rs = rows_(name).filter(pred).map(function (r) { return r._row; }).sort(function (a, b) { return b - a; });
-  rs.forEach(function (r) { sh.deleteRow(r); });
+  const all = rows_(name);
+  const rs = all.filter(pred).map(function (r) { return r._row; }).sort(function (a, b) { return b - a; });
+  if (rs.length <= 20) { rs.forEach(function (r) { sh.deleteRow(r); }); return rs.length; }
+  // 大量刪除：一次重寫，比一列一列刪快很多
+  const h = HEAD[name], keep = all.filter(function (r) { return !pred(r); }).map(function (r) { return h.map(function (k) { return r[k]; }); });
+  sh.getRange(2, 1, all.length, h.length).clearContent();
+  h.forEach(function (k, i) { if (TEXT_COLS.indexOf(k) >= 0 && keep.length) sh.getRange(2, i + 1, keep.length, 1).setNumberFormat('@'); });
+  if (keep.length) sh.getRange(2, 1, keep.length, h.length).setValues(keep);
   return rs.length;
 }
 
