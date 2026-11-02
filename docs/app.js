@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.11';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.12';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -747,7 +747,7 @@ function renderPurchaseTab() {
   $('p-list-title').textContent = date + ' 進貨（合計 ' + money(total) + '）';
   $('p-list').innerHTML = list.map(function (x) {
     return '<tr><td>' + esc(x.cat) + pendTag('purchase', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
-      '</td><td class="n">' + (/^D\d{8}/.test(x.id) ? '<span class="muted" style="font-size:13px">在每日結帳改</span>' : '<button class="danger" onclick="delPurchase(\'' + jsq(x.id) + '\')">刪除</button>') + '</td></tr>';
+      '</td><td class="n">' + (/^D\d{8}/.test(x.id) ? '<span class="muted" style="font-size:13px">在每日結帳改</span>' : '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delPurchase(\'' + jsq(x.id) + '\')">✕</button>') + '</td></tr>';
   }).join('') || '<tr><td class="muted">還沒有進貨紀錄</td></tr>';
 }
 function selCat(c) { ST.selCat = c; renderPurchaseTab(); $('p-amount').focus(); }
@@ -1060,8 +1060,8 @@ function renderExpenseTab() {
   var list = view().expense.filter(function (x) { return x.month === month; });
   var total = list.reduce(function (a, x) { return a + Number(x.amount || 0); }, 0);
   $('e-list').innerHTML = list.map(function (x) {
-    return '<tr><td>' + esc(x.type) + '</td><td>' + esc(x.item) + pendTag('expense', x.id) + ' <span class="muted">' + esc(x.note) + '</span></td><td class="n">' + money(x.amount) +
-      '</td><td class="n">' + (/^E\d{8}/.test(x.id) ? '<span class="muted" style="font-size:13px">在每日結帳改</span>' : '<button class="danger" onclick="delExpense(\'' + jsq(x.id) + '\')">刪除</button>') + '</td></tr>';
+    return '<tr><td class="nowrap">' + esc(x.type) + '</td><td>' + esc(x.item) + pendTag('expense', x.id) + ' <span class="muted">' + esc(x.note) + '</span></td><td class="n">' + money(x.amount) +
+      '</td><td class="n">' + (/^E\d{8}/.test(x.id) ? '<span class="muted" style="font-size:13px">在每日結帳改</span>' : '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delExpense(\'' + jsq(x.id) + '\')">✕</button>') + '</td></tr>';
   }).join('') + (list.length ? '<tr><td></td><td><b>合計</b></td><td class="n"><b>' + money(total) + '</b></td><td></td></tr>' : '<tr><td class="muted">還沒有支出</td></tr>');
 }
 function addExpense() {
@@ -1089,7 +1089,7 @@ function renderDeductTab() {
   var list = view().deduct.filter(function (x) { return x.month === month; });
   $('x-list').innerHTML = list.map(function (x) {
     return '<tr><td>' + esc(x.type) + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
-      '</td><td class="n"><button class="danger" onclick="delDeduct(\'' + jsq(x.id) + '\')">刪除</button></td></tr>';
+      '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delDeduct(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
   }).join('') || '<tr><td class="muted">這個月沒有扣除項目</td></tr>';
 }
 function addDeduct() {
