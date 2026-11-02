@@ -325,8 +325,27 @@
     border-radius: 50%; background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15);
     display: flex; align-items: center; justify-content: center; }
   #themeBtn svg { width: 22px; height: 22px; }
-  #themeBtn small { position: absolute; bottom: -18px; font-size: 11px; color: var(--muted); white-space: nowrap; }
   @media (max-width: 899px) { body.has-bar #themeBtn { bottom: calc(86px + env(safe-area-inset-bottom)); } }
+  #menuBtn { display: none !important; }                     /* 設定在「更多／裝置」裡，不需要 ⋯ */
+
+  /* ===== 手機：日期放上標題列、同步狀態放右下角 ===== */
+  @media (max-width: 899px) {
+    header { flex-wrap: wrap; row-gap: 8px; }
+    header #pickbar { position: static; margin: 0 0 0 auto; padding: 0; flex: 0 0 auto; }
+    header #pickbar.multi { flex: 1 0 100%; margin: 0; flex-wrap: nowrap; gap: 6px; }
+    header #pickbar.multi #ov-seg button { padding: 0 12px; }
+    header h1 { flex: 0 1 auto; }
+    header #pickbar input, header #pickbar select { font-size: 14px; padding: 4px 2px; }
+    header #pickbar input::-webkit-calendar-picker-indicator { display: none; }
+    header #pickbar input[type=date] { width: 96px; } header #pickbar input[type=month] { width: 96px; }
+    header #pickbar.multi input[type=month] { width: 120px; }
+    header #pickbar .step { width: 26px; height: 26px; font-size: 17px; }
+    header #pickbar .pin, header #pickbar #ov-month-pick, header #pickbar #ov-year-pick, header #pickbar #ov-seg { box-shadow: none; }
+    body.has-bar #sync { position: fixed; z-index: 7; right: 74px; bottom: calc(92px + env(safe-area-inset-bottom)); height: 36px;
+      background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15); font-size: 13px; padding: 0 12px; }
+    body.has-bar #sync.pending { background: var(--amber); color: #3d2600; }
+    body.has-bar #sync.err { background: #ff8a75; color: #3d0b04; }
+  }
 </style>
 </head>
 <body>

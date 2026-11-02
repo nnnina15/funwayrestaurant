@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.6';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -32,7 +32,7 @@ function applyTheme() {
   var m = LS.get('fw_theme', 'auto');
   if (m === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', m);
   var t = THEMES.filter(function (x) { return x[0] === m; })[0] || THEMES[0];
-  $('themeBtn').innerHTML = ICONS[m === 'light' ? 'sun' : m === 'dark' ? 'moon' : 'auto'] + '<small>' + t[1] + '</small>';
+  $('themeBtn').innerHTML = ICONS[m === 'light' ? 'sun' : m === 'dark' ? 'moon' : 'auto']; $('themeBtn').title = '顯示模式：' + t[1];
 }
 function cycleTheme() {
   var m = LS.get('fw_theme', 'auto'), i = THEMES.map(function (x) { return x[0]; }).indexOf(m);
@@ -366,8 +366,19 @@ function pinPickers(name) {
     ST.pinned.push({ node: node, ph: ph, cap: cap });
   });
   bar.classList.toggle('hide', !ST.pinned.length);
+  bar.classList.toggle('multi', ST.pinned.length > 1);
+  placePickbar();
+}
+// 手機：日期／月份放進標題列（省一整列）；平板、電腦放回內容上方
+var PHONE = window.matchMedia ? window.matchMedia('(max-width: 899px)') : { matches: false };
+function placePickbar() {
+  var bar = $('pickbar'), head = document.querySelector('header');
+  if (!ST.pickHome) ST.pickHome = { parent: bar.parentNode, next: bar.nextSibling };
+  if (PHONE.matches && bar.parentNode !== head) head.appendChild(bar);
+  else if (!PHONE.matches && bar.parentNode === head) ST.pickHome.parent.insertBefore(bar, ST.pickHome.next);
   updateStickyTop();
 }
+if (PHONE.addEventListener) PHONE.addEventListener('change', placePickbar);
 function updateStickyTop() {
   var h = document.querySelector('header').offsetHeight, t = $('tabs');
   var tabsOn = t && !t.classList.contains('hide') && getComputedStyle(t).display !== 'none';
