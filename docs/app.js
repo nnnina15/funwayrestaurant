@@ -449,7 +449,7 @@ function openEmp(name) {
   var rows = view().payroll.filter(function (x) { return x.month === month && x.name === name; });
   var saved = rows.length > 0;
   if (saved) {
-    ST.items = rows.map(function (x) { return { item: x.item, amount: x.amount, kind: x.kind, hours: x.hours, rate: x.rate }; });
+    ST.items = rows.map(function (x) { return { item: x.item, amount: x.amount, kind: x.kind, hours: x.hours, rate: x.rate, neg: Number(x.amount) < 0 }; });
   } else {
     var e = (ST.snap.config.employees || []).filter(function (x) { return x.name === name; })[0];
     ST.items = e ? payrollDefaults(e) : [{ item: '薪資', amount: '', kind: '薪資' }];
@@ -461,19 +461,65 @@ function openEmp(name) {
   $('s-editor').scrollIntoView({ behavior: 'smooth' });
 }
 function hasRate(it) { return it.rate !== '' && it.rate !== undefined && it.rate !== null; }
+
+/* 常用項目：[名稱, 類別, 1=加項 / -1=扣項] */
+var PAY_PRESETS = [
+  ['加班費', '薪資', 1], ['多加班', '薪資', 1], ['全勤獎金', '薪資', 1], ['責任津貼', '薪資', 1], ['職務加給', '薪資', 1],
+  ['銷假上班', '薪資', 1], ['節日獎金', '薪資', 1], ['早退', '薪資', -1], ['請假扣薪', '薪資', -1],
+  ['扣健保(自付)', '薪資', -1], ['扣勞保(自付)', '薪資', -1], ['已預支', '預支', -1],
+  ['勞退(公司)', '公司負擔', 1], ['健保(公司)', '公司負擔', 1], ['勞保(公司)', '公司負擔', 1]
+];
+// 從過去的人事紀錄學習：用越多次的排越前面，類別和正負也照過去的習慣
+function payPresets() {
+  var stat = {};
+  view().payroll.forEach(function (x) {
+    var n = String(x.item || '').trim();
+    if (!n || n === '月薪' || n === '時薪' || n === '薪資' || hasRate(x)) return;
+    if (!stat[n]) stat[n] = { n: 0, kind: x.kind || '薪資', neg: 0 };
+    stat[n].n++; stat[n].kind = x.kind || stat[n].kind;
+    if (Number(x.amount) < 0) stat[n].neg++;
+  });
+  var learned = Object.keys(stat).sort(function (a, b) { return stat[b].n - stat[a].n; }).slice(0, 12).map(function (n) {
+    return [n, stat[n].kind, stat[n].neg * 2 > stat[n].n ? -1 : 1];
+  });
+  var seen = {}, out = [];
+  learned.concat(PAY_PRESETS).forEach(function (p) { if (!seen[p[0]]) { seen[p[0]] = true; out.push(p); } });
+  return out;
+}
+function renderPresetChips() {
+  var have = {}; ST.items.forEach(function (it) { have[String(it.item || '').trim()] = true; });
+  ST.presets = payPresets();
+  $('s-presets').innerHTML = ST.presets.map(function (p, i) {
+    if (have[p[0]]) return '';
+    return '<button class="' + (p[2] < 0 ? 'neg' : '') + '" onclick="addPreset(' + i + ')">＋' + esc(p[0]) + (p[2] < 0 ? '（扣）' : '') + '</button>';
+  }).join('');
+}
+function addPreset(i) {
+  var p = ST.presets[i];
+  ST.items.push({ item: p[0], amount: '', kind: p[1], neg: p[2] < 0 });
+  renderItems();
+  var inputs = $('s-items').querySelectorAll('.item-row');
+  var last = inputs[inputs.length - 1];
+  if (last) { var a = last.querySelectorAll('input')[1]; if (a) a.focus(); }
+}
 function renderItems() {
   var kinds = ST.snap.config.kinds || ['薪資', '公司負擔', '預支'];
   $('s-items').innerHTML = ST.items.map(function (it, i) {
     var amt = hasRate(it)
       ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="時數" inputmode="text" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal" oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
-      : '<input value="' + esc(it.amount) + '" inputmode="text" placeholder="金額（扣款打負數）" oninput="setItem(' + i + ',\'amount\',this.value)">';
+      : '<input' + (it.neg ? ' class="neg-in"' : '') + ' value="' + esc(it.amount) + '" inputmode="text" placeholder="' + (it.neg ? '扣多少（打正數就好）' : '金額（扣款打負數）') + '" oninput="setItem(' + i + ',\'amount\',this.value)">';
     return '<div class="item-row"><input value="' + esc(it.item) + '" placeholder="項目名稱" oninput="setItem(' + i + ',\'item\',this.value)">' + amt +
       '<select onchange="setItem(' + i + ',\'kind\',this.value)">' + kinds.map(function (k) { return '<option' + (k === it.kind ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select>' +
       '<button class="danger" onclick="delItem(' + i + ')">✕</button></div>';
   }).join('');
+  renderPresetChips();
   payCalc();
 }
-function itemAmount(it) { return hasRate(it) ? Math.round(expr(it.hours) * expr(it.rate)) : expr(it.amount); }
+function itemAmount(it) {
+  if (hasRate(it)) return Math.round(expr(it.hours) * expr(it.rate));
+  var a = expr(it.amount);
+  return it.neg && a > 0 ? -a : a;     // 扣款項目打正數也會變成扣
+}
 function setItem(i, k, val) { ST.items[i][k] = val; payCalc(); }
 function delItem(i) { ST.items.splice(i, 1); renderItems(); }
 function addItem(hourly) { ST.items.push(hourly ? { item: '時薪', hours: '', rate: '', kind: '薪資' } : { item: '', amount: '', kind: '薪資' }); renderItems(); }
@@ -492,7 +538,7 @@ function savePayroll() {
   var items = ST.items.filter(function (it) { return String(it.item || '').trim(); }).map(function (it) {
     var r = hasRate(it);
     var o = { item: String(it.item).trim(), kind: it.kind || '薪資', hours: r ? expr(it.hours) : '', rate: r ? expr(it.rate) : '' };
-    o.amount = r ? Math.round(o.hours * o.rate) : expr(it.amount);
+    o.amount = itemAmount(it);
     if (isNaN(o.amount)) bad = true;
     return o;
   });

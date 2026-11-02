@@ -48,6 +48,10 @@
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .chips button { background: var(--soft); color: var(--ink); padding: 12px 14px; font-size: 17px; }
   .chips button.on { background: var(--brand); color: #fff; }
+  #s-presets { margin-bottom: 10px; }
+  #s-presets button { padding: 9px 12px; font-size: 16px; }
+  #s-presets button.neg { color: var(--bad); }
+  .neg-in { color: var(--bad); border-color: #f2b8b0 !important; }
   .calc { background: var(--soft); border-radius: 12px; padding: 12px 14px; margin-top: 14px; font-size: 17px; line-height: 1.8; }
   .calc b { font-size: 20px; }
   .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
@@ -171,6 +175,8 @@
       <p class="muted">每個人可以自己加項目：加班費、全勤、津貼、扣款、預支…<br>
         <b>薪資</b>＝發給員工、也算公司成本；<b>公司負擔</b>＝勞健保勞退公司付的，只算成本；<b>預支</b>＝已先給的錢，只影響實發。</p>
       <div id="s-items"></div>
+      <label>常用項目（點一下加入）</label>
+      <div class="chips" id="s-presets"></div>
       <button class="ghost" onclick="addItem(false)">＋ 新增項目</button>
       <button class="ghost" onclick="addItem(true)">＋ 時數 × 時薪</button>
       <div class="calc" id="s-calc"></div>
