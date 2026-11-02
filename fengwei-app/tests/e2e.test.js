@@ -85,7 +85,10 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.fill('#pin', '9999'); await B.pg.click('#v-login .primary'); await B.pg.waitForSelector('#tab-daily:not(.hide)');
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
   assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 3, '手機要看到平板的進貨（手動 2 + 結帳單 1）');
-  await B.pg.click('#tb-payroll'); await B.pg.click('text=範例計時(請改名)');
+  await B.pg.click('#tb-payroll'); await B.pg.click('text=範例正職(請改名)');
+  assert.ok((await B.pg.textContent('#s-name')).includes('1/2'));
+  await B.pg.click('#s-name .step >> nth=1');                        // › 下一位
+  assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('2/2'), '› 要切到下一位');
   await B.pg.fill('.hours input >> nth=0', '106'); await B.pg.fill('.hours input >> nth=1', '240'); await B.pg.dispatchEvent('.hours input >> nth=0', 'input');
   await B.pg.click('text=＋ 新增項目'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=0', '加班費'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=1', '700'); await B.pg.dispatchEvent('.item-row >> nth=1 >> input >> nth=1', 'input');
   assert.ok((await B.pg.textContent('#s-calc')).includes('26,140'));

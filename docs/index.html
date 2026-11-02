@@ -159,6 +159,13 @@
   .dv tr.tot td, .dv tr.tot th { background: color-mix(in srgb, var(--brand) 10%, var(--card)); font-weight: 800; font-size: 18px; }
   .dv .split { font-size: 13px; color: var(--muted); padding: 8px 14px; display: flex; align-items: center; gap: 6px; }
 
+  .emp-nav { display: flex; align-items: center; gap: 10px; }
+  .emp-nav::before { display: none; }
+  .emp-nav .step { height: 44px; }
+  .emp-nav .step:disabled { opacity: .35; cursor: default; }
+  .emp-t { flex: 1; text-align: center; font-size: 21px; }
+  .emp-t small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+
   /* ===== 重點數字卡 ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
@@ -388,7 +395,7 @@
       <button class="ghost" onclick="addTempEmployee()">＋ 其他人（不在員工名單）</button>
     </div>
     <div class="card hide" id="s-editor">
-      <h2 id="s-name"></h2>
+      <h2 id="s-name" class="emp-nav"></h2>
       <p class="muted">每個人可以自己加項目：加班費、全勤、津貼、扣款、預支…<br>
         <b>薪資</b>＝發給員工、也算公司成本；<b>公司負擔</b>＝勞健保勞退公司付的，只算成本；<b>預支</b>＝已先給的錢，只影響實發。</p>
       <div id="s-items"></div>

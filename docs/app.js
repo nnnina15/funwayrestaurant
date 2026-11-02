@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.7.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.8.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -653,6 +653,7 @@ function renderPayrollTab(full) {
   }
   function sub(list) { return list.reduce(function (a, n) { return a + (by[n] ? by[n].cost : 0); }, 0); }
   var h = '';
+  ST.empOrder = groups['正職'].concat(groups['計時'], groups['其他']);   // 編輯區 ‹ › 切換用的順序
   [['正職', '正職'], ['計時', '計時（時薪）'], ['其他', '其他（不在員工名單）']].forEach(function (g) {
     var list = groups[g[0]];
     if (!list.length) return;
@@ -666,8 +667,15 @@ function addTempEmployee() {
   var n = prompt('輸入名字（例：臨時工小王）');
   if (n && n.trim()) openEmp(n.trim());
 }
-function openEmp(name) {
-  ST.emp = name;
+// 編輯區上方的 ‹ ›：切換到上一位／下一位員工
+function stepEmp(d) {
+  var list = ST.empOrder || [], i = list.indexOf(ST.emp) + d;
+  if (i < 0 || i >= list.length) return toast(d < 0 ? '已經是第一位' : '已經是最後一位');
+  if (ST.itemsDirty && !confirm(ST.emp + ' 改了還沒儲存，確定要切換？（改的內容會不見）')) return;
+  openEmp(list[i], true);
+}
+function openEmp(name, stay) {
+  ST.emp = name; ST.itemsDirty = false;
   var month = $('s-month').value;
   var rows = view().payroll.filter(function (x) { return x.month === month && x.name === name; });
   var saved = rows.length > 0;
@@ -677,11 +685,14 @@ function openEmp(name) {
     var e = (ST.snap.config.employees || []).filter(function (x) { return x.name === name; })[0];
     ST.items = e ? payrollDefaults(e) : [{ item: '薪資', amount: '', kind: '薪資' }];
   }
-  $('s-name').textContent = name + '｜' + month + (saved ? '（已儲存過）' : '（帶入預設）');
+  renderPayrollTab(false);
+  var list = ST.empOrder || [], idx = list.indexOf(name);
+  $('s-name').innerHTML = '<button class="step" onclick="stepEmp(-1)" aria-label="上一位"' + (idx <= 0 ? ' disabled' : '') + '>‹</button>' +
+    '<span class="emp-t">' + esc(name) + '<small>' + month + (saved ? '・已儲存過' : '・帶入預設') + (idx >= 0 ? '・' + (idx + 1) + '/' + list.length : '') + '</small></span>' +
+    '<button class="step" onclick="stepEmp(1)" aria-label="下一位"' + (idx < 0 || idx >= list.length - 1 ? ' disabled' : '') + '>›</button>';
   $('s-editor').classList.remove('hide');
   renderItems();
-  renderPayrollTab(false);
-  $('s-editor').scrollIntoView({ behavior: 'smooth' });
+  if (!stay) $('s-editor').scrollIntoView({ behavior: 'smooth' });
 }
 function hasRate(it) { return it.rate !== '' && it.rate !== undefined && it.rate !== null; }
 
@@ -698,6 +709,7 @@ function renderPresetChips() {
   }).join('');
 }
 function addPreset(i) {
+  ST.itemsDirty = true;
   var p = ST.presets[i];
   ST.items.push({ item: p[0], amount: '', kind: p[1], neg: p[2] < 0 });
   renderItems();
@@ -723,9 +735,9 @@ function itemAmount(it) {
   var a = expr(it.amount);
   return it.neg && a > 0 ? -a : a;     // 扣款項目打正數也會變成扣
 }
-function setItem(i, k, val) { ST.items[i][k] = val; payCalc(); }
-function delItem(i) { ST.items.splice(i, 1); renderItems(); }
-function addItem(hourly) { ST.items.push(hourly ? { item: '時薪', hours: '', rate: '', kind: '薪資' } : { item: '', amount: '', kind: '薪資' }); renderItems(); }
+function setItem(i, k, val) { ST.items[i][k] = val; ST.itemsDirty = true; payCalc(); }
+function delItem(i) { ST.items.splice(i, 1); ST.itemsDirty = true; renderItems(); }
+function addItem(hourly) { ST.itemsDirty = true; ST.items.push(hourly ? { item: '時薪', hours: '', rate: '', kind: '薪資' } : { item: '', amount: '', kind: '薪資' }); renderItems(); }
 function payCalc() {
   var pay = 0, cost = 0, bad = false;
   ST.items.forEach(function (it) {
