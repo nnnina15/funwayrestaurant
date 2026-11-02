@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.13';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.14';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -656,7 +656,7 @@ function renderLines() {
         '<optgroup label="進貨">' + ST.lineCats.map(function (c) { return opt(c); }).join('') + '</optgroup>' +
         '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + opt(LINE_WAGE, '薪資／預支（月底人事會算）') + '</optgroup>' +
       '</select>' +
-      '<button class="danger" onclick="delLine(' + i + ')">✕</button></div>';
+      '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delLine(' + i + ')">✕</button></div>';
   }).join('');
   renderLineChips();
   dailyCalc();
@@ -883,7 +883,7 @@ function renderItems() {
       : '<input' + (it.neg ? ' class="neg-in"' : '') + ' value="' + esc(it.amount) + '" inputmode="text" placeholder="' + (it.neg ? '扣多少（打正數就好）' : '金額（扣款打負數）') + '" oninput="setItem(' + i + ',\'amount\',this.value)">';
     return '<div class="item-row' + (hasRate(it) ? ' rate' : '') + '"><input value="' + esc(it.item) + '" placeholder="項目名稱" oninput="setItem(' + i + ',\'item\',this.value)">' + amt +
       '<select onchange="setItem(' + i + ',\'kind\',this.value)">' + kinds.map(function (k) { return '<option value="' + esc(k) + '"' + (k === it.kind ? ' selected' : '') + '>' + esc(window.matchMedia && window.matchMedia('(max-width: 560px)').matches && k === '公司負擔' ? '公司付' : k) + '</option>'; }).join('') + '</select>' +
-      '<button class="danger" onclick="delItem(' + i + ')">✕</button></div>';
+      '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delItem(' + i + ')">✕</button></div>';
   }).join('');
   renderPresetChips();
   payCalc();
@@ -1346,7 +1346,7 @@ function renderPresetEditor() {
     var sign = isPay ? '<select class="pe-sign" onchange="peSet(' + i + ',\'sign\',this.value)"><option' + (it.sign !== '扣' ? ' selected' : '') + '>加</option><option' + (it.sign === '扣' ? ' selected' : '') + '>扣</option></select>' : '';
     return '<div class="pe-row' + (isPay ? ' pay' : '') + '"><input value="' + esc(it.name) + '" placeholder="名稱" oninput="peSet(' + i + ',\'name\',this.value)">' + sel + sign +
       '<button class="pe-mv" onclick="peMove(' + i + ',-1)" aria-label="上移">↑</button><button class="pe-mv" onclick="peMove(' + i + ',1)" aria-label="下移">↓</button>' +
-      '<button class="danger" onclick="peDel(' + i + ')">✕</button></div>';
+      '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="peDel(' + i + ')">✕</button></div>';
   }).join('') || '<p class="muted">清單是空的，按下面「＋新增項目」</p>';
   $('pe-save').disabled = !ST.pe.dirty;
   $('pe-save').textContent = ST.pe.dirty ? '儲存「' + PE_USES.filter(function (u) { return u[0] === ST.pe.use; })[0][1] + '」常用項目' : '沒有變更';
