@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.2';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -1217,7 +1217,7 @@ function renderSummaryTab() {
     (ST.outbox.length ? '｜<span class="warn">' + ST.outbox.length + ' 筆待上傳（已算進來）</span>' : '') + '</p>';
   if (!m) { $('m-body').innerHTML = note + '<p class="muted">這個月還沒有任何資料</p>'; return; }
   var rows = [
-    ['現場營收', m.site], ['Panda 入帳', m.pandaN === null ? '未對帳' : m.pandaN], ['Uber 入帳', m.uberN === null ? '未對帳' : m.uberN],
+    ['現場營收', m.site], ['Panda', m.pandaN === null ? '未對帳' : m.pandaN, false, '', m.pandaG], ['Uber', m.uberN === null ? '未對帳' : m.uberN, false, '', m.uberG],
     ['＝ 實際營收', m.actual, true], ['進貨', -m.purchase, false, pct(m.purchasePct)], ['人事成本', -m.staff, false, pct(m.staffPct)],
     ['固定支出', -m.fixed], ['其他支出', -m.other], [m.feeEst ? '線上支付手續費（估計）' : '線上支付手續費', -m.fee], ['＝ 盈餘', m.profit, true],
     ['員工分紅', -m.bonus], ['年終預留', -m.reserve], ['其他扣除', -m.deductOther], ['＝ 可分配給股東', m.dist, true]
@@ -1228,7 +1228,13 @@ function renderSummaryTab() {
   var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('盈餘', m.profit, '扣完所有成本', true) +
     kpi('可分配給股東', m.dist, '扣員工分紅、年終後') + kpi('人事佔比', pct(m.staffPct), '進貨佔比 ' + pct(m.purchasePct)) + '</div>' + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
     '　工作天 ' + m.days + '　日均營收 ' + money(m.avg) + '　現金差額累計 ' + money(m.cashDiff) + '</p>';
-  h += '<table>' + rows.map(function (x) {
+  h += '<table class="msum">' + rows.map(function (x) {
+    if (x[4] !== undefined) {                       // 外送：日結 − 實際收到 ＝ 付給平台
+      var got = typeof x[1] === 'number', pay = got ? x[4] - x[1] : null;
+      return '<tr class="dlv"><td><span>' + x[0] + '</span><span class="dlv-g"><small>日結</small>' + money(x[4]) + '<i>−</i></span></td><td class="n">' +
+        (got ? '<small>實際收到</small><span class="' + sgn(x[1]) + '">' + money(x[1]) + '</span>' : '<span class="warn">未對帳</span>') + '</td><td class="n dlv-p">' +
+        (got ? '<i>＝</i><small>付給平台</small><span class="bad">' + money(pay) + '</span>' + (x[4] ? '<em>' + Math.round(pay / x[4] * 100) + '%</em>' : '') : '<span class="muted">—</span>') + '</td></tr>';
+    }
     return '<tr' + (x[2] ? ' style="font-weight:700"' : '') + '><td>' + x[0] + '</td><td class="n">' +
       (typeof x[1] === 'number' ? '<span class="' + sgn(x[1]) + '">' + money(x[1]) + '</span>' : '<span class="warn">' + x[1] + '</span>') + '</td><td class="n muted">' + (x[3] || '') + '</td></tr>';
   }).join('') + '</table>';

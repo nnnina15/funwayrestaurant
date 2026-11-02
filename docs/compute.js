@@ -96,7 +96,12 @@ function computeAll_(D, today) {
 
   Object.keys(M).sort().forEach(function (k) {
     const m = M[k];
-    const st = storeMap[m.store] || { fee: 0, cashIn: false };
+    const st0 = storeMap[m.store] || { fee: 0, cashIn: false };
+    const st = Object.assign({}, st0);
+    if (!(n(st.fee) >= 0 && n(st.fee) <= 10)) {          // 手續費率不合理（例如打成 500），先用 2% 並提醒
+      m.warns.push(['手續費率設定錯誤', '試算表「設定_店家」的手續費率(%) 是 ' + st0.fee + '，看起來不對，先用 2% 計算，請改成正確的數字（例如 2）']);
+      st.fee = 2;
+    }
     const status = m.month === curMonth ? '進行中' : (m.month > curMonth ? '未來' : '已結束');
 
     if (status === '進行中') m.warns.push(['未結帳', '本月還沒結束，數字只供參考，先不要拿來分紅']);

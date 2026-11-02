@@ -186,6 +186,15 @@
   #pickbar #ov-seg button.on { background: var(--brand); color: #fff; }
   #pickbar select { -webkit-appearance: none; appearance: none; background-image: none; cursor: pointer; padding: 4px 10px !important; }
   #pickbar input[type=month] { width: 170px; }
+  .msum tr.dlv td { vertical-align: middle; }
+  .msum tr.dlv td:first-child { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .msum small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; line-height: 1.2; }
+  .msum .dlv-g { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; position: relative; padding-right: 18px; }
+  .msum .dlv-g i, .msum .dlv-p i { font-style: normal; color: var(--muted); position: absolute; top: 50%; transform: translateY(-50%); }
+  .msum .dlv-g i { right: 0; }
+  .msum .dlv-p { position: relative; padding-left: 22px; white-space: nowrap; }
+  .msum .dlv-p i { left: 4px; }
+  .msum .dlv-p em { font-style: normal; font-size: 12px; color: var(--muted); margin-left: 4px; }
   .h2row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
   .h2row h2 { margin: 0; }
   .h2row select { width: auto; padding: 5px 10px; font-size: 14px; font-weight: 700; }
