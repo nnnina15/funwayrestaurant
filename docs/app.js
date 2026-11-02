@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.10';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.11';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -871,8 +871,8 @@ function renderItems() {
     var amt = hasRate(it)
       ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="時數" inputmode="text" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal" oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
       : '<input' + (it.neg ? ' class="neg-in"' : '') + ' value="' + esc(it.amount) + '" inputmode="text" placeholder="' + (it.neg ? '扣多少（打正數就好）' : '金額（扣款打負數）') + '" oninput="setItem(' + i + ',\'amount\',this.value)">';
-    return '<div class="item-row"><input value="' + esc(it.item) + '" placeholder="項目名稱" oninput="setItem(' + i + ',\'item\',this.value)">' + amt +
-      '<select onchange="setItem(' + i + ',\'kind\',this.value)">' + kinds.map(function (k) { return '<option' + (k === it.kind ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select>' +
+    return '<div class="item-row' + (hasRate(it) ? ' rate' : '') + '"><input value="' + esc(it.item) + '" placeholder="項目名稱" oninput="setItem(' + i + ',\'item\',this.value)">' + amt +
+      '<select onchange="setItem(' + i + ',\'kind\',this.value)">' + kinds.map(function (k) { return '<option value="' + esc(k) + '"' + (k === it.kind ? ' selected' : '') + '>' + esc(window.matchMedia && window.matchMedia('(max-width: 560px)').matches && k === '公司負擔' ? '公司付' : k) + '</option>'; }).join('') + '</select>' +
       '<button class="danger" onclick="delItem(' + i + ')">✕</button></div>';
   }).join('');
   renderPresetChips();
