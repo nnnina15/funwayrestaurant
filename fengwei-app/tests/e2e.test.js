@@ -117,6 +117,8 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await fillDv('Panda', 0, 1, '39182'); await fillDv('Panda', 1, 1, '10964'); await fillDv('Panda', 2, 1, '315');
   await fillDv('Uber', 0, 0, '24384'); await fillDv('Uber', 1, 0, '8540'); await fillDv('Uber', 2, 0, '500');
   assert.strictEqual(await B.pg.textContent('#dv-Panda-tot'), '64,691'); assert.strictEqual(await B.pg.textContent('#dv-Uber-tot'), '15,344');
+  // 線上支付：本月收款來自每日結帳；這個測試月份沒有全支付，所以只驗證欄位存在且可存
+  assert.ok(await B.pg.isVisible('#op-0') && await B.pg.isVisible('#op-1'));
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-delivery.png'), fullPage: true });
   await B.pg.click('#tab-delivery .primary');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
@@ -136,9 +138,18 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok(dt.includes('實際營收') && dt.includes('支出計算') && dt.includes('11/1週日') && dt.includes('40,045'), '日：每天一行、總營收 40,045');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-day.png'), fullPage: true });
   assert.ok(await B.pg.isHidden('#m-body') && await B.pg.isHidden('#y-body'));
+  // 線上支付：11 月全支付收款 575，月底實際入帳 560 → 手續費 15；月結不再顯示「估計」
+  await B.pg.click('#tb-delivery'); await B.pg.fill('#v-month', '2026-11'); await B.pg.dispatchEvent('#v-month', 'change');
+  await B.pg.fill('#op-0', '560'); await B.pg.dispatchEvent('#op-0', 'input');
+  assert.ok((await B.pg.textContent('#op-fee-0')).startsWith('15'), await B.pg.textContent('#op-fee-0'));
+  await B.pg.fill('#op-1', '3640'); await B.pg.dispatchEvent('#op-1', 'input');
+  await B.pg.click('#tab-delivery .primary');
+  await B.pg.click('#tb-overview');
   // 總覽：月
   await B.pg.click('#ov-seg button[data-v="month"]');
   assert.ok((await B.pg.textContent('#m-body')).includes('可分配給股東'));
+  const mb = await B.pg.textContent('#m-body');
+  assert.ok(mb.includes('線上支付手續費') && !mb.includes('線上支付手續費（估計）'), '對帳後不再是估計');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-summary.png'), fullPage: true });
   // 店長看不到管理分頁
   const tabsA = await A.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent));

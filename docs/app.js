@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '3.6.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '3.7.0';   // 和 sw.js 的 VERSION 一起改
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -777,6 +777,26 @@ function renderDeliveryTab() {
     return '<div class="dv" id="dv-' + p + '"></div>';
   }).join('');
   ['Panda', 'Uber'].forEach(function (p) { renderDv(p, gross[p]); });
+  // 全支付／LINE Pay：填月底實際入帳，手續費＝收款－入帳
+  var pay = { '全支付': 0, 'LINE Pay': 0 };
+  V.daily.forEach(function (x) { if (x.date.slice(0, 7) === month && !x.closed) { pay['全支付'] += Number(x.allpay || 0); pay['LINE Pay'] += Number(x.line || 0); } });
+  ST.op = pay;
+  $('v-body').insertAdjacentHTML('beforeend', '<div class="dv"><div class="dv-h"><span>全支付／LINE Pay 月底入帳</span><span class="muted">手續費＝收款－實際入帳</span></div><table><thead><tr><th></th><th>本月收款</th><th>月底實際入帳</th><th>手續費</th></tr></thead><tbody>' +
+    ['全支付', 'LINE Pay'].map(function (p, i) {
+      var rec = V.delivery.filter(function (x) { return x.month === month && x.platform === p; })[0];
+      return '<tr><th>' + p + pendTag('delivery', month + '|' + p) + '</th><td class="n">' + money(pay[p]) + '</td>' +
+        '<td><input id="op-' + i + '" inputmode="text" value="' + (rec ? esc(rec.amount) : '') + '" placeholder="沒填＝先估計" oninput="opCalc()"></td><td class="n" id="op-fee-' + i + '"></td></tr>';
+    }).join('') + '</tbody></table></div>');
+  opCalc();
+}
+function opCalc() {
+  ['全支付', 'LINE Pay'].forEach(function (p, i) {
+    var raw = $('op-' + i).value.trim(), g = ST.op[p], el = $('op-fee-' + i);
+    if (raw === '') { el.innerHTML = g ? '<span class="muted">估計 ' + money(g * (ST.snap.config.store.fee || 0) / 100) + '</span>' : '—'; return; }
+    var net = expr(raw); if (isNaN(net)) { el.innerHTML = '<span class="bad">看不懂</span>'; return; }
+    var fee = g - net;
+    el.innerHTML = '<span class="' + (fee < 0 ? 'warn' : '') + '">' + money(fee) + '</span>' + (g ? '<br><small class="muted">' + pct(fee / g) + '</small>' : '');
+  });
 }
 function dvNet(o) {
   return DV_ROWS.reduce(function (a, r) { var v = expr(o[r[0]]); if (isNaN(v)) return a; return a + (r[2] ? -Math.abs(v) : v); }, 0);
@@ -828,6 +848,14 @@ function saveDelivery() {
     });
     var amount = filled ? periods.reduce(function (a, o) { return a + dvNet(o); }, 0) : '';
     enqueue('delivery.upsert', { month: month, platform: p, amount: amount, periods: filled ? periods : null });
+    changed++;
+  });
+  ['全支付', 'LINE Pay'].forEach(function (p, i) {
+    var raw = $('op-' + i).value.trim(), amt = raw === '' ? '' : expr(raw);
+    if (amt !== '' && isNaN(amt)) { bad = true; return; }
+    var cur = view().delivery.filter(function (x) { return x.month === month && x.platform === p; })[0];
+    if ((cur ? cur.amount : '') === amt) return;
+    enqueue('delivery.upsert', { month: month, platform: p, amount: amt });
     changed++;
   });
   if (bad) return toast('有金額格式看不懂');
@@ -1077,7 +1105,7 @@ function renderSummaryTab() {
   var rows = [
     ['現場營收', m.site], ['Panda 入帳', m.pandaN === null ? '未對帳' : m.pandaN], ['Uber 入帳', m.uberN === null ? '未對帳' : m.uberN],
     ['＝ 實際營收', m.actual, true], ['進貨', -m.purchase, false, pct(m.purchasePct)], ['人事成本', -m.staff, false, pct(m.staffPct)],
-    ['固定支出', -m.fixed], ['其他支出', -m.other], ['線上支付手續費', -m.fee], ['＝ 盈餘', m.profit, true],
+    ['固定支出', -m.fixed], ['其他支出', -m.other], [m.feeEst ? '線上支付手續費（估計）' : '線上支付手續費', -m.fee], ['＝ 盈餘', m.profit, true],
     ['員工分紅', -m.bonus], ['年終預留', -m.reserve], ['其他扣除', -m.deductOther], ['＝ 可分配給股東', m.dist, true]
   ];
   var shares = R.shares.filter(function (x) { return x.month === month; });

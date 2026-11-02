@@ -41,7 +41,7 @@ const TEXT_COLS = ['日期', '月份', '店長PIN', '管理PIN', '編號', '輸�
 const PAYROLL_KINDS = ['薪資', '公司負擔', '預支'];
 const EXPENSE_TYPES = ['固定', '其他'];
 const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除'];
-const PLATFORMS = ['Panda', 'Uber'];
+const PLATFORMS = ['Panda', 'Uber', '全支付', 'LINE Pay'];   // 後兩個是線上支付：記月底實際入帳
 // 常用項目的預設值（App 裡「裝置 → 常用項目設定」可以改）
 const DEFAULT_PRESETS = [
   ['每日結帳', '米', '米', ''], ['每日結帳', '菜', '菜', ''], ['每日結帳', '蔥', '菜', ''], ['每日結帳', '油條', '其他支出', ''],

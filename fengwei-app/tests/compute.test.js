@@ -52,4 +52,13 @@ assert.ok(R2.warns.some(w => w.month === '2026-10' && w.type === '人事未填' 
 // 比例不是 100%
 D.partners.pop();
 assert.ok(ctx.computeAll_(D, '2026-11-01').warns.some(w => w.type === '股東設定'));
+// 全支付／LINE Pay 填了月底實際入帳 → 手續費＝收款－入帳，不再估計
+const allpayG = 1000 * workDays, lineG = 500 * workDays;
+D.delivery.push({ store: '大埔店', month: '2026-09', platform: '全支付', amount: allpayG - 300 });
+D.delivery.push({ store: '大埔店', month: '2026-09', platform: 'LINE Pay', amount: lineG - 120 });
+const R3 = ctx.computeAll_(D, '2026-11-01');
+const sep3 = R3.months.find(m => m.month === '2026-09');
+assert.strictEqual(sep3.fee, 420); assert.strictEqual(sep3.feeEst, false);
+assert.ok(!R3.warns.some(w => w.month === '2026-09' && w.type === '線上支付未對帳'));
+assert.ok(R.warns.some(w => w.month === '2026-09' && w.type === '線上支付未對帳'), '沒對帳要提醒');
 console.log('全部測試通過 ✓');

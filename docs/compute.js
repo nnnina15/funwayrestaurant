@@ -35,7 +35,7 @@ function computeAll_(D, today) {
   function get(store, month) {
     const k = store + '|' + month;
     if (!M[k]) M[k] = { store: store, month: month, days: 0, dates: {}, site: 0, pandaG: 0, uberG: 0,
-      allpay: 0, line: 0, cashDiff: 0, pandaN: null, uberN: null, purchase: 0, staff: 0, staffNames: {},
+      allpay: 0, line: 0, cashDiff: 0, pandaN: null, uberN: null, allpayN: null, lineN: null, purchase: 0, staff: 0, staffNames: {},
       fixed: 0, other: 0, bonus: 0, reserve: 0, deductOther: 0, cats: {}, warns: [] };
     return M[k];
   }
@@ -73,6 +73,8 @@ function computeAll_(D, today) {
     if (!r.store || !r.month) return;
     const m = get(r.store, r.month);
     if (r.platform === 'Panda') m.pandaN = (m.pandaN || 0) + n(r.amount);
+    if (r.platform === '全支付') m.allpayN = (m.allpayN || 0) + n(r.amount);
+    if (r.platform === 'LINE Pay') m.lineN = (m.lineN || 0) + n(r.amount);
     if (r.platform === 'Uber') m.uberN = (m.uberN || 0) + n(r.amount);
   });
   D.deduct.forEach(function (r) {
@@ -119,13 +121,19 @@ function computeAll_(D, today) {
     }
 
     const actual = m.site + (m.pandaN || 0) + (m.uberN || 0);
-    const fee = Math.round((m.allpay + m.line) * n(st.fee) / 100);
+    // 線上支付手續費：有填月底實際入帳 → 收款 − 入帳；還沒對帳 → 先用費率估計
+    const feeAll = m.allpayN !== null ? m.allpay - m.allpayN : m.allpay * n(st.fee) / 100;
+    const feeLine = m.lineN !== null ? m.line - m.lineN : m.line * n(st.fee) / 100;
+    const fee = Math.round(feeAll + feeLine);
+    const feeEst = (m.allpay > 0 && m.allpayN === null) || (m.line > 0 && m.lineN === null);
+    if (status === '已結束' && feeEst) m.warns.push(['線上支付未對帳', '全支付／LINE Pay 月底實際入帳還沒填，手續費先用 ' + n(st.fee) + '% 估計']);
     const profit = actual - m.purchase - m.staff - m.fixed - m.other - fee + (st.cashIn ? m.cashDiff : 0);
     const dist = profit - m.bonus - m.reserve - m.deductOther;
     if (status === '已結束' && dist < 0) m.warns.push(['虧損', '可分配金額為負數 ' + fmt(dist) + '，股東分紅會是負的']);
 
     months.push({ store: m.store, month: m.month, status: status, days: m.days, site: m.site,
       pandaG: m.pandaG, pandaN: m.pandaN, uberG: m.uberG, uberN: m.uberN, actual: actual,
+      allpay: m.allpay, line: m.line, allpayN: m.allpayN, lineN: m.lineN, feeEst: feeEst,
       avg: m.days ? Math.round(actual / m.days) : 0, purchase: m.purchase, staff: m.staff,
       fixed: m.fixed, other: m.other, fee: fee, cashDiff: m.cashDiff, profit: profit,
       bonus: m.bonus, reserve: m.reserve, deductOther: m.deductOther, dist: dist,
