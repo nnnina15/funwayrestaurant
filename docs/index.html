@@ -320,8 +320,9 @@
   .formula { font-size: 12px; margin: 8px 4px 0; }
   @media (max-width: 700px) { .cashpanel { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 560px) {
-    .tiles.t3 { grid-template-columns: 1fr 1fr; }
-    .tiles.t3 .tile:first-child { grid-column: 1 / -1; }
+    .tiles.t3 { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }   /* 現場｜Panda｜Uber 一排 */
+    .tiles.t3 .tile { padding-left: 10px; padding-right: 8px; }
+    .tiles.t3 .tile input { font-size: 20px; }
     .tile input { font-size: 23px; }
     /* 支出明細一行：名稱｜金額｜分類｜✕ */
     .line { grid-template-columns: minmax(0, 1fr) 78px 76px 24px; gap: 5px; }
