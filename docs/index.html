@@ -95,6 +95,10 @@
   /* ===== 版面 ===== */
   main { max-width: 900px; margin: 0 auto; padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); }
   body.page-wide main { max-width: 1400px; }
+  @media (max-width: 560px) {                               /* 手機：左右留白縮小，內容寬一點 */
+    main { padding-left: 8px; padding-right: 8px; padding-top: 12px; }
+    .card { padding: 14px 12px; border-radius: 14px; margin-bottom: 12px; }
+  }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
   .card h2 { margin: 0 0 14px; font-size: 19px; display: flex; align-items: center; gap: 8px; }
   .card h2::before { content: ""; width: 4px; height: 18px; border-radius: 2px; background: var(--brand); }
