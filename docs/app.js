@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.27';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.28';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -551,7 +551,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.0.5';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.0.6';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -603,7 +603,19 @@ function renderDailyExist() {
   if (d) $('d-exist').innerHTML = '這天已經有紀錄（' + esc(d.editedAt || '') + (d.device ? '，' + esc(d.device) : '') + '）' +
     pendTag('daily', d.date) + '，修改後再儲存會覆蓋。';
 }
-var LINE_OTHER = '其他支出', LINE_WAGE = '薪資／預支';
+var LINE_OTHER = '其他支出', LINE_WAGE = '薪資／預支';      // LINE_WAGE：舊資料用，不會自動記到人事
+var LINE_PT = 'PT薪資', LINE_ADV = '預支';                    // 新的：存檔時自動記到「人事」
+function isWageCat(c) { return c === LINE_PT || c === LINE_ADV || c === LINE_WAGE; }
+// 名稱看起來是 PT 或預支，就自動選對分類（舊的「薪資／預支」也換成新的）
+function wageCatFor(name) { var n = String(name || ''); return /預支|借/.test(n) ? LINE_ADV : LINE_PT; }
+// 記到人事時是誰：名稱裡有員工名字就用員工名字，不然就用名稱本身（例如 PT）
+function slipPerson(name, cat) {
+  var n = String(name || '').trim(), emps = ((ST.snap && ST.snap.config.employees) || []).map(function (e) { return e.name; })
+    .sort(function (a, b) { return b.length - a.length; });
+  for (var i = 0; i < emps.length; i++) if (emps[i] && n.indexOf(emps[i]) >= 0) return emps[i];
+  n = n.replace(/預支|借支|借款|薪資|日薪/g, '').trim();
+  return n || (cat === LINE_ADV ? '（未指定）' : 'PT');
+}
 
 /* ---------- 常用項目：存在試算表「設定_常用項目」，在「裝置 → 常用項目設定」修改 ---------- */
 var PRESET_DEFAULTS = {
@@ -632,7 +644,8 @@ function linePresets() {
   });
   return presetsFor('每日結帳').map(function (p) {
     var c = p.cat;
-    if (c !== LINE_OTHER && c !== LINE_WAGE && ST.lineCats.indexOf(c) < 0) c = ST.lineCats.indexOf(p.name) >= 0 ? p.name : LINE_OTHER;
+    if (c === LINE_WAGE) c = wageCatFor(p.name);
+    if (c !== LINE_OTHER && c !== LINE_PT && c !== LINE_ADV && ST.lineCats.indexOf(c) < 0) c = ST.lineCats.indexOf(p.name) >= 0 ? p.name : LINE_OTHER;
     return { name: p.name, cat: c, last: last[p.name] === undefined ? null : last[p.name] };
   });
 }
@@ -662,7 +675,7 @@ function renderLines() {
       '<input class="amt" value="' + esc(l.amount) + '" inputmode="text" placeholder="金額" oninput="setLine(' + i + ',\'amount\',this.value)">' +
       '<select onchange="setLine(' + i + ',\'cat\',this.value)">' +
         '<optgroup label="進貨">' + ST.lineCats.map(function (c) { return opt(c); }).join('') + '</optgroup>' +
-        '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + opt(LINE_WAGE, window.matchMedia && window.matchMedia('(max-width: 560px)').matches ? '薪資/預支' : '薪資／預支（月底人事會算）') + '</optgroup>' +
+        '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + (function () { var ph = window.matchMedia && window.matchMedia('(max-width: 560px)').matches; return opt(LINE_PT, ph ? 'PT薪資' : 'PT薪資（記到人事）') + opt(LINE_ADV, ph ? '預支' : '預支（記到人事）') + (l.cat === LINE_WAGE ? opt(LINE_WAGE, '薪資／預支（舊）') : ''); })() + '</optgroup>' +
       '</select>' +
       '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delLine(' + i + ')">✕</button></div>';
   }).join('');
@@ -674,8 +687,9 @@ function guessLine(i) {
   var l = ST.lines[i], n = String(l.name || '').trim();
   if (!n) return;
   var m = lineMemory()[n];
-  if (m && m.cat) l.cat = m.cat;
+  if (m && m.cat) l.cat = m.cat === LINE_WAGE ? wageCatFor(n) : m.cat;
   else if (ST.lineCats.indexOf(n) >= 0) l.cat = n;
+  else if (/^PT|預支|借支/i.test(n)) l.cat = wageCatFor(n);
   else return;
   // 只改這一行的分類，不重畫整個清單（不然正在輸入的金額欄會不見）
   var sel = $('d-lines').querySelectorAll('.line')[i];
@@ -725,7 +739,7 @@ function saveDaily() {
   });
   var tag = date.replace(/-/g, '');
   lines.forEach(function (l) {
-    if (!l.amount || l.cat === LINE_WAGE) return;
+    if (!l.amount || isWageCat(l.cat)) return;
     if (l.cat === LINE_OTHER) {
       l.pid = 'E' + tag + uid().slice(0, 6);
       enqueue('expense.add', { id: l.pid, month: date.slice(0, 7), type: '其他', item: l.name, amount: l.amount, note: '每日結帳 ' + date });
@@ -734,6 +748,13 @@ function saveDaily() {
       enqueue('purchase.add', { id: l.pid, date: date, cat: l.cat, amount: l.amount, note: '每日結帳：' + l.name });
     }
   });
+  // PT 薪資／預支 → 記到人事（這天上次記的會先清掉再重記，所以改了、刪了都會跟著變）
+  var slip = lines.filter(function (l) { return l.amount && (l.cat === LINE_PT || l.cat === LINE_ADV); }).map(function (l) {
+    var who = slipPerson(l.name, l.cat), adv = l.cat === LINE_ADV;
+    return { name: who, item: adv ? '預支' : (l.name && l.name !== who ? l.name : 'PT薪資'), amount: adv ? -Math.abs(l.amount) : l.amount, kind: adv ? '預支' : '薪資' };
+  });
+  var hadSlip = ((old && old.lines) || []).some(function (l) { return l.cat === LINE_PT || l.cat === LINE_ADV; });
+  if (slip.length || hadSlip) enqueue('payroll.slip', { date: date, items: slip });
   var spend = lines.reduce(function (a, l) { return a + l.amount; }, 0);
   var expected = v('d-site') - v('d-allpay') - v('d-line') - spend;
   var diff = closed ? 0 : v('d-cash') - expected;
@@ -744,7 +765,7 @@ function saveDaily() {
   var np = lines.filter(function (l) { return l.pid && l.pid.charAt(0) === 'D'; }).length;
   var ne = lines.filter(function (l) { return l.pid && l.pid.charAt(0) === 'E'; }).length;
   toast((Math.abs(diff) > (ST.snap.config.store.cashWarn || 500) ? '已儲存，但現金差額偏大，請確認' : '已儲存 ✓') +
-    (np || ne ? '（自動記 ' + (np ? '進貨 ' + np + ' 筆' : '') + (np && ne ? '、' : '') + (ne ? '其他支出 ' + ne + ' 筆' : '') + '）' : ''));
+    (np || ne || slip.length ? '（自動記 ' + [np ? '進貨 ' + np + ' 筆' : '', ne ? '其他支出 ' + ne + ' 筆' : '', slip.length ? '人事 ' + slip.length + ' 筆' : ''].filter(Boolean).join('、') + '）' : ''));
 }
 
 /* ---------- 進貨 ---------- */
@@ -851,12 +872,14 @@ function openEmp(name, stay) {
   ST.emp = name; ST.itemsDirty = false;
   var month = $('s-month').value; ST.empMonth = month;
   var rows = view().payroll.filter(function (x) { return x.month === month && x.name === name; });
-  var saved = rows.length > 0;
+  var asItem = function (x) { return { item: x.item, amount: x.amount, kind: x.kind, hours: x.hours, rate: x.rate, neg: Number(x.amount) < 0 }; };
+  // 只有「每日結帳」自動記進來的（PT 薪資／預支）還不算填過：照樣帶入這個人的預設，再加上日結的項目
+  var saved = rows.some(function (x) { return !/（日結 \d+\/\d+）$/.test(String(x.item || '')); });
   if (saved) {
-    ST.items = rows.map(function (x) { return { item: x.item, amount: x.amount, kind: x.kind, hours: x.hours, rate: x.rate, neg: Number(x.amount) < 0 }; });
+    ST.items = rows.map(asItem);
   } else {
     var e = (ST.snap.config.employees || []).filter(function (x) { return x.name === name; })[0];
-    ST.items = e ? payrollDefaults(e) : [{ item: '薪資', amount: '', kind: '薪資' }];
+    ST.items = (e ? payrollDefaults(e) : (rows.length ? [] : [{ item: '薪資', amount: '', kind: '薪資' }])).concat(rows.map(asItem));
   }
   renderPayrollTab(false);
   var list = ST.empOrder || [], idx = list.indexOf(name);
@@ -1363,7 +1386,7 @@ function renderSummaryTab() {
 
 /* ---------- 裝置設定 ---------- */
 var OP_NAMES = { 'presets.set': '常用項目設定', 'daily.upsert': '每日結帳', 'purchase.add': '新增進貨', 'purchase.del': '刪除進貨', 'expense.add': '新增支出',
-  'expense.del': '刪除支出', 'deduct.add': '新增扣除', 'deduct.del': '刪除扣除', 'payroll.upsert': '人事', 'delivery.upsert': '外送對帳' };
+  'expense.del': '刪除支出', 'deduct.add': '新增扣除', 'deduct.del': '刪除扣除', 'payroll.upsert': '人事', 'payroll.slip': '日結→人事', 'delivery.upsert': '外送對帳' };
 function opLabel(op) {
   if (!op) return '';
   var d = op.data || {};
@@ -1380,7 +1403,7 @@ function checkUpdate() {
 /* ---------- 常用項目設定（管理） ---------- */
 var PE_USES = [['每日結帳', '每日結帳・支出明細'], ['固定支出', '固定／其他支出'], ['人事', '人事']];
 function peCatOptions(use) {
-  if (use === '每日結帳') return [['進貨', categoriesFor(todayStr().slice(0, 7))], ['其他', [LINE_OTHER, LINE_WAGE]]];
+  if (use === '每日結帳') return [['進貨', categoriesFor(todayStr().slice(0, 7))], ['其他', [LINE_OTHER, LINE_PT, LINE_ADV]]];
   if (use === '固定支出') return [['', ['固定', '其他']]];
   return [['', ['薪資', '公司負擔', '預支']]];
 }

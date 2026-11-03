@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.0.5';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '新增「⑤ 更新程式」：以後按一下就能更新並自動部署，不用再手動貼程式碼';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.0.6';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '每日結帳的 PT 薪資、預支會自動記到人事（店長也能存）';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -50,7 +50,7 @@ const PLATFORMS = ['Panda', 'Uber', '全支付', 'LINE Pay'];   // 後兩個是�
 // 常用項目的預設值（App 裡「裝置 → 常用項目設定」可以改）
 const DEFAULT_PRESETS = [
   ['每日結帳', '米', '米', ''], ['每日結帳', '菜', '菜', ''], ['每日結帳', '蔥', '菜', ''], ['每日結帳', '油條', '其他支出', ''],
-  ['每日結帳', '燉滷', '其他支出', ''], ['每日結帳', 'PT', '薪資／預支', ''],
+  ['每日結帳', '燉滷', '其他支出', ''], ['每日結帳', 'PT', 'PT薪資', ''],
   ['固定支出', '房租', '固定', ''], ['固定支出', '電費', '固定', ''], ['固定支出', '水費', '固定', ''], ['固定支出', '電話費', '固定', ''],
   ['固定支出', '網路費', '固定', ''], ['固定支出', '瓦斯費', '固定', ''], ['固定支出', '拜拜', '固定', ''], ['固定支出', '聚餐', '其他', ''],
   ['固定支出', '外送費用', '其他', ''],
@@ -60,7 +60,7 @@ const DEFAULT_PRESETS = [
   ['人事', '勞退(公司)', '公司負擔', '加'], ['人事', '健保(公司)', '公司負擔', '加'], ['人事', '勞保(公司)', '公司負擔', '加']
 ];
 const PRESET_USES = ['每日結帳', '固定支出', '人事'];
-const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del'];
+const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del', 'payroll.slip'];
 
 /* ============================================================
  * 試算表選單 & 初始化
@@ -106,6 +106,8 @@ function fetchText_(url) {
   if (r.getResponseCode() !== 200) throw new Error('下載失敗（' + r.getResponseCode() + '）：' + url);
   return r.getContentText('UTF-8');
 }
+
+function slipSuffix_(date) { return '（日結 ' + Number(date.slice(5, 7)) + '/' + Number(date.slice(8, 10)) + '）'; }
 
 function verNum_(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 
@@ -602,6 +604,19 @@ function applyServerOp_(store, op) {
       deleteWhere_(S.PRESET, function (x) { return str_(x['店別']) === store && str_(x['用途']) === use; });
       append_(S.PRESET, (d.items || []).filter(function (it) { return str_(it.name); }).map(function (it) {
         return { '店別': store, '用途': use, '名稱': str_(it.name), '分類': str_(it.cat), '加扣': str_(it.sign) === '扣' ? '扣' : (use === '人事' ? '加' : '') };
+      }));
+      return 'ok';
+    }
+    // 每日結帳的 PT 薪資／預支 → 記到人事：先刪這天上次產生的（項目結尾是「（日結 11/3）」），再加新的
+    case 'payroll.slip': {
+      const date = dateKey_(d.date);
+      if (!date) throw new Error('日結缺日期');
+      const month = date.slice(0, 7), suffix = slipSuffix_(date);
+      deleteWhere_(S.PAYROLL, function (x) { return str_(x['店別']) === store && monthKey_(x['月份']) === month && str_(x['項目']).slice(-suffix.length) === suffix; });
+      append_(S.PAYROLL, (d.items || []).filter(function (it) { return str_(it.name) && num_(it.amount); }).map(function (it) {
+        const item = str_(it.item);
+        return { '輸入時間': at, '月份': month, '店別': store, '姓名': str_(it.name), '項目': item.slice(-suffix.length) === suffix ? item : item + suffix,
+          '金額': num_(it.amount), '類別': it.kind === '預支' ? '預支' : '薪資', '時數': '', '時薪': '', '裝置': dev };
       }));
       return 'ok';
     }

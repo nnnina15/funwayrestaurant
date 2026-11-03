@@ -190,6 +190,17 @@ function applyOp_(state, op, store) {
     case 'deduct.del':
       state.deduct = keep(state.deduct, function (r) { return r.id === d.id; });
       break;
+    case 'payroll.slip': {        // 每日結帳的 PT 薪資／預支 → 人事（先刪這天上次產生的）
+      const sfx = '（日結 ' + Number(d.date.slice(5, 7)) + '/' + Number(d.date.slice(8, 10)) + '）', mon = d.date.slice(0, 7);
+      state.payroll = keep(state.payroll, function (r) { return r.month === mon && String(r.item || '').slice(-sfx.length) === sfx; });
+      (d.items || []).forEach(function (it) {
+        if (!it.name || !Number(it.amount)) return;
+        const item = String(it.item || '');
+        state.payroll.push({ store: store, month: mon, name: it.name, item: item.slice(-sfx.length) === sfx ? item : item + sfx, amount: Number(it.amount),
+          kind: it.kind === '預支' ? '預支' : '薪資', hours: '', rate: '', editedAt: d.editedAt });
+      });
+      break;
+    }
     case 'payroll.upsert':
       state.payroll = keep(state.payroll, function (r) { return r.month === d.month && r.name === d.name; });
       (d.items || []).forEach(function (it) {

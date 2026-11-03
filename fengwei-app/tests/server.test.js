@@ -126,7 +126,7 @@ assert.strictEqual(row26['應有現金'], 29125 - 575 - 3713 - 1300);
 assert.deepStrictEqual(r.data.daily.find(x => x.date === '2026-10-26').lines, lines);
 
 // 常用項目：預設有資料；管理可以改（只改這家店），店長不行
-assert.ok(adm.data.presets.some(x => x.use === '每日結帳' && x.name === 'PT' && x.cat === '薪資／預支' && x.store === '全部'));
+assert.ok(adm.data.presets.some(x => x.use === '每日結帳' && x.name === 'PT' && x.cat === 'PT薪資' && x.store === '全部'));
 r = g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [op('presets.set', { use: '每日結帳', items: [{ name: 'X', cat: '米' }] })] });
 assert.strictEqual(r.results[0].status, 'error', '店長不能改常用項目');
 r = g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, ops: [op('presets.set', { use: '每日結帳', items: [{ name: '豬肉', cat: '豬肉攤' }, { name: '米', cat: '米' }] })] });

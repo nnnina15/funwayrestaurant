@@ -53,7 +53,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await A.pg.locator('.stepper:has(#d-date) .step').first().click(); assert.strictEqual(await A.pg.inputValue('#d-date'), '2026-11-01');
   // 照紙本結帳單輸入（10/26 那張）
   for (const [id, v] of [['d-site', '29125'], ['d-panda', '6358'], ['d-uber', '4562'], ['d-allpay', '575'], ['d-line', '3713']]) await A.pg.fill('#' + id, v);
-  const slip = [['燉滷', '500', '其他支出'], ['油條', '400', '其他支出'], ['蔥', '140', '菜'], ['PT', '800', '薪資／預支'], ['淳', '420', '其他支出']];
+  const slip = [['燉滷', '500', '其他支出'], ['油條', '400', '其他支出'], ['蔥', '140', '菜'], ['PT', '800', 'PT薪資'], ['淳', '420', '其他支出']];
   for (let i = 0; i < slip.length; i++) {
     if (i > 0) await A.pg.click('text=＋ 新增一行');
     const row = A.pg.locator('#d-lines .line').nth(i);
@@ -94,6 +94,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.strictEqual(g.rows(S.PURCHASE).find(r => r['分類'] === '乾貨/配菜')['金額'], 4115);
   assert.strictEqual(g.rows(S.PURCHASE).find(r => r['分類'] === '菜')['金額'], 150);
   assert.deepStrictEqual(g.rows(S.EXPENSE).map(r => r['項目'] + r['金額']).sort(), ['油條400', '淳420', '燉滷500'], 'PT 是薪資，不另記其他支出');
+  assert.deepStrictEqual(g.rows('人事明細').map(r => [r['姓名'], r['項目'], r['金額'], r['類別']]), [['PT', 'PT薪資（日結 11/1）', 800, '薪資']], '日結的 PT 自動記到人事（存兩次也只有一筆）');
   const day = g.rows(S.DAILY)[0];
   assert.strictEqual(day['現場支出'], 2270); assert.strictEqual(day['現金差額'], 268); assert.strictEqual(day['裝置'], '大埔平板');
   assert.ok(String(day['支出明細']).startsWith('燉滷 500（→其他支出#E'), day['支出明細']);
@@ -106,9 +107,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
   assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 3, '手機要看到平板的進貨（手動 2 + 結帳單 1）');
   await B.pg.click('#tb-payroll'); await B.pg.click('text=範例正職(請改名)');
-  assert.ok((await B.pg.textContent('#s-name')).includes('1/2'));
+  assert.ok((await B.pg.textContent('#s-name')).includes('1/3'), '範例正職、範例計時，加上日結自動記的 PT');
   await B.pg.click('#s-name .step >> nth=1');                        // › 下一位
-  assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('2/2'), '› 要切到下一位');
+  assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('2/3'), '› 要切到下一位');
   await B.pg.fill('.hours input >> nth=0', '106'); await B.pg.fill('.hours input >> nth=1', '240'); await B.pg.dispatchEvent('.hours input >> nth=0', 'input');
   await B.pg.click('text=＋ 新增項目'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=0', '加班費'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=1', '700'); await B.pg.dispatchEvent('.item-row >> nth=1 >> input >> nth=1', 'input');
   assert.ok((await B.pg.textContent('#s-calc')).includes('26,140'));
@@ -121,7 +122,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('.item-row >> nth=2 >> button.danger');
   await B.pg.click('text=儲存這位員工');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
-  assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 26140);
+  assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 26140 + 800, '人事頁存的 26,140 ＋ 日結自動記的 PT 800');
   await B.pg.click('#tb-expense'); await B.pg.fill('#e-month', '2026-01'); await B.pg.dispatchEvent('#e-month', 'change');
   await B.pg.locator('.stepper:has(#e-month) .step').first().click(); assert.strictEqual(await B.pg.inputValue('#e-month'), '2025-12', '月份 ‹ 要能跨年');
   // 固定支出常用項目：點「房租」帶入名稱和類型，記過就不再顯示；下個月會顯示上次金額
