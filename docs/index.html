@@ -249,7 +249,11 @@
   /* ===== 年度表格 ===== */
   .swipe { display: none; margin: -6px 0 6px; }
   @media (max-width: 900px) { .swipe { display: block; } }
-  .xscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; }
+  .xscroll { overflow: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px;
+    max-height: calc((100vh - var(--sticky-top, 60px) - 40px) / var(--fz, 1)); }   /* 表格自己捲：標題和總計固定在上面 */
+  @media (max-width: 899px) { body.has-bar .xscroll { max-height: calc((100vh - var(--sticky-top, 60px) - 120px) / var(--fz, 1)); } }
+  .ytable thead th { z-index: 2; }
+  .ytable thead + tbody tr.trow:first-child th, .ytable thead + tbody tr.trow:first-child td { position: sticky; top: var(--thead-h, 37px); z-index: 2; }
   .ytable { border-collapse: separate; border-spacing: 0; font-size: 15px; white-space: nowrap; }
   .ytable th, .ytable td { padding: 9px 12px; border-bottom: 1px solid var(--line); }
   .ytable thead th { background: var(--soft); position: sticky; top: 0; font-weight: 700; font-size: 14px; }

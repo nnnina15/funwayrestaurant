@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.17';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.18';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -1146,6 +1146,10 @@ function renderOverview() {
   if (ST.ov === 'day') renderDayView(); else if (ST.ov === 'month') renderSummaryTab(); else renderYearTab();
 }
 var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+// 表格標題列的高度：讓「總計」列固定在標題下面
+function fixTheads(root) {
+  Array.prototype.forEach.call(root.querySelectorAll('.ytable'), function (t) { if (t.tHead) t.style.setProperty('--thead-h', t.tHead.offsetHeight + 'px'); });
+}
 function renderDayView() {
   var month = $('m-month').value, V = view();
   var y = Number(month.slice(0, 4)), mo = Number(month.slice(5, 7)), last = new Date(y, mo, 0).getDate();
@@ -1200,7 +1204,7 @@ function renderDayView() {
   h += '<h2>實際營收</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead>' + revHead + '</thead><tbody>' + revTot + revRows + '</tbody></table></div>';
   h += '<h2 style="margin-top:22px">支出計算（進貨）</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead>' + buyHead + '</thead><tbody>' + buyTot + buyRows + '</tbody></table></div>';
   h += '<p class="muted">總營收＝現場＋panda＋uber（外送是營業額，不是實際入帳）。月結請看「月」。</p>';
-  $('dd-body').innerHTML = h;
+  $('dd-body').innerHTML = h; fixTheads($('dd-body'));
 }
 
 function renderYearTab() {
@@ -1269,7 +1273,7 @@ function renderYearTab() {
   });
   h += drow(months, cur + (perDay ? ' 全年平均' : ' 全年'), 'yrow') + '</tbody></table></div>';
   h += '<p class="muted">電費、水費是從「固定／其他支出」裡項目名稱有「電費」「水費」的金額抓的。季、全年的每天平均＝合計 ÷ 總工作天。</p>';
-  $('y-body').innerHTML = h;
+  $('y-body').innerHTML = h; fixTheads($('y-body'));
 }
 
 function renderSummaryTab() {
