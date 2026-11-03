@@ -386,9 +386,11 @@
       display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px;
       background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15); font-size: 14px; padding: 0; }
     body.has-bar #sync .sync-txt { display: none; }
+    body.has-bar #sync:not(.open) { width: 48px; padding: 0; }   /* 收起來時：和亮暗按鈕一樣的正圓 */
     body.has-bar #sync.open { padding: 0 0 0 16px; }
+    body.has-bar #sync, #themeBtn { box-sizing: border-box; min-height: 0; margin: 0; -webkit-appearance: none; appearance: none; }
     body.has-bar #sync.open .sync-txt { display: inline; }
-    body.has-bar #sync .sync-ic { width: 46px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: var(--ok); }
+    body.has-bar #sync .sync-ic { width: 46px; height: 46px; flex: 0 0 46px; line-height: 1; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: var(--ok); }
     body.has-bar #sync.pending .sync-ic, body.has-bar #sync.err .sync-ic { color: inherit; font-size: 15px; }
     body.has-bar #sync.pending { background: var(--amber); color: #3d2600; }
     body.has-bar #sync.err { background: #ff8a75; color: #3d0b04; }
