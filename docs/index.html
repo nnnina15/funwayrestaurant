@@ -260,6 +260,13 @@
   .ytable thead th.cat { color: var(--muted); font-weight: 500; }
   .ytable tbody th, .ytable thead th:first-child { position: sticky; left: 0; background: var(--card); text-align: left; z-index: 1; border-right: 1px solid var(--line); }
   .ytable thead th:first-child { background: var(--soft); z-index: 2; }
+
+  /* 疊放順序：左上角 > 標題列 > 總計列的左格 > 總計列 > 日期欄 > 一般格子（左右、上下滑都不會互相蓋住） */
+  .ytable tbody th { z-index: 1; }
+  .ytable thead + tbody tr.trow:first-child td { z-index: 2; }
+  .ytable thead + tbody tr.trow:first-child th { z-index: 3; left: 0; }
+  .ytable thead th { z-index: 4; }
+  .ytable thead th:first-child { z-index: 5; left: 0; }
   .ytable td.em { font-weight: 700; }
   .ytable tr.qrow th, .ytable tr.qrow td { background: var(--qrow); font-weight: 700; }
   .ytable tr.yrow th, .ytable tr.yrow td { background: var(--yrow); font-weight: 800; border-top: 2px solid var(--amber); }
