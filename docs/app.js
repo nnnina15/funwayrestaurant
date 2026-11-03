@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.23';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.24';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -829,6 +829,13 @@ function renderPayrollTab(full) {
     '<p class="muted">本月人事成本合計：<b>' + money(total) + '</b></p>';
   if (full) $('s-editor').classList.toggle('hide', !ST.emp);
 }
+// 換月份：同一位員工直接換成新月份的資料（沒選人就只更新名單）
+function onPayMonth() {
+  if (ST.emp) {
+    if (ST.itemsDirty && !confirm(ST.emp + ' 改了還沒儲存，換月份會不見，確定？')) { $('s-month').value = ST.empMonth || $('s-month').value; return; }
+    openEmp(ST.emp, true);
+  } else renderPayrollTab(true);
+}
 function addTempEmployee() {
   var n = prompt('輸入名字（例：臨時工小王）');
   if (n && n.trim()) openEmp(n.trim());
@@ -842,7 +849,7 @@ function stepEmp(d) {
 }
 function openEmp(name, stay) {
   ST.emp = name; ST.itemsDirty = false;
-  var month = $('s-month').value;
+  var month = $('s-month').value; ST.empMonth = month;
   var rows = view().payroll.filter(function (x) { return x.month === month && x.name === name; });
   var saved = rows.length > 0;
   if (saved) {
@@ -854,7 +861,7 @@ function openEmp(name, stay) {
   renderPayrollTab(false);
   var list = ST.empOrder || [], idx = list.indexOf(name);
   $('s-name').innerHTML = '<button class="step" onclick="stepEmp(-1)" aria-label="上一位"' + (idx <= 0 ? ' disabled' : '') + '>‹</button>' +
-    '<span class="emp-t">' + esc(name) + '<small>' + month + (saved ? '・已儲存過' : '・帶入預設') + (idx >= 0 ? '・' + (idx + 1) + '/' + list.length : '') + '</small></span>' +
+    '<span class="emp-t">' + esc(name) + '<small>' + month.slice(0, 4) + '/' + Number(month.slice(5, 7)) + '月' + (saved ? '・已儲存過' : '・帶入預設') + (idx >= 0 ? '・' + (idx + 1) + '/' + list.length : '') + '</small></span>' +
     '<button class="step" onclick="stepEmp(1)" aria-label="下一位"' + (idx < 0 || idx >= list.length - 1 ? ' disabled' : '') + '>›</button>';
   $('s-editor').classList.remove('hide');
   renderItems();
