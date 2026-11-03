@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.1.8';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.2.0';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -385,7 +385,7 @@ function enterApp() {
   var t = todayStr(), m = t.slice(0, 7);
   ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
   ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });
-  $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
+  $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除', '股東分紅（已發）']).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
   var mine = TABS.filter(function (x) { return !x[2] || isAdmin(); });
   $('tabs').innerHTML = mine.map(function (x) {
     return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
@@ -585,7 +585,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.1.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.1.1';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -1329,17 +1329,25 @@ function renderYearTab() {
   var cols = ['盈餘', '員工分紅', '年終預留', '可分配'].concat(partners.map(function (p) {
     var pp = (L.C.partners || []).filter(function (x) { return x.name === p; })[0]; return p + ' ' + pp.pct + '%';
   }));
+  // 結餘：上一年留下來的錢 ＋ 每月可分配 − 實際發給股東的分紅（分紅扣除頁的「股東分紅（已發）」）
+  var carry = R.months.filter(function (m) { return m.month.slice(0, 4) < cur; }).reduce(function (a, m) { return a + m.dist - (m.paid || 0); }, 0);
+  var bal = {}, run = carry;
+  months.forEach(function (m) { run += m.dist - (m.paid || 0); bal[m.month] = run; });
+  cols = cols.concat(['已發分紅', '結餘']);
   var rowOf = function (list, name, cls) {
     return '<tr class="' + cls + '"><th>' + name + '</th>' + td(sum(list, function (m) { return m.profit; })) +
       td(sum(list, function (m) { return m.bonus; })) + td(sum(list, function (m) { return m.reserve; })) +
       td(sum(list, function (m) { return m.dist; }), 'em') +
-      partners.map(function (p) { return td(sum(list, function (m) { return share[m.month + '|' + p] || 0; }), 'em'); }).join('') + '</tr>';
+      partners.map(function (p) { return td(sum(list, function (m) { return share[m.month + '|' + p] || 0; }), 'em'); }).join('') +
+      td(-sum(list, function (m) { return m.paid || 0; })) + td(list.length ? bal[list[list.length - 1].month] : carry, 'em bal') + '</tr>';
   };
+  var carryRow = '<tr class="carry"><th>上一年結餘</th>' + cols.map(function (c, i) { return i === cols.length - 1 ? td(carry, 'em bal') : '<td></td>'; }).join('') + '</tr>';
   var yDays = sum(months, function (m) { return m.days; }), yAct = sum(months, function (m) { return m.actual; });
-  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', sum(months, function (m) { return m.profit; }), months.length + ' 個月', true) +
-    kpi('可分配給股東', sum(months, function (m) { return m.dist; })) + kpi('實際營收', yAct, '工作 ' + yDays + ' 天') +
-    kpi('日均營收', yDays ? Math.round(yAct / yDays) : 0) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th>' +
-    cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', carry + sum(months, function (m) { return m.profit; }), '今年 ' + money(sum(months, function (m) { return m.profit; })) + '＋上一年結餘 ' + money(carry), true) +
+    kpi('可分配給股東', sum(months, function (m) { return m.dist; })) +
+    kpi('年底結餘', months.length ? bal[months[months.length - 1].month] : carry, '上一年結餘 ' + money(carry) + '｜已發分紅 ' + money(sum(months, function (m) { return m.paid || 0; }))) +
+    kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th>' +
+    cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' + carryRow;
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
     if (!qm.length) return;
@@ -1347,7 +1355,7 @@ function renderYearTab() {
     h += rowOf(qm, '<span class="qtag">Q' + q + '</span><small>合計</small>', 'qrow');
   });
   h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
-  h += '<p class="muted">每月的分紅＝可分配 × 股東比例。進行中的月份數字會變動，先不要拿來分紅。</p>';
+  h += '<p class="muted">每月的分紅＝可分配 × 股東比例（應分多少）。已發分紅＝在「分紅扣除」記的「股東分紅（已發）」。結餘＝上一年結餘＋可分配−已發分紅，也就是還沒分出去的錢。進行中的月份數字會變動，先不要拿來分紅。</p>';
 
   // 表二：平均細項
   var catSet = {}; R.cats.forEach(function (c) { if (c.month.slice(0, 4) === cur) catSet[c.cat] = (catSet[c.cat] || 0) + c.amount; });

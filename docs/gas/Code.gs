@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.1.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '更新方式改成：按「⑤ 更新程式」就直接換新程式，不需要 Apps Script API、不用重新部署';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.1.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '分紅扣除新增「股東分紅（已發）」，年總覽可以算上一年結餘和年底結餘';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -45,7 +45,7 @@ HEAD[S.R_WARN] = ['店別', '月份', '類型', '說明'];
 const TEXT_COLS = ['日期', '月份', '期間', '編號', '輸入時間', '帳號', '臨時PIN', 'PIN(加密，勿改)', '最後登入', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 const PAYROLL_KINDS = ['薪資', '公司負擔', '預支'];
 const EXPENSE_TYPES = ['固定', '其他'];
-const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除'];
+const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除', '股東分紅（已發）'];   // 已發：實際發給股東的分紅，只用來算結餘
 const PLATFORMS = ['Panda', 'Uber', '全支付', 'LINE Pay'];   // 後兩個是線上支付：記月底實際入帳
 // 常用項目的預設值（App 裡「裝置 → 常用項目設定」可以改）
 const DEFAULT_PRESETS = [

@@ -36,7 +36,7 @@ function computeAll_(D, today) {
     const k = store + '|' + month;
     if (!M[k]) M[k] = { store: store, month: month, days: 0, dates: {}, site: 0, pandaG: 0, uberG: 0,
       allpay: 0, line: 0, cashDiff: 0, pandaN: null, uberN: null, allpayN: null, lineN: null, purchase: 0, staff: 0, staffNames: {},
-      fixed: 0, other: 0, bonus: 0, reserve: 0, deductOther: 0, cats: {}, warns: [] };
+      fixed: 0, other: 0, bonus: 0, reserve: 0, deductOther: 0, paid: 0, cats: {}, warns: [] };
     return M[k];
   }
   function fmt(n) { return (Math.round(n) || 0).toLocaleString('en-US'); }
@@ -82,6 +82,7 @@ function computeAll_(D, today) {
     const m = get(r.store, r.month);
     if (r.type === '員工分紅') m.bonus += n(r.amount);
     else if (r.type === '年終預留') m.reserve += n(r.amount);
+    else if (r.type === '股東分紅（已發）') m.paid += n(r.amount);   // 實際發給股東的錢：不影響可分配，只算結餘
     else m.deductOther += n(r.amount);
   });
 
@@ -141,7 +142,7 @@ function computeAll_(D, today) {
       allpay: m.allpay, line: m.line, allpayN: m.allpayN, lineN: m.lineN, feeEst: feeEst,
       avg: m.days ? Math.round(actual / m.days) : 0, purchase: m.purchase, staff: m.staff,
       fixed: m.fixed, other: m.other, fee: fee, cashDiff: m.cashDiff, profit: profit,
-      bonus: m.bonus, reserve: m.reserve, deductOther: m.deductOther, dist: dist,
+      bonus: m.bonus, reserve: m.reserve, deductOther: m.deductOther, dist: dist, paid: m.paid,
       purchasePct: actual ? m.purchase / actual : 0, staffPct: actual ? m.staff / actual : 0,
       warnCount: m.warns.length });
 

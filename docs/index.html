@@ -285,6 +285,8 @@
   .ytable tr.qrow td.neg { color: var(--bad); }
   .ytable tr.qrow td:not(.neg):not(.zero) { color: var(--ink); }
   .ytable tr.qrow th { white-space: nowrap; }
+  .ytable tr.carry th, .ytable tr.carry td { background: var(--soft); color: var(--muted); font-weight: 700; }
+  .ytable td.bal { background: color-mix(in srgb, var(--amber) 9%, transparent); }
   .ytable .qtag { display: inline-block; background: var(--amber); color: #3d2600; font-weight: 800; font-size: 12px; line-height: 1; padding: 4px 7px; border-radius: 6px; margin-right: 6px; vertical-align: 1px; }
   .ytable tr.qrow th small { color: var(--muted); font-weight: 600; font-size: 13px; }
   .ytable tr.yrow th, .ytable tr.yrow td { background: var(--yrow); font-weight: 800; border-top: 2px solid var(--amber); }
