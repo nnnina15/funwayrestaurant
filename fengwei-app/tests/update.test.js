@@ -1,64 +1,61 @@
-// 「⑤ 更新程式」：從 GitHub Pages 下載 → 換掉 Code、compute、appsscript（其他檔案不動）→ 建新版本 → 更新網頁應用程式部署
+// 「⑤ 更新程式」：從 GitHub Pages 下載 → 你確認 → 存進指令碼屬性 → App／選單直接用新版（不需要 Apps Script API、不用重新部署）
 const assert = require('assert'), fs = require('fs'), path = require('path');
 const { createGas } = require('./gas-mock.js');
 const D = path.join(__dirname, '..', '..', 'docs');
-function run(opts) {
+const CODE = fs.readFileSync(path.join(D, 'gas', 'Code.gs'), 'utf8');
+const CUR = CODE.match(/const SERVER_VERSION = '([^']+)'/)[1];
+function setup(opts) {
   const g = createGas(), calls = [], alerts = [];
-  let newVer = opts.version || '9.9.9';
-  const code = fs.readFileSync(path.join(D, 'gas', 'Code.gs'), 'utf8').replace(/const SERVER_VERSION = '[^']+'/, "const SERVER_VERSION = '" + newVer + "'");
-  const site = { 'gas/version.json': JSON.stringify({ version: newVer, notes: '測試更新' }), 'gas/Code.gs': opts.badCode ? 'oops' : code,
-    'compute.js': fs.readFileSync(path.join(D, 'compute.js'), 'utf8'), 'gas/appsscript.json': fs.readFileSync(path.join(D, 'gas', 'appsscript.json'), 'utf8') };
-  const project = [{ name: 'Code', type: 'SERVER_JS', source: 'function doPost(e) {}' }, { name: 'compute', type: 'SERVER_JS', source: 'function computeAll_() {}' },
-    { name: 'appsscript', type: 'JSON', source: '{}' }, { name: '我的筆記', type: 'SERVER_JS', source: '// keep' }];
-  const resp = (code, body) => ({ getResponseCode: () => code, getContentText: () => (typeof body === 'string' ? body : JSON.stringify(body)) });
+  const newVer = opts.version || '9.9.9';
+  const code = CODE.replace(/const SERVER_VERSION = '[^']+'/, "const SERVER_VERSION = '" + newVer + "'")
+    .replace("function doPost(e) {", "function doPost(e) { if (JSON.parse(e.postData.contents).action === 'whoami') return ContentService.createTextOutput(JSON.stringify({ ok: true, v: SERVER_VERSION }));");
+  const site = { 'gas/version.json': JSON.stringify({ version: newVer, notes: '測試更新' }), 'gas/Code.gs': opts.badCode ? opts.badCode : code,
+    'compute.js': fs.readFileSync(path.join(D, 'compute.js'), 'utf8') };
+  const base = opts.pagesAtRoot ? 'https://nnnina15.github.io/funwayrestaurant/' : 'https://nnnina15.github.io/funwayrestaurant/docs/';
   g.ctx.UrlFetchApp = { fetch(url, o) {
-    o = o || {}; calls.push([(o.method || 'get').toUpperCase(), url.replace(/\?t=\d+$/, '')]);
-    const pages = opts.pagesAtRoot ? 'https://nnnina15.github.io/funwayrestaurant/' : 'https://nnnina15.github.io/funwayrestaurant/docs/';
-    if (url.startsWith('https://nnnina15.github.io/')) { const p = url.replace(/\?t=\d+$/, ''); return p.startsWith(pages) && site[p.slice(pages.length)] !== undefined ? resp(200, site[p.slice(pages.length)]) : resp(404, 'nf'); }
-    if (opts.apiOff) return resp(403, { error: { message: 'User has not enabled the Apps Script API.' } });
-    const p = url.split('/projects/SID')[1];
-    if (p === '/content' && o.method === 'get') return resp(200, { files: project });
-    if (p.startsWith('/content?versionNumber=')) return resp(200, { files: [{ name: 'Code', type: 'SERVER_JS', source: "const SERVER_VERSION = '" + (opts.deployedVer || '1.0.0') + "';" }] });
-    if (p === '/content' && o.method === 'put') { project.splice(0, project.length, ...JSON.parse(o.payload).files); return resp(200, {}); }
-    if (p === '/versions') return resp(200, { versionNumber: 7 });
-    if (p === '/deployments' && o.method === 'get') return resp(200, { deployments: [
-      { deploymentId: 'HEADID', deploymentConfig: {}, entryPoints: [{ entryPointType: 'WEB_APP' }] },
-      { deploymentId: 'WEB1', deploymentConfig: { versionNumber: 3 }, entryPoints: [{ entryPointType: 'WEB_APP' }] }] });
-    if (p === '/deployments/WEB1' && o.method === 'put') { assert.strictEqual(JSON.parse(o.payload).deploymentConfig.versionNumber, 7); return resp(200, {}); }
-    throw new Error('unexpected ' + url);
+    const u = url.replace(/[?&]t=\d+$/, ''); calls.push(u);
+    if (opts.noPerm) throw new Error('你沒有呼叫「UrlFetchApp.fetch」的權限。必要權限：https://www.googleapis.com/auth/script.external_request');
+    const ok = u.startsWith(base) && site[u.slice(base.length)] !== undefined;
+    return { getResponseCode: () => (ok ? 200 : 404), getContentText: () => (ok ? site[u.slice(base.length)] : 'nf') };
   } };
-  g.ctx.ScriptApp.getScriptId = () => 'SID'; g.ctx.ScriptApp.getOAuthToken = () => 'TOKEN';
-  const ui = { Button: { OK: 'OK', CANCEL: 'CANCEL' }, ButtonSet: { OK_CANCEL: 1, OK: 0 }, alert(...a) { alerts.push(a.join('｜')); return 'OK' } };
-  g.ctx.SpreadsheetApp.getUi = () => ui;
-  g.ctx.updateProgram();
-  return { calls, alerts, project };
+  g.ctx.SpreadsheetApp.getUi = () => ({ Button: { OK: 'OK', CANCEL: 'CANCEL' }, ButtonSet: { OK_CANCEL: 1, OK: 0 },
+    alert(...a) { alerts.push(a.join('｜')); return opts.cancel ? 'CANCEL' : 'OK'; }, createMenu() { const m = { addItem: () => m, addSeparator: () => m, addToUi: () => m }; return m; } });
+  return { g, calls, alerts };
 }
-let r = run({});
-assert.ok(r.alerts[0].includes('9.9.9') && r.alerts[0].includes('測試更新'), '先顯示版本與說明讓你確認');
-assert.ok(/更新完成/.test(r.alerts[1]), r.alerts[1]);
-assert.ok(r.project.find(f => f.name === 'Code').source.includes("SERVER_VERSION = '9.9.9'"));
-assert.ok(r.project.find(f => f.name === 'compute').source.includes('function computeAll_'));
-assert.ok(r.project.find(f => f.name === 'appsscript').source.includes('script.projects'));
-assert.strictEqual(r.project.find(f => f.name === '我的筆記').source, '// keep', '其他檔案不動');
-assert.ok(r.calls.some(c => c[0] === 'PUT' && c[1].endsWith('/deployments/WEB1')) && !r.calls.some(c => c[1].endsWith('/deployments/HEADID')), '只更新正式部署');
-r = run({ pagesAtRoot: true }); assert.ok(/更新完成/.test(r.alerts[1]), '根目錄發布也抓得到');
-r = run({ apiOff: true }); assert.ok(/usersettings/.test(r.alerts[1]) && r.project[0].source === 'function doPost(e) {}', 'API 沒開：提示怎麼開，程式不動');
-r = run({ badCode: true }); assert.ok(/不完整/.test(r.alerts[1]) && r.project[0].source === 'function doPost(e) {}', '下載不完整：不換');
-const CUR = require('fs').readFileSync(path.join(D, 'gas', 'Code.gs'), 'utf8').match(/SERVER_VERSION = '([^']+)'/)[1];
-r = run({ version: '1.0.0', deployedVer: CUR });
-assert.ok(/已經是最新版/.test(r.alerts[0]) && !r.calls.some(c => c[0] !== 'GET'), '沒有新版、部署也是最新：什麼都不改');
-// 程式是最新的，但 App 連的部署還是舊版（手動貼了沒部署）→ 問你要不要部署 → 部署
-r = run({ version: '1.0.0', deployedVer: '4.0.5' });
-assert.ok(/App 還在用舊版/.test(r.alerts[0]) && /4\.0\.5/.test(r.alerts[0]), r.alerts[0]);
-assert.ok(/部署完成/.test(r.alerts[1]), r.alerts[1]);
-assert.ok(r.calls.some(c => c[0] === 'POST' && c[1].endsWith('/versions')) && r.calls.some(c => c[0] === 'PUT' && c[1].endsWith('/deployments/WEB1')), '有建新版本並更新部署');
-assert.ok(!r.calls.some(c => c[0] === 'PUT' && c[1].endsWith('/content')), '程式內容不動');
-// 還沒授權連外：說明怎麼授權，不要說成「連不到 GitHub」
-{
-  const g = createGas(), alerts = [];
-  g.ctx.UrlFetchApp = { fetch() { throw new Error('你沒有呼叫「UrlFetchApp.fetch」的權限。必要權限：https://www.googleapis.com/auth/script.external_request'); } };
-  g.ctx.SpreadsheetApp.getUi = () => ({ Button: { OK: 'OK' }, ButtonSet: { OK_CANCEL: 1, OK: 0 }, alert(...a) { alerts.push(a.join('｜')); return 'OK'; } });
-  g.ctx.updateProgram();
-  assert.ok(/需要先授權/.test(alerts[0]) && /updateProgram/.test(alerts[0]) && !/連不到 GitHub/.test(alerts[0]), alerts[0]);
-}
+
+// 1. 正常更新：存進屬性；之後 App 的請求用的是新版
+let t = setup({});
+t.g.ctx.updateProgram();
+assert.ok(/9\.9\.9/.test(t.alerts[0]) && /測試更新/.test(t.alerts[0]), '先顯示版本與說明讓你確認');
+assert.ok(/更新完成/.test(t.alerts[1]), t.alerts[1]);
+assert.strictEqual(t.g.props.FW_BUNDLE_VER, '9.9.9');
+assert.ok(Object.keys(t.g.props).filter(k => /^FW_BUNDLE_\d+$/.test(k)).length === Number(t.g.props.FW_BUNDLE_N), '分段存好');
+// 新的一次執行（模擬 App 連進來）：要用新版
+const g2 = t.g; const fresh = createGas(); Object.assign(fresh.props, g2.props); fresh.ctx.resetBundleCache_();
+const r = fresh.ctx.doPost({ postData: { contents: JSON.stringify({ action: 'whoami' }) } });
+assert.deepStrictEqual(JSON.parse(r.content), { ok: true, v: '9.9.9' }, 'App 連進來直接用新版，不用重新部署');
+// 一般功能也走新版（登入）
+fresh.sheets['設定_帳號'] || fresh.ctx.setup();
+const login = fresh.post({ action: 'login', account: '管理員', pin: 'x' });
+assert.ok(login && login.ok === false, '新版也能正常回應');
+// 2. 根目錄發布也抓得到
+t = setup({ pagesAtRoot: true }); t.g.ctx.updateProgram(); assert.ok(/更新完成/.test(t.alerts[1]), '根目錄發布也抓得到');
+// 3. 你按取消：什麼都不變
+t = setup({ cancel: true }); t.g.ctx.updateProgram(); assert.ok(!t.g.props.FW_BUNDLE_VER, '按取消不會換');
+// 4. 下載的程式壞掉／不完整：不換
+t = setup({ badCode: "const SERVER_VERSION = '9.9.9'; function compileBundle_(){} function doPost( {" }); t.g.ctx.updateProgram();
+assert.ok(/沒有更新/.test(t.alerts[1]) && !t.g.props.FW_BUNDLE_VER, '壞掉的程式不換：' + t.alerts[1]);
+t = setup({ badCode: 'oops' }); t.g.ctx.updateProgram(); assert.ok(/不完整/.test(t.alerts[1]) && !t.g.props.FW_BUNDLE_VER);
+// 5. 沒有新版：不動
+t = setup({ version: '1.0.0' }); t.g.ctx.updateProgram(); assert.ok(/已經是最新版/.test(t.alerts[0]) && t.calls.length === 1 && !t.g.props.FW_BUNDLE_VER);
+// 6. 還沒授權連外：說明怎麼授權
+t = setup({ noPerm: true }); t.g.ctx.updateProgram(); assert.ok(/需要先授權/.test(t.alerts[0]) && !/連不到 GitHub/.test(t.alerts[0]), t.alerts[0]);
+// 7. 存的版本比內建舊（例如之後手動貼了更新的 Code.gs）：用內建的
+const g3 = createGas(); g3.props.FW_BUNDLE_VER = '1.0.0'; g3.props.FW_BUNDLE_N = '1'; g3.props.FW_BUNDLE_0 = 'throw new Error("不該載入")'; g3.ctx.resetBundleCache_();
+g3.ctx.setup(); g3.sheets['設定_帳號'].cells[1][4] = 'Funway#2026';
+assert.strictEqual(g3.post({ action: 'login', account: '管理員', pin: 'Funway#2026', newPin: 'Admin#2026x' }).config.serverVersion, CUR, '舊的存檔不用');
+// 8. 存的新版壞掉：自動用內建版本，App 照常
+const g4 = createGas(); g4.props.FW_BUNDLE_VER = '99.0.0'; g4.props.FW_BUNDLE_N = '1'; g4.props.FW_BUNDLE_0 = 'function ( {'; g4.ctx.resetBundleCache_();
+g4.ctx.setup(); g4.sheets['設定_帳號'].cells[1][4] = 'Funway#2026';
+assert.strictEqual(g4.post({ action: 'login', account: '管理員', pin: 'Funway#2026', newPin: 'Admin#2026x' }).config.serverVersion, CUR, '新版壞掉就用內建');
 console.log('⑤ 更新程式 ✓');

@@ -50,7 +50,9 @@ function createGas() {
     console, Date, JSON, Math, Object, Array, String, Number, isFinite, Error,
     SpreadsheetApp: { getActive: () => ss, openById: (id) => others[id], getUi: () => ({ alert() {}, createMenu() { const m = { addItem: () => m, addToUi: () => m }; return m; } }) },
     ScriptApp: { getProjectTriggers: () => [], deleteTrigger: () => {}, newTrigger: () => { const t = { timeBased: () => t, everyDays: () => t, atHour: () => t, create: () => t }; return t; } },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (props[k] === undefined ? null : props[k]), setProperty: (k, v) => { props[k] = String(v); },
+      getProperties: () => Object.assign({}, props), setProperties: (o) => { Object.keys(o).forEach(k => { if (String(o[k]).length * 3 > 9216) throw new Error('屬性太大：' + k); props[k] = String(o[k]); }); },
+      deleteProperty: (k) => { delete props[k]; } }) },
     CacheService: { getScriptCache: () => ({ get: (k) => (cache[k] === undefined ? null : cache[k]), put: (k, v) => { cache[k] = v; }, remove: (k) => { delete cache[k]; } }) },
     MailApp: { sendEmail: (o) => { mails.push(o); }, getRemainingDailyQuota: () => 100 },
     Session: { getEffectiveUser: () => ({ getEmail: () => 'owner@example.com' }) },
@@ -77,7 +79,7 @@ function createGas() {
     Object.keys(data).forEach((n) => { sh[n] = makeSheet(n); sh[n].cells = data[n].map((r) => r.slice()); sh[n].getLastColumn = () => data[n][0].length; });
     others[id] = { getSheetByName: (n) => sh[n] || null };
   };
-  return { ctx, post, sheets, mails, addOther, rows: (n) => ctx.__rows(n) };
+  return { ctx, post, sheets, mails, addOther, props, rows: (n) => ctx.__rows(n) };
 }
 
 module.exports = { createGas };

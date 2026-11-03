@@ -34,10 +34,10 @@
    - 誰可以存取：**所有人**（App 有 PIN 碼保護）
    - 按「部署」，複製網址（`https://script.google.com/macros/s/……/exec`）。這就是「**同步網址**」。
 
-9. 開啟 **Apps Script API**（讓「⑤ 更新程式」能自己更新，只做一次）：打開 https://script.google.com/home/usersettings → 「Google Apps Script API」切到 **開啟**。
-
-> **以後更新程式：試算表選單「風味記帳 → ⑤ 更新程式」**。它會先顯示新版本和這次改了什麼，你按「確定」才會換上新程式並自動部署，網址不變、App 不用重設。
-> 程式只會從你自己的 GitHub Pages（nnnina15.github.io/funwayrestaurant）下載。建議 GitHub 帳號開啟兩步驟驗證。
+> **以後更新程式：試算表選單「風味記帳 → ⑤ 更新程式」**。它會先顯示新版本和這次改了什麼，你按「確定」才會換上新程式。
+> 新程式存在這份試算表的「指令碼屬性」裡，App 連進來、選單、初始化都會直接用新版，**不用重新部署、網址不變、不需要 Apps Script API**。
+> 第一次按 ⑤ 會要求「連線至外部服務」的授權（下載新版用）。如果沒跳出允許視窗：在 Apps Script 選 updateProgram 按「執行」；還是不行就到 https://myaccount.google.com/permissions 移除「風味記帳系統」再執行一次。
+> 程式只會從你自己的 GitHub Pages（nnnina15.github.io/funwayrestaurant）下載，下載的程式壞掉不會換上去；存的新版萬一載入失敗，會自動用 Code.gs 本身的版本。建議 GitHub 帳號開啟兩步驟驗證。
 > App 發現試算表程式比較舊時，最上面會出現紅色提醒。
 
 ## 二、發布 App（約 3 分鐘，只做一次）

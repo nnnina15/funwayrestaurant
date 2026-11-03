@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.0.8';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '每日結帳的 PT 薪資、預支自動記到人事；⑤ 更新程式會檢查 App 用的部署是不是最新，舊的會幫你部署';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.1.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '更新方式改成：按「⑤ 更新程式」就直接換新程式，不需要 Apps Script API、不用重新部署';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -67,6 +67,7 @@ const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del', 'payroll.sl
  * ============================================================ */
 
 function onOpen() {
+  const B_ = bundle_(); if (B_) return B_.onOpen();
   SpreadsheetApp.getUi().createMenu('風味記帳')
     .addItem('① 初始化（第一次使用）', 'setup')
     .addItem('② 需要時產生報表（平常不用）', 'buildReportsMenu')
@@ -78,40 +79,63 @@ function onOpen() {
 }
 
 /* ============================================================
- * ⑤ 更新程式：從 GitHub 抓最新版 → 你按確定 → 自動換程式碼並部署新版本
- * 需要先開啟一次 Apps Script API：https://script.google.com/home/usersettings
+ * ⑤ 更新程式：從你的 GitHub Pages 下載新版 → 你按確定 → 存進這個試算表的「指令碼屬性」
+ * 之後 App 連進來、選單、初始化都會先用存好的新版（不用重新部署，網址不變）
+ * 你沒按確定之前什麼都不會變；新版載入失敗就自動用這個檔案本身（內建版本）
  * ============================================================ */
 
+const BUNDLE_KEY = 'FW_BUNDLE';
+let BUNDLE_CACHE_;
+
+// 有存比內建更新的版本就載入它（同一次執行只載一次）；沒有就回傳 null
+function bundle_() {
+  if (typeof FW_IN_BUNDLE_ !== 'undefined') return null;       // 自己就是存好的新版：不要再載一次
+  if (BUNDLE_CACHE_ !== undefined) return BUNDLE_CACHE_;
+  BUNDLE_CACHE_ = null;
+  try {
+    const p = PropertiesService.getScriptProperties();
+    const ver = p.getProperty(BUNDLE_KEY + '_VER'), n = Number(p.getProperty(BUNDLE_KEY + '_N') || 0);
+    if (!ver || !n || verNum_(ver) <= verNum_(SERVER_VERSION)) return null;
+    let src = '';
+    for (let i = 0; i < n; i++) src += p.getProperty(BUNDLE_KEY + '_' + i) || '';
+    BUNDLE_CACHE_ = compileBundle_(src);
+  } catch (e) {
+    console.error('新版程式載入失敗，先用內建版本：' + e);
+    BUNDLE_CACHE_ = null;
+  }
+  return BUNDLE_CACHE_;
+}
+
+function resetBundleCache_() { BUNDLE_CACHE_ = undefined; }   // 測試用：模擬新的一次執行
+
+function compileBundle_(src) {
+  return (0, eval)('(function () { var FW_IN_BUNDLE_ = true;\n' + src +
+    '\nreturn { version: SERVER_VERSION, doPost: doPost, onOpen: onOpen, setup: setup, importOldData: importOldData, clearImported: clearImported, buildReportsMenu: buildReportsMenu, updateProgram: updateProgram };\n})()');
+}
+
+// 目前實際在用的版本（有存新版就是新版）
+function activeVersion_() { const B = bundle_(); return B ? B.version : SERVER_VERSION; }
+
 function updateProgram() {
+  const B = bundle_(); if (B) return B.updateProgram();
   const ui = SpreadsheetApp.getUi();
   let info;
   try { info = checkUpdate_(); } catch (e) {
     const m = String(e.message || e);
     if (/權限|permission|authoriz|external_request/i.test(m)) {
-      ui.alert('需要先授權（只要做一次）', '「⑤ 更新程式」要連到 GitHub 下載新版，需要你允許：\n\n1. 擴充功能 → Apps Script\n2. 確認 appsscript.json 裡有 script.external_request（沒有就貼上最新的 appsscript.json 並存檔）\n3. 上方函式選 updateProgram → 按「執行」→ 審查權限 → 允許\n4. 回來再按一次「⑤ 更新程式」\n\n（原因：' + m.slice(0, 150) + '）', ui.ButtonSet.OK);
+      ui.alert('需要先授權（只要做一次）', '「⑤ 更新程式」要連到 GitHub 下載新版，需要你允許：\n\n1. 擴充功能 → Apps Script\n2. 上方函式選 updateProgram → 按「執行」→ 審查權限 → 允許\n   （沒跳出允許視窗：到 https://myaccount.google.com/permissions 移除「風味記帳系統」再執行一次）\n3. 回來再按一次「⑤ 更新程式」\n\n（原因：' + m.slice(0, 150) + '）', ui.ButtonSet.OK);
     } else ui.alert('連不到 GitHub，請稍後再試。\n\n' + m);
     return;
   }
-  if (!info.newer) {
-    let stale = [];
-    try { stale = staleDeployments_(); } catch (e) {}
-    if (!stale.length) { ui.alert('已經是最新版（' + SERVER_VERSION + '），App 也在用這一版，不用更新。'); return; }
-    if (ui.alert('程式是最新版，但 App 還在用舊版', '程式已經是 ' + SERVER_VERSION + '，但 App 連的部署還是 ' + stale.join('、') + '（可能是手動貼了程式但還沒部署）。\n\n按「確定」幫你部署，網址不變。', ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
-    try { ui.alert('部署完成 ✓（' + deployAll_(SERVER_VERSION) + ' 個網頁應用程式）。App 下次同步就會用新程式。'); }
-    catch (e) { ui.alert('部署沒有成功', String(e.message || e) + '\n\n請手動：部署 → 管理部署作業 → 編輯 → 新版本 → 部署', ui.ButtonSet.OK); }
-    return;
-  }
+  if (!info.newer) { ui.alert('已經是最新版（' + SERVER_VERSION + '），不用更新。'); return; }
   const ok = ui.alert('有新版程式', '目前：' + SERVER_VERSION + '\n最新：' + info.version + '\n\n這次更新：\n' + info.notes +
-    '\n\n按「確定」會自動換成新程式並部署，App 網址不變。', ui.ButtonSet.OK_CANCEL);
+    '\n\n按「確定」就會換成新程式，App 下次同步就會用到（不用重新部署，網址不變）。', ui.ButtonSet.OK_CANCEL);
   if (ok !== ui.Button.OK) return;
   try {
-    const n = installUpdate_(info);
-    ui.alert('更新完成 ✓ 已是 ' + info.version + '（部署了 ' + n + ' 個網頁應用程式）。\n\n請重新整理試算表，App 下次同步就會用新程式。');
+    installUpdate_(info);
+    ui.alert('更新完成 ✓ 已是 ' + info.version + '。\n\n請重新整理試算表（選單才會換成新的）。App 下次同步就會用新程式。');
   } catch (e) {
-    const m = String(e.message || e);
-    ui.alert('更新沒有成功', (/has not (been used|enabled)|not enabled|SERVICE_DISABLED|User has not enabled/i.test(m)
-      ? '請先開啟 Apps Script API（只要做一次）：\n1. 打開 https://script.google.com/home/usersettings\n2. 把「Google Apps Script API」切到「開啟」\n3. 回來再按一次「⑤ 更新程式」'
-      : m) + '\n\n舊程式還在，App 照常可以用。', ui.ButtonSet.OK);
+    ui.alert('更新沒有成功', String(e.message || e) + '\n\n舊程式還在，App 照常可以用。', ui.ButtonSet.OK);
   }
 }
 
@@ -136,77 +160,37 @@ function checkUpdate_() {
   throw last;
 }
 
-function scriptApi_(method, path, body) {
-  const r = UrlFetchApp.fetch('https://script.googleapis.com/v1/projects/' + ScriptApp.getScriptId() + path, {
-    method: method, contentType: 'application/json', muteHttpExceptions: true,
-    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
-    payload: body ? JSON.stringify(body) : undefined
-  });
-  const text = r.getContentText();
-  if (r.getResponseCode() >= 300) {
-    let msg = text; try { msg = JSON.parse(text).error.message; } catch (e) {}
-    throw new Error(msg);
-  }
-  return text ? JSON.parse(text) : {};
-}
-
 function installUpdate_(info) {
   const code = fetchText_(info.base + 'gas/Code.gs');
   const compute = fetchText_(info.base + 'compute.js');
-  const manifest = fetchText_(info.base + 'gas/appsscript.json');
-  // 確認下載的是完整、版本相符的程式，才換上去
-  if (code.indexOf("const SERVER_VERSION = '" + info.version + "'") < 0 || code.indexOf('function installUpdate_') < 0) throw new Error('下載的程式不完整，沒有更新');
+  // 確認下載的是完整、版本相符、能執行的程式，才換上去
+  if (code.indexOf("const SERVER_VERSION = '" + info.version + "'") < 0 || code.indexOf('function compileBundle_') < 0) throw new Error('下載的程式不完整，沒有更新');
   if (compute.indexOf('function computeAll_') < 0) throw new Error('下載的計算程式不完整，沒有更新');
-  JSON.parse(manifest);
-  const cur = scriptApi_('get', '/content').files || [];
-  let hasCode = false, hasCompute = false, hasManifest = false;
-  const files = cur.map(function (f) {
-    if (f.type === 'JSON' && f.name === 'appsscript') { hasManifest = true; return { name: f.name, type: 'JSON', source: manifest }; }
-    if (f.type === 'SERVER_JS' && f.source.indexOf('function computeAll_') >= 0 && f.source.indexOf('function doPost') < 0) { hasCompute = true; return { name: f.name, type: 'SERVER_JS', source: compute }; }
-    if (f.type === 'SERVER_JS' && f.source.indexOf('function doPost') >= 0) { hasCode = true; return { name: f.name, type: 'SERVER_JS', source: code }; }
-    return { name: f.name, type: f.type, source: f.source };
+  const src = compute + '\n' + code;
+  let test;
+  try { test = compileBundle_(src); } catch (e) { throw new Error('下載的程式有錯，沒有更新（' + e.message + '）'); }
+  if (typeof test.doPost !== 'function' || test.version !== info.version) throw new Error('下載的程式不完整，沒有更新');
+  // 分段存（每段不超過屬性的大小限制），最後才寫版本號：中途失敗也不會用到半套程式
+  const p = PROPS_(), size = 2000, chunks = {};
+  let n = 0;
+  for (let i = 0; i < src.length; i += size) chunks[BUNDLE_KEY + '_' + (n++)] = src.slice(i, i + size);
+  p.deleteProperty(BUNDLE_KEY + '_VER');
+  p.setProperties(chunks);
+  p.setProperties({ [BUNDLE_KEY + '_N']: String(n), [BUNDLE_KEY + '_VER']: info.version });
+  const all = p.getProperties();
+  Object.keys(all).forEach(function (k) {
+    const m = k.match(new RegExp('^' + BUNDLE_KEY + '_(\\d+)$'));
+    if (m && Number(m[1]) >= n) p.deleteProperty(k);
   });
-  if (!hasCode) files.push({ name: 'Code', type: 'SERVER_JS', source: code });
-  if (!hasCompute) files.push({ name: 'compute', type: 'SERVER_JS', source: compute });
-  if (!hasManifest) files.push({ name: 'appsscript', type: 'JSON', source: manifest });
-  scriptApi_('put', '/content', { files: files });
-  return deployAll_(info.version);
+  BUNDLE_CACHE_ = undefined;
 }
-
-// App 連的網頁應用程式部署（不含測試用的 HEAD）
-function webDeployments_() {
-  return (scriptApi_('get', '/deployments').deployments || []).filter(function (d) {
-    return d.deploymentConfig && d.deploymentConfig.versionNumber &&
-      (d.entryPoints || []).some(function (e) { return e.entryPointType === 'WEB_APP'; });
-  });
-}
-
-// 用目前的程式建一個新版本，並把所有網頁應用程式部署換成它（網址不變）
-function deployAll_(label) {
-  const ver = scriptApi_('post', '/versions', { description: '風味記帳 ' + label });
-  const deps = webDeployments_();
-  if (!deps.length) throw new Error('程式已換新，但找不到網頁應用程式的部署。請手動：部署 → 管理部署作業 → 編輯 → 新版本 → 部署');
-  deps.forEach(function (d) {
-    scriptApi_('put', '/deployments/' + d.deploymentId, { deploymentConfig: {
-      scriptId: ScriptApp.getScriptId(), versionNumber: ver.versionNumber, manifestFileName: 'appsscript', description: '風味記帳 ' + label } });
-  });
-  return deps.length;
-}
-
-// 程式是最新的，但 App 連的部署還是舊版（例如手動貼了程式卻沒部署）：回傳舊的版本號，沒有就回傳空陣列
-function staleDeployments_() {
-  return webDeployments_().map(function (d) {
-    const files = scriptApi_('get', '/content?versionNumber=' + d.deploymentConfig.versionNumber).files || [];
-    const src = files.map(function (f) { return f.source || ''; }).join('\n');
-    const m = src.match(/const SERVER_VERSION = '([^']+)'/);
-    return m ? m[1] : '舊版';
-  }).filter(function (v) { return verNum_(v) < verNum_(SERVER_VERSION); });
-}
+function PROPS_() { return PropertiesService.getScriptProperties(); }
 
 // 報表分頁平常不產生（大家看 App 的「總覽」）；需要時用選單「② 需要時產生報表」
 const REPORT_SHEETS = [S.R_MONTH, S.R_SHARE, S.R_CAT, S.R_WARN];
 
 function setup() {
+  const B_ = bundle_(); if (B_) return B_.setup();
   const ss = SpreadsheetApp.getActive();
   // 拿掉報表分頁和每天自動重算的排程
   REPORT_SHEETS.forEach(function (n) { const sh = ss.getSheetByName(n); if (sh && ss.getSheets().length > 1) ss.deleteSheet(sh); });
@@ -297,6 +281,7 @@ function migrateDelivery_(sh) {
 
 // ④ 清除舊表匯入的資料：只刪「裝置＝舊表匯入」的列，App 輸入的資料不動（重新匯入前用）
 function clearImported() {
+  const B_ = bundle_(); if (B_) return B_.clearImported();
   const ui = SpreadsheetApp.getUi();
   if (ui.alert('清除舊表匯入的資料', '會刪掉每日營收、進貨、其他支出、人事明細、外送對帳、分配前扣除裡「裝置＝舊表匯入」的資料。\n用 App 輸入的資料不會動。確定嗎？', ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
   const msg = withLock_(function () { return clearImported_(); });
@@ -324,6 +309,7 @@ function seed_(name, rows) {
  * ============================================================ */
 
 function importOldData() {
+  const B_ = bundle_(); if (B_) return B_.importOldData();
   const ui = SpreadsheetApp.getUi();
   const resp = ui.prompt('匯入舊資料', '貼上「風味記帳_舊資料匯入」試算表的網址：', ui.ButtonSet.OK_CANCEL);
   if (resp.getSelectedButton() !== ui.Button.OK) return;
@@ -398,6 +384,7 @@ function doGet() {
 }
 
 function doPost(e) {
+  const B_ = bundle_(); if (B_) return B_.doPost(e);
   try {
     const req = JSON.parse(e.postData.contents || '{}');
     switch (req.action) {
@@ -860,6 +847,7 @@ function loadData_() {
 }
 
 function buildReportsMenu() {
+  const B_ = bundle_(); if (B_) return B_.buildReportsMenu();
   const n = buildReports();
   SpreadsheetApp.getUi().alert('已產生報表（' + n + ' 個月）：報表_月結、報表_分紅、報表_進貨分類、警示。\n\n這些分頁不會自動更新，下次按「① 初始化」會刪掉。');
 }
