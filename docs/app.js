@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.2.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.2.2';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -1362,8 +1362,7 @@ function renderYearTab() {
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
     if (!qm.length) return;
-    qm.forEach(function (m) { h += rowOf([m], label(m), ''); });
-    h += rowOf(qm, '<span class="qtag">Q' + q + '</span><small>合計</small>', 'qrow');
+    qm.forEach(function (m) { h += rowOf([m], label(m), ''); });   // 盈餘與分紅：像舊表一樣不放季合計
   });
   h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
   h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝上一年結餘＋盈餘−分紅−員工分紅−存年終−其他扣除，也就是還沒分掉的錢。每月「應該分多少」請看「月」總覽。</p>';

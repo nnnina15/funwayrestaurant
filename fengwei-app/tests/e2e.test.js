@@ -155,7 +155,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="year"]'); await B.pg.waitForSelector('#y-body .ytable');
   assert.strictEqual(await B.pg.evaluate(() => document.querySelector('header').getBoundingClientRect().top), 0, '總覽上方不能有白邊');
   const yt = await B.pg.textContent('#y-body');
-  assert.ok(yt.includes('Q4合計') && yt.includes('2026 全年') && yt.includes('豐吉') && yt.includes('結餘') && yt.includes('上一年結餘'), '年：要有季合計、全年、股東欄');
+  assert.ok(yt.includes('2026 全年') && yt.includes('豐吉') && yt.includes('結餘') && yt.includes('上一年結餘'), '年：要有季合計、全年、股東欄');
   // 總覽：日（看 2026-11 每天的營收和進貨）
   await B.pg.click('#ov-seg button[data-v="day"]'); await B.pg.fill('#m-month', '2026-11'); await B.pg.dispatchEvent('#m-month', 'change');
   const dt = await B.pg.textContent('#dd-body');
