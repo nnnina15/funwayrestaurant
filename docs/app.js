@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.21';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.22';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -1165,11 +1165,13 @@ function fixTheads(root) {
     if (lift) { var cb = document.createElement('tbody'), r = top.cloneNode(true); r.style.height = th + 'px'; cb.appendChild(r); ct.appendChild(cb); }
     head.appendChild(ct); sc.parentNode.insertBefore(head, sc);
     sc.style.marginTop = -(hh + th + 1) + 'px';   // 複本剛好蓋住原本的標題列＋總計列
-    // 左右滑：表格和表頭互相同步
-    var busy = false;
-    sc.addEventListener('scroll', function () { if (busy) return; busy = true; head.scrollLeft = sc.scrollLeft; busy = false; });
-    head.addEventListener('scroll', function () { if (busy) return; busy = true; sc.scrollLeft = head.scrollLeft; busy = false; });
-    head.style.overflowX = 'auto'; head.style.scrollbarWidth = 'none';
+    // 左右滑：只有表格本身能滑，表頭單向跟著（表頭不接手指，滑表頭的位置其實是在滑下面的表格）
+    var raf = 0;
+    sc.addEventListener('scroll', function () {
+      if (raf) return;
+      raf = requestAnimationFrame(function () { raf = 0; head.scrollLeft = sc.scrollLeft; });
+    }, { passive: true });
+    head.scrollLeft = sc.scrollLeft;
   });
 }
 window.addEventListener('resize', function () { ['dd-body', 'y-body'].forEach(function (id) { var el = $(id); if (el && !el.classList.contains('hide')) fixTheads(el); }); });

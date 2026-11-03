@@ -251,7 +251,7 @@
   @media (max-width: 900px) { .swipe { display: block; } }
   .xscroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; }
   /* 置頂的表頭：複製一份標題列＋總計列，跟著頁面固定在上方，左右滑時和表格同步 */
-  .xhead { position: sticky; top: calc(var(--sticky-top, 50px) / var(--fz, 1)); z-index: 3; overflow: hidden; border: 1px solid var(--line); border-bottom: 0;
+  .xhead { position: sticky; top: calc(var(--sticky-top, 50px) / var(--fz, 1)); z-index: 3; overflow: hidden; pointer-events: none; border: 1px solid var(--line); border-bottom: 0;
     border-radius: 12px 12px 0 0; background: var(--card); }
   .xhead + .xscroll { border-top-color: transparent; }   /* 表頭複本疊在原本的表頭上面（margin-top 由程式設定） */
   .xhead .ytable { table-layout: fixed; }
