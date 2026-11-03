@@ -172,6 +172,9 @@
   .dv .split { font-size: 13px; color: var(--muted); padding: 8px 14px; display: flex; align-items: center; gap: 6px; }
 
   .emp-nav { display: flex; align-items: center; gap: 10px; }
+  /* 人事：員工名字列往下滑時固定在日期列下面 */
+  #s-name { position: sticky; top: calc(var(--sticky-top, 50px) / var(--fz, 1)); z-index: 3; background: var(--card);
+    margin: -6px -2px 8px; padding: 6px 2px 8px; border-bottom: 1px solid var(--line); }
   .emp-nav::before { display: none; }
   .emp-nav .step { height: 44px; }
   .emp-nav .step:disabled { opacity: .35; cursor: default; }
