@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.24';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.25';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -1159,19 +1159,30 @@ function fixTheads(root) {
     var t = sc.querySelector('table.ytable'); if (!t || !t.tHead) return;
     var old = sc.previousElementSibling; if (old && old.classList.contains('xhead')) old.remove();
     sc.style.marginTop = '';
+    // 先拿掉上次固定的欄寬，讓表格照內容排一次再量
+    var oldCg = t.querySelector('colgroup.fixw'); if (oldCg) oldCg.remove();
+    t.style.tableLayout = ''; t.style.width = '';
     var top = t.tBodies[0] && t.tBodies[0].rows[0], lift = top && top.classList.contains('trow');
-    // 量原本每一欄的寬度、每一列的高度
-    var widths = Array.prototype.map.call(t.tHead.rows[0].cells, function (c) { return c.getBoundingClientRect().width; });
-    var hh = t.tHead.rows[0].getBoundingClientRect().height, th = lift ? top.getBoundingClientRect().height : 0;
+    var widths = Array.prototype.map.call(t.tHead.rows[0].cells, function (c) { return Math.ceil(c.offsetWidth) + 1; });
+    var total = widths.reduce(function (s, w) { return s + w; }, 0);
+    // 原本的表格和表頭複本用「同一組」欄寬，兩邊一定對齊
+    function colgroup() {
+      var cg = document.createElement('colgroup'); cg.className = 'fixw';
+      widths.forEach(function (w) { var c = document.createElement('col'); c.style.width = w + 'px'; cg.appendChild(c); });
+      return cg;
+    }
+    t.insertBefore(colgroup(), t.firstChild); t.style.tableLayout = 'fixed'; t.style.width = total + 'px';
     var head = document.createElement('div'); head.className = 'xhead';
-    var ct = document.createElement('table'); ct.className = 'ytable'; ct.style.width = t.getBoundingClientRect().width + 'px';
-    var cg = document.createElement('colgroup');
-    widths.forEach(function (w) { var c = document.createElement('col'); c.style.width = w + 'px'; cg.appendChild(c); });
-    ct.appendChild(cg);
-    var ch = t.tHead.cloneNode(true); ch.rows[0].style.height = hh + 'px'; ct.appendChild(ch);
-    if (lift) { var cb = document.createElement('tbody'), r = top.cloneNode(true); r.style.height = th + 'px'; cb.appendChild(r); ct.appendChild(cb); }
+    var ct = document.createElement('table'); ct.className = 'ytable'; ct.style.tableLayout = 'fixed'; ct.style.width = total + 'px';
+    ct.appendChild(colgroup());
+    ct.appendChild(t.tHead.cloneNode(true));
+    if (lift) { var cb = document.createElement('tbody'); cb.appendChild(top.cloneNode(true)); ct.appendChild(cb); }
     head.appendChild(ct); sc.parentNode.insertBefore(head, sc);
-    sc.style.marginTop = -(hh + th + 1) + 'px';   // 複本剛好蓋住原本的標題列＋總計列
+    // 兩邊的列高也對齊，複本剛好蓋住原本的標題列＋總計列
+    var hr = t.tHead.rows[0], cr = ct.tHead.rows[0], hh = Math.max(hr.offsetHeight, cr.offsetHeight);
+    hr.style.height = cr.style.height = hh + 'px';
+    if (lift) { var cr2 = ct.tBodies[0].rows[0], th2 = Math.max(top.offsetHeight, cr2.offsetHeight); top.style.height = cr2.style.height = th2 + 'px'; }
+    sc.style.marginTop = -head.offsetHeight + 'px';
     // 左右滑：只有表格本身能滑，表頭單向跟著（表頭不接手指，滑表頭的位置其實是在滑下面的表格）
     var raf = 0;
     sc.addEventListener('scroll', function () {
