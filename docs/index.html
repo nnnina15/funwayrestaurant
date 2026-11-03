@@ -476,14 +476,14 @@
       <div class="sec d-body">
         <div class="sec-h">營業額</div>
         <div class="tiles t3">
-          <label class="tile"><span>現場</span><input id="d-site" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
-          <label class="tile"><span>Panda</span><input id="d-panda" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
-          <label class="tile"><span>Uber</span><input id="d-uber" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+          <label class="tile"><span>現場</span><input id="d-site" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
+          <label class="tile"><span>Panda</span><input id="d-panda" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
+          <label class="tile"><span>Uber</span><input id="d-uber" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
         </div>
         <div class="sec-h sub">現場收款中的非現金</div>
         <div class="tiles t2">
-          <label class="tile"><span>全支付</span><input id="d-allpay" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
-          <label class="tile"><span>LINE Pay</span><input id="d-line" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+          <label class="tile"><span>全支付</span><input id="d-allpay" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
+          <label class="tile"><span>LINE Pay</span><input id="d-line" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
         </div>
         <div class="totalbar"><span>總營收</span><b id="d-total">0</b></div>
       </div>
@@ -500,7 +500,7 @@
       <div class="cashpanel d-body">
         <div class="cp"><span>總支出</span><b id="d-spendv">0</b></div>
         <div class="cp"><span>現金盈餘</span><b id="d-expected">0</b></div>
-        <label class="cp in"><span>現場現金（數到的）</span><input id="d-cash" inputmode="decimal" placeholder="0" oninput="dailyCalc()"></label>
+        <label class="cp in"><span>現場現金（數到的）</span><input id="d-cash" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
         <div class="cp"><span>現金差額</span><b id="d-diff" class="big2">—</b></div>
       </div>
       <p class="muted d-body formula">現金盈餘 = 現場 − 全支付 − LINE Pay − 總支出　｜　現金差額 = 現場現金 − 現金盈餘</p>
