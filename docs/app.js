@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.15';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.16';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -45,6 +45,14 @@ function cycleTheme() {
 function applyFont() {
   var f = Number(LS.get('fw_font', 1)) || 1;
   document.documentElement.style.setProperty('--fz', f);   // 只放大內容，標題列和下方分頁不變
+  // iPhone Safari 放大後內容會比螢幕寬：先測這台瀏覽器的行為，會變寬就把寬度縮回來
+  if (ST.zoomWidens === undefined) {
+    var box = document.createElement('div'), kid = document.createElement('div');
+    box.style.cssText = 'position:absolute;visibility:hidden;width:200px;left:-9999px;top:0';
+    kid.style.cssText = 'zoom:2'; kid.textContent = 'x'; box.appendChild(kid); document.body.appendChild(box);
+    ST.zoomWidens = kid.getBoundingClientRect().width > 250; box.remove();
+  }
+  document.documentElement.classList.toggle('zoom-fix', ST.zoomWidens && f !== 1);
   Array.prototype.forEach.call(document.querySelectorAll('#font-seg button'), function (b) { b.classList.toggle('on', Number(b.getAttribute('data-v')) === f); });
   if (ST.sess) { try { updateStickyTop(); } catch (e) {} }
 }
