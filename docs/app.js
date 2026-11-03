@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.28';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.29';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -115,6 +115,8 @@ function setNum(id, n) { $(id).value = n ? n : ''; }
 function isAdmin() { return ST.sess && ST.sess.role === 'admin'; }
 
 /* ---------- 和 Google 溝通 ---------- */
+// 手機有網路，但連不到試算表的同步服務（試算表程式剛更新需要授權、出錯，或同步網址換了）
+var SYNC_DOWN_MSG = '連不到試算表的同步服務。手機有網路，是試算表那邊的問題：請管理者打開試算表，按「風味記帳 → ⑤ 更新程式」（第一次會要求授權，按允許），或確認同步網址沒有換。';
 function api(action, body) {
   var ctrl = window.AbortController ? new AbortController() : null;
   var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 25000);
@@ -122,13 +124,20 @@ function api(action, body) {
     method: 'POST', redirect: 'follow', signal: ctrl ? ctrl.signal : undefined,
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(Object.assign({ action: action }, body || {}))
-  }).then(function (r) { return r.json(); }).then(function (res) {
+  }).then(function (r) {
+    // 有回應但不是我們的資料（例如 Google 的錯誤頁）：是試算表程式的問題，不是網路
+    return r.text().then(function (t) {
+      try { return JSON.parse(t); } catch (x) { var e = new Error('bad'); e.down = true; e.detail = t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120); throw e; }
+    });
+  }).then(function (res) {
     clearTimeout(timer);
     if (!res.ok) { var e = new Error(res.error || '伺服器錯誤'); e.server = true; e.auth = !!res.auth; e.data = res; throw e; }
     return res;
   }, function (err) {
     clearTimeout(timer);
-    var e = new Error('連不上網路'); e.network = true; e.cause = err; throw e;
+    var off = navigator.onLine === false;
+    var e = new Error(off ? '連不上網路' : SYNC_DOWN_MSG);
+    e.network = off; e.down = !off; e.cause = err; e.detail = err && err.detail; throw e;
   });
 }
 
@@ -286,7 +295,8 @@ function login() {
       if ($('login-new').value) toast('⚠ ' + e.message); else { toast(e.message); $('login-new').focus(); }
       return;
     }
-    toast(e.network ? '第一次登入（或重新登入）需要網路' : '⚠ ' + e.message);
+    if (e.down) { alert(SYNC_DOWN_MSG + (e.detail ? '\n\n（試算表回應：' + e.detail + '）' : '')); return; }
+    toast(e.network ? '手機目前沒有網路，第一次登入（或重新登入）需要網路' : '⚠ ' + e.message);
   });
 }
 function changePin() {
@@ -487,6 +497,7 @@ function trySync(manual) {
       if (x.status === 'error') ST.failed.push({ at: nowStr(), op: op, msg: x.error });
       if (x.status === 'stale') ST.failed.push({ at: nowStr(), op: op, msg: '別台裝置已經存了更新的版本，這筆沒有覆蓋' });
     });
+    ST.syncDown = false;
     ST.outbox = ST.outbox.filter(function (o) { return !done[o.id]; });
     if (ST.failed.length > 50) ST.failed = ST.failed.slice(-50);
     saveOutbox();
@@ -497,7 +508,7 @@ function trySync(manual) {
     if (manual) toast('同步完成 ✓');
     if (ST.outbox.length) setTimeout(trySync, 300);
   }, function (e) {
-    ST.syncing = false;
+    ST.syncing = false; ST.syncDown = !!e.down;
     if (e.auth) { ST.authLost = true; toast('登入已失效，請重新輸入 PIN（資料都還在）'); }
     else if (manual) toast(e.network ? '同步失敗：連不上網路，稍後會自動再試' : '⚠ ' + e.message);
     renderStatus(); renderBanner();
@@ -557,6 +568,7 @@ function renderBanner() {
   var h = '';
   var sv = ST.snap && ST.snap.config && ST.snap.config.serverVersion;
   if (ST.snap && verNum(sv) < verNum(NEED_SERVER)) h += '<div class="banner err">試算表的程式還是舊版（' + esc(sv || '舊版') + '），請管理者到試算表按選單「風味記帳 → ⑤ 更新程式」。</div>';
+  if (ST.syncDown && !ST.authLost) h += '<div class="banner err">' + esc(SYNC_DOWN_MSG) + '資料都存在這台裝置，恢復後會自動上傳。</div>';
   if (ST.authLost) h += '<div class="banner err">登入已失效（PIN 可能改過）。<a href="#" onclick="relogin();return false">按這裡重新登入</a>，還沒上傳的 ' + ST.outbox.length + ' 筆都會保留。</div>';
   else if (ST.outbox.length && navigator.onLine === false) h += '<div class="banner">目前離線：有 ' + ST.outbox.length + ' 筆存在這台裝置，連上網路會自動上傳。</div>';
   var recent = ST.failed.filter(function (f) { return !f.seen; });
