@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.0.26';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.0.27';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -662,7 +662,7 @@ function renderLines() {
       '<input class="amt" value="' + esc(l.amount) + '" inputmode="text" placeholder="金額" oninput="setLine(' + i + ',\'amount\',this.value)">' +
       '<select onchange="setLine(' + i + ',\'cat\',this.value)">' +
         '<optgroup label="進貨">' + ST.lineCats.map(function (c) { return opt(c); }).join('') + '</optgroup>' +
-        '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + opt(LINE_WAGE, '薪資／預支（月底人事會算）') + '</optgroup>' +
+        '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + opt(LINE_WAGE, window.matchMedia && window.matchMedia('(max-width: 560px)').matches ? '薪資/預支' : '薪資／預支（月底人事會算）') + '</optgroup>' +
       '</select>' +
       '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delLine(' + i + ')">✕</button></div>';
   }).join('');
