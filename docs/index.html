@@ -308,7 +308,9 @@
   .line input, .line select { font-size: 16px; padding: 10px 12px; }
   .line input.amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
   .addline { width: 100%; border: 1.5px dashed var(--line); background: transparent; color: var(--muted); }
-  .cashpanel { margin-top: 20px; background: var(--head); color: #fff; border-radius: 18px; padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .cashpanel { margin-top: 20px; background: var(--head); color: #fff; border-radius: 18px; padding: 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tile.cash { background: color-mix(in srgb, var(--amber) 16%, var(--soft)); }   /* 數到的現金：和非現金分一下顏色 */
+  .tile.cash span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cp { margin: 0; padding: 12px 14px; border-radius: 13px; display: block; }
   .cp span { display: block; font-size: 13px; color: rgba(255,255,255,.65); font-weight: 600; }
   .cp b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; margin-top: 2px; }
@@ -318,7 +320,7 @@
   .cp b.big2 { font-size: 28px; }
   .cp b.ok { color: #7ee2a8; } .cp b.warn { color: var(--amber); } .cp b.bad { color: #ff8a75; }
   .formula { font-size: 12px; margin: 8px 4px 0; }
-  @media (max-width: 700px) { .cashpanel { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 700px) { .cashpanel { grid-template-columns: repeat(3, 1fr); } .cashpanel .cp { padding: 10px 10px; } .cashpanel .cp b { font-size: 20px; } .cashpanel .cp b.big2 { font-size: 22px; } }
   @media (max-width: 560px) {
     .tiles.t3 { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }   /* 現場｜Panda｜Uber 一排 */
     .tiles.t3 .tile { padding-left: 10px; padding-right: 8px; }
@@ -480,10 +482,11 @@
           <label class="tile"><span>Panda</span><input id="d-panda" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
           <label class="tile"><span>Uber</span><input id="d-uber" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
         </div>
-        <div class="sec-h sub">現場收款中的非現金</div>
-        <div class="tiles t2">
+        <div class="sec-h sub">現場收款：非現金 ／ 數到的現金</div>
+        <div class="tiles t3">
           <label class="tile"><span>全支付</span><input id="d-allpay" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
           <label class="tile"><span>LINE Pay</span><input id="d-line" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
+          <label class="tile cash"><span>現場現金（數到的）</span><input id="d-cash" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
         </div>
         <div class="totalbar"><span>總營收</span><b id="d-total">0</b></div>
       </div>
@@ -500,7 +503,6 @@
       <div class="cashpanel d-body">
         <div class="cp"><span>總支出</span><b id="d-spendv">0</b></div>
         <div class="cp"><span>現金盈餘</span><b id="d-expected">0</b></div>
-        <label class="cp in"><span>現場現金（數到的）</span><input id="d-cash" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="0" oninput="digitsOnly(this);dailyCalc()"></label>
         <div class="cp"><span>現金差額</span><b id="d-diff" class="big2">—</b></div>
       </div>
       <p class="muted d-body formula">現金盈餘 = 現場 − 全支付 − LINE Pay − 總支出　｜　現金差額 = 現場現金 − 現金盈餘</p>
