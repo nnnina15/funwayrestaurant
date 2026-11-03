@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.1.7';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.1.8';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -1351,7 +1351,10 @@ function renderYearTab() {
 
   // 表二：平均細項
   var catSet = {}; R.cats.forEach(function (c) { if (c.month.slice(0, 4) === cur) catSet[c.cat] = (catSet[c.cat] || 0) + c.amount; });
-  var cats = Object.keys(catSet).sort(function (a, b) { return catSet[b] - catSet[a]; });
+  // 欄位順序：照「設定_進貨分類」的順序（和進貨頁一樣）；設定裡沒有的（以前的分類）放最後、照金額大到小
+  var setOrder = []; (ST.snap.config.categories || []).forEach(function (c) { if (setOrder.indexOf(c.cat) < 0) setOrder.push(c.cat); });
+  var cats = setOrder.filter(function (c) { return catSet[c] !== undefined; })
+    .concat(Object.keys(catSet).filter(function (c) { return setOrder.indexOf(c) < 0; }).sort(function (a, b) { return catSet[b] - catSet[a]; }));
   var catAmt = {}; R.cats.forEach(function (c) { catAmt[c.month + '|' + c.cat] = c.amount; });
   var util = {};
   V.expense.forEach(function (x) {
