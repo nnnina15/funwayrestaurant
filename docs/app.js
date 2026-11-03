@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.1.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.1.1';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -197,7 +197,25 @@ function stepField(id, d) {
   el.dispatchEvent(new Event('change'));
 }
 
+// PIN 欄右邊的眼睛：按住就顯示 PIN，放開就藏起來
+function addEyes() {
+  Array.prototype.forEach.call(document.querySelectorAll('input[type=password]'), function (el) {
+    if (el.parentNode.classList.contains('pw')) return;
+    var w = document.createElement('span'); w.className = 'pw';
+    el.parentNode.insertBefore(w, el); w.appendChild(el);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'eye'; b.tabIndex = -1;
+    b.setAttribute('aria-label', '按住顯示 PIN'); b.title = '按住顯示 PIN';
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var show = function (e) { if (e) e.preventDefault(); el.type = 'text'; b.classList.add('on'); };
+    var hide = function () { el.type = 'password'; b.classList.remove('on'); };
+    b.addEventListener('pointerdown', show);
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach(function (ev) { b.addEventListener(ev, hide); });
+    b.addEventListener('contextmenu', function (e) { e.preventDefault(); });   // 手機長按不要跳出選單
+    w.appendChild(b);
+  });
+}
 function boot() {
+  addEyes();
   addSteppers();
   applyTheme();
   applyFont();
