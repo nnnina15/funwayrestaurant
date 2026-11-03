@@ -18,6 +18,7 @@ function run(opts) {
     if (opts.apiOff) return resp(403, { error: { message: 'User has not enabled the Apps Script API.' } });
     const p = url.split('/projects/SID')[1];
     if (p === '/content' && o.method === 'get') return resp(200, { files: project });
+    if (p.startsWith('/content?versionNumber=')) return resp(200, { files: [{ name: 'Code', type: 'SERVER_JS', source: "const SERVER_VERSION = '" + (opts.deployedVer || '1.0.0') + "';" }] });
     if (p === '/content' && o.method === 'put') { project.splice(0, project.length, ...JSON.parse(o.payload).files); return resp(200, {}); }
     if (p === '/versions') return resp(200, { versionNumber: 7 });
     if (p === '/deployments' && o.method === 'get') return resp(200, { deployments: [
@@ -43,7 +44,15 @@ assert.ok(r.calls.some(c => c[0] === 'PUT' && c[1].endsWith('/deployments/WEB1')
 r = run({ pagesAtRoot: true }); assert.ok(/更新完成/.test(r.alerts[1]), '根目錄發布也抓得到');
 r = run({ apiOff: true }); assert.ok(/usersettings/.test(r.alerts[1]) && r.project[0].source === 'function doPost(e) {}', 'API 沒開：提示怎麼開，程式不動');
 r = run({ badCode: true }); assert.ok(/不完整/.test(r.alerts[1]) && r.project[0].source === 'function doPost(e) {}', '下載不完整：不換');
-r = run({ version: '1.0.0' }); assert.ok(/已經是最新版/.test(r.alerts[0]) && r.calls.length === 1, '沒有新版就不動');
+const CUR = require('fs').readFileSync(path.join(D, 'gas', 'Code.gs'), 'utf8').match(/SERVER_VERSION = '([^']+)'/)[1];
+r = run({ version: '1.0.0', deployedVer: CUR });
+assert.ok(/已經是最新版/.test(r.alerts[0]) && !r.calls.some(c => c[0] !== 'GET'), '沒有新版、部署也是最新：什麼都不改');
+// 程式是最新的，但 App 連的部署還是舊版（手動貼了沒部署）→ 問你要不要部署 → 部署
+r = run({ version: '1.0.0', deployedVer: '4.0.5' });
+assert.ok(/App 還在用舊版/.test(r.alerts[0]) && /4\.0\.5/.test(r.alerts[0]), r.alerts[0]);
+assert.ok(/部署完成/.test(r.alerts[1]), r.alerts[1]);
+assert.ok(r.calls.some(c => c[0] === 'POST' && c[1].endsWith('/versions')) && r.calls.some(c => c[0] === 'PUT' && c[1].endsWith('/deployments/WEB1')), '有建新版本並更新部署');
+assert.ok(!r.calls.some(c => c[0] === 'PUT' && c[1].endsWith('/content')), '程式內容不動');
 // 還沒授權連外：說明怎麼授權，不要說成「連不到 GitHub」
 {
   const g = createGas(), alerts = [];

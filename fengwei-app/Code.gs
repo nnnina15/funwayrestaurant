@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.0.7';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '每日結帳的 PT 薪資、預支會自動記到人事（店長也能存）；⑤ 更新程式需要授權時會說明怎麼做';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.0.8';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '每日結帳的 PT 薪資、預支自動記到人事；⑤ 更新程式會檢查 App 用的部署是不是最新，舊的會幫你部署';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -92,7 +92,15 @@ function updateProgram() {
     } else ui.alert('連不到 GitHub，請稍後再試。\n\n' + m);
     return;
   }
-  if (!info.newer) { ui.alert('已經是最新版（' + SERVER_VERSION + '），不用更新。'); return; }
+  if (!info.newer) {
+    let stale = [];
+    try { stale = staleDeployments_(); } catch (e) {}
+    if (!stale.length) { ui.alert('已經是最新版（' + SERVER_VERSION + '），App 也在用這一版，不用更新。'); return; }
+    if (ui.alert('程式是最新版，但 App 還在用舊版', '程式已經是 ' + SERVER_VERSION + '，但 App 連的部署還是 ' + stale.join('、') + '（可能是手動貼了程式但還沒部署）。\n\n按「確定」幫你部署，網址不變。', ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
+    try { ui.alert('部署完成 ✓（' + deployAll_(SERVER_VERSION) + ' 個網頁應用程式）。App 下次同步就會用新程式。'); }
+    catch (e) { ui.alert('部署沒有成功', String(e.message || e) + '\n\n請手動：部署 → 管理部署作業 → 編輯 → 新版本 → 部署', ui.ButtonSet.OK); }
+    return;
+  }
   const ok = ui.alert('有新版程式', '目前：' + SERVER_VERSION + '\n最新：' + info.version + '\n\n這次更新：\n' + info.notes +
     '\n\n按「確定」會自動換成新程式並部署，App 網址不變。', ui.ButtonSet.OK_CANCEL);
   if (ok !== ui.Button.OK) return;
@@ -162,17 +170,37 @@ function installUpdate_(info) {
   if (!hasCompute) files.push({ name: 'compute', type: 'SERVER_JS', source: compute });
   if (!hasManifest) files.push({ name: 'appsscript', type: 'JSON', source: manifest });
   scriptApi_('put', '/content', { files: files });
-  const ver = scriptApi_('post', '/versions', { description: '風味記帳 ' + info.version });
-  const deps = (scriptApi_('get', '/deployments').deployments || []).filter(function (d) {
+  return deployAll_(info.version);
+}
+
+// App 連的網頁應用程式部署（不含測試用的 HEAD）
+function webDeployments_() {
+  return (scriptApi_('get', '/deployments').deployments || []).filter(function (d) {
     return d.deploymentConfig && d.deploymentConfig.versionNumber &&
       (d.entryPoints || []).some(function (e) { return e.entryPointType === 'WEB_APP'; });
   });
+}
+
+// 用目前的程式建一個新版本，並把所有網頁應用程式部署換成它（網址不變）
+function deployAll_(label) {
+  const ver = scriptApi_('post', '/versions', { description: '風味記帳 ' + label });
+  const deps = webDeployments_();
   if (!deps.length) throw new Error('程式已換新，但找不到網頁應用程式的部署。請手動：部署 → 管理部署作業 → 編輯 → 新版本 → 部署');
   deps.forEach(function (d) {
     scriptApi_('put', '/deployments/' + d.deploymentId, { deploymentConfig: {
-      scriptId: ScriptApp.getScriptId(), versionNumber: ver.versionNumber, manifestFileName: 'appsscript', description: '風味記帳 ' + info.version } });
+      scriptId: ScriptApp.getScriptId(), versionNumber: ver.versionNumber, manifestFileName: 'appsscript', description: '風味記帳 ' + label } });
   });
   return deps.length;
+}
+
+// 程式是最新的，但 App 連的部署還是舊版（例如手動貼了程式卻沒部署）：回傳舊的版本號，沒有就回傳空陣列
+function staleDeployments_() {
+  return webDeployments_().map(function (d) {
+    const files = scriptApi_('get', '/content?versionNumber=' + d.deploymentConfig.versionNumber).files || [];
+    const src = files.map(function (f) { return f.source || ''; }).join('\n');
+    const m = src.match(/const SERVER_VERSION = '([^']+)'/);
+    return m ? m[1] : '舊版';
+  }).filter(function (v) { return verNum_(v) < verNum_(SERVER_VERSION); });
 }
 
 // 報表分頁平常不產生（大家看 App 的「總覽」）；需要時用選單「② 需要時產生報表」
