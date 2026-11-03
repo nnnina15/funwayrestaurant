@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.1.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.1.6';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -622,8 +622,8 @@ function loadDaily() {
   setNum('d-site', d && d.site); setNum('d-panda', d && d.panda); setNum('d-uber', d && d.uber);
   setNum('d-allpay', d && d.allpay); setNum('d-line', d && d.line);
   setNum('d-cash', d && d.cash); $('d-note').value = d ? (d.note || '') : '';
-  if (d && d.lines && d.lines.length) ST.lines = JSON.parse(JSON.stringify(d.lines)).map(function (l) { if (!l.cat) l.cat = LINE_WAGE; return l; });
-  else if (d && d.spend) ST.lines = [{ name: '現場支出（舊資料）', amount: d.spend, cat: LINE_WAGE }];
+  if (d && d.lines && d.lines.length) ST.lines = JSON.parse(JSON.stringify(d.lines)).map(function (l) { if (!l.cat) l.cat = LINE_OLD; return l; });
+  else if (d && d.spend) ST.lines = [{ name: '舊表的現場支出合計', amount: d.spend, cat: LINE_OLD }];
   else ST.lines = [{ name: '', amount: '', cat: LINE_OTHER }];
   ST.lineCats = categoriesFor(date.slice(0, 7));
   var mem = lineMemory();
@@ -639,8 +639,9 @@ function renderDailyExist() {
     pendTag('daily', d.date) + '，修改後再儲存會覆蓋。';
 }
 var LINE_OTHER = '其他支出', LINE_WAGE = '薪資／預支';      // LINE_WAGE：舊資料用，不會自動記到人事
-var LINE_PT = 'PT薪資', LINE_ADV = '預支';                    // 新的：存檔時自動記到「人事」
-function isWageCat(c) { return c === LINE_PT || c === LINE_ADV || c === LINE_WAGE; }
+var LINE_PT = 'PT薪資', LINE_ADV = '預支';
+var LINE_OLD = '舊表合計';                                     // 舊表匯入的日子只有支出合計：照算現金，但不另外記到進貨／支出／人事（舊表的進貨已經匯入過）                    // 新的：存檔時自動記到「人事」
+function isWageCat(c) { return c === LINE_PT || c === LINE_ADV || c === LINE_WAGE || c === LINE_OLD; }   // 這些都不會自動記成進貨／其他支出
 // 名稱看起來是 PT 或預支，就自動選對分類（舊的「薪資／預支」也換成新的）
 function wageCatFor(name) { var n = String(name || ''); return /預支|借/.test(n) ? LINE_ADV : LINE_PT; }
 // 記到人事時是誰：名稱裡有員工名字就用員工名字，不然就用名稱本身（例如 PT）
@@ -710,7 +711,7 @@ function renderLines() {
       '<input class="amt" value="' + esc(l.amount) + '" inputmode="text" placeholder="金額" oninput="setLine(' + i + ',\'amount\',this.value)">' +
       '<select onchange="setLine(' + i + ',\'cat\',this.value)">' +
         '<optgroup label="進貨">' + ST.lineCats.map(function (c) { return opt(c); }).join('') + '</optgroup>' +
-        '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + (function () { var ph = window.matchMedia && window.matchMedia('(max-width: 560px)').matches; return opt(LINE_PT, ph ? 'PT薪資' : 'PT薪資（記到人事）') + opt(LINE_ADV, ph ? '預支' : '預支（記到人事）') + (l.cat === LINE_WAGE ? opt(LINE_WAGE, '薪資／預支（舊）') : ''); })() + '</optgroup>' +
+        '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + (function () { var ph = window.matchMedia && window.matchMedia('(max-width: 560px)').matches; return opt(LINE_PT, ph ? 'PT薪資' : 'PT薪資（記到人事）') + opt(LINE_ADV, ph ? '預支' : '預支（記到人事）') + (l.cat === LINE_WAGE ? opt(LINE_WAGE, '薪資／預支（舊）') : '') + (l.cat === LINE_OLD ? opt(LINE_OLD, '舊表合計') : ''); })() + '</optgroup>' +
       '</select>' +
       '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delLine(' + i + ')">✕</button></div>';
   }).join('');
