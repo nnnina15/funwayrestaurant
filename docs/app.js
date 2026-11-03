@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.1.6';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.1.7';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -1344,7 +1344,7 @@ function renderYearTab() {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
     if (!qm.length) return;
     qm.forEach(function (m) { h += rowOf([m], label(m), ''); });
-    h += rowOf(qm, 'Q' + q + ' 合計', 'qrow');
+    h += rowOf(qm, '<span class="qtag">Q' + q + '</span><small>合計</small>', 'qrow');
   });
   h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
   h += '<p class="muted">每月的分紅＝可分配 × 股東比例。進行中的月份數字會變動，先不要拿來分紅。</p>';
@@ -1371,7 +1371,7 @@ function renderYearTab() {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
     if (!qm.length) return;
     qm.forEach(function (m) { h += drow([m], label(m), ''); });
-    h += drow(qm, 'Q' + q + (perDay ? ' 平均' : ' 合計'), 'qrow');
+    h += drow(qm, '<span class="qtag">Q' + q + '</span><small>' + (perDay ? '平均' : '合計') + '</small>', 'qrow');
   });
   h += drow(months, cur + (perDay ? ' 全年平均' : ' 全年'), 'yrow') + '</tbody></table></div>';
   h += '<p class="muted">電費、水費是從「固定／其他支出」裡項目名稱有「電費」「水費」的金額抓的。季、全年的每天平均＝合計 ÷ 總工作天。</p>';

@@ -279,7 +279,14 @@
   .ytable thead th { z-index: 4; }
   .ytable thead th:first-child { z-index: 5; left: 0; }
   .ytable td.em { font-weight: 700; }
-  .ytable tr.qrow th, .ytable tr.qrow td { background: var(--qrow); font-weight: 700; }
+  /* 季合計：和月份分開（上面一條線、下面留空），數字用深色，月份的紅綠才看得清楚 */
+  .ytable tr.qrow th, .ytable tr.qrow td { background: var(--qrow); font-weight: 700; color: var(--ink);
+    border-top: 1.5px solid color-mix(in srgb, var(--amber) 55%, var(--line)); border-bottom: 10px solid var(--card); }
+  .ytable tr.qrow td.neg { color: var(--bad); }
+  .ytable tr.qrow td:not(.neg):not(.zero) { color: var(--ink); }
+  .ytable tr.qrow th { white-space: nowrap; }
+  .ytable .qtag { display: inline-block; background: var(--amber); color: #3d2600; font-weight: 800; font-size: 12px; line-height: 1; padding: 4px 7px; border-radius: 6px; margin-right: 6px; vertical-align: 1px; }
+  .ytable tr.qrow th small { color: var(--muted); font-weight: 600; font-size: 13px; }
   .ytable tr.yrow th, .ytable tr.yrow td { background: var(--yrow); font-weight: 800; border-top: 2px solid var(--amber); }
 
   /* ===== 每日結帳 ===== */
