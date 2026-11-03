@@ -44,4 +44,12 @@ r = run({ pagesAtRoot: true }); assert.ok(/更新完成/.test(r.alerts[1]), '根
 r = run({ apiOff: true }); assert.ok(/usersettings/.test(r.alerts[1]) && r.project[0].source === 'function doPost(e) {}', 'API 沒開：提示怎麼開，程式不動');
 r = run({ badCode: true }); assert.ok(/不完整/.test(r.alerts[1]) && r.project[0].source === 'function doPost(e) {}', '下載不完整：不換');
 r = run({ version: '1.0.0' }); assert.ok(/已經是最新版/.test(r.alerts[0]) && r.calls.length === 1, '沒有新版就不動');
+// 還沒授權連外：說明怎麼授權，不要說成「連不到 GitHub」
+{
+  const g = createGas(), alerts = [];
+  g.ctx.UrlFetchApp = { fetch() { throw new Error('你沒有呼叫「UrlFetchApp.fetch」的權限。必要權限：https://www.googleapis.com/auth/script.external_request'); } };
+  g.ctx.SpreadsheetApp.getUi = () => ({ Button: { OK: 'OK' }, ButtonSet: { OK_CANCEL: 1, OK: 0 }, alert(...a) { alerts.push(a.join('｜')); return 'OK'; } });
+  g.ctx.updateProgram();
+  assert.ok(/需要先授權/.test(alerts[0]) && /updateProgram/.test(alerts[0]) && !/連不到 GitHub/.test(alerts[0]), alerts[0]);
+}
 console.log('⑤ 更新程式 ✓');

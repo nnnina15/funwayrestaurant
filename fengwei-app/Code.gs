@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.0.6';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '每日結帳的 PT 薪資、預支會自動記到人事（店長也能存）';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.0.7';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '每日結帳的 PT 薪資、預支會自動記到人事（店長也能存）；⑤ 更新程式需要授權時會說明怎麼做';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -85,7 +85,13 @@ function onOpen() {
 function updateProgram() {
   const ui = SpreadsheetApp.getUi();
   let info;
-  try { info = checkUpdate_(); } catch (e) { ui.alert('連不到 GitHub，請稍後再試。\n\n' + e.message); return; }
+  try { info = checkUpdate_(); } catch (e) {
+    const m = String(e.message || e);
+    if (/權限|permission|authoriz|external_request/i.test(m)) {
+      ui.alert('需要先授權（只要做一次）', '「⑤ 更新程式」要連到 GitHub 下載新版，需要你允許：\n\n1. 擴充功能 → Apps Script\n2. 確認 appsscript.json 裡有 script.external_request（沒有就貼上最新的 appsscript.json 並存檔）\n3. 上方函式選 updateProgram → 按「執行」→ 審查權限 → 允許\n4. 回來再按一次「⑤ 更新程式」\n\n（原因：' + m.slice(0, 150) + '）', ui.ButtonSet.OK);
+    } else ui.alert('連不到 GitHub，請稍後再試。\n\n' + m);
+    return;
+  }
   if (!info.newer) { ui.alert('已經是最新版（' + SERVER_VERSION + '），不用更新。'); return; }
   const ok = ui.alert('有新版程式', '目前：' + SERVER_VERSION + '\n最新：' + info.version + '\n\n這次更新：\n' + info.notes +
     '\n\n按「確定」會自動換成新程式並部署，App 網址不變。', ui.ButtonSet.OK_CANCEL);
