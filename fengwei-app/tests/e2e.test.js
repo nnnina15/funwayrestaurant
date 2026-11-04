@@ -267,6 +267,28 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tb-settings'); await B.pg.fill('#cp-old', 'Nina#2026x'); await B.pg.fill('#cp-new', 'Nina#2027y'); await B.pg.fill('#cp-new2', 'Nina#2027y');
   await B.pg.click('#set-pin-card .primary'); await B.pg.waitForFunction(() => /PIN 已更改/.test(document.getElementById('toast').textContent));
   console.log('帳號登入、切店、改 PIN ✓');
+  // 裝置：管理可以改員工名單、進貨分類；字體大小併進「這台裝置」，卡片順序：常用項目 → 員工 → 分類
+  await B.pg.click('#tb-settings');
+  assert.deepStrictEqual(await B.pg.$$eval('#tab-settings > .card:not(.hide) h2', h => h.map(x => x.textContent)).then(x => x.slice(1, 4)), ['常用項目設定', '員工名單（大埔店）', '進貨分類（大埔店）']);
+  await B.pg.click('text=＋ 新增員工');
+  await B.pg.fill('.ee-item.open .ee-body > label input', '阿寶');
+  await B.pg.fill('.ee-nums label:has-text("月薪") input', '45000');
+  await B.pg.click('#ee-save');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  assert.ok(g.rows(S.EMP).some(r => r['姓名'] === '阿寶' && r['店別'] === '大埔店' && r['月薪'] === 45000 && r['在職(是/否)'] === '是'), '員工存到試算表');
+  await B.pg.click('#tb-payroll');
+  assert.ok((await B.pg.textContent('#s-roster')).includes('＋阿寶'), '人事頁馬上有阿寶');
+  await B.pg.click('#tb-settings');
+  await B.pg.click('text=＋ 新增分類');
+  await B.pg.fill('.ce-row:last-child input >> nth=0', '飲料');
+  await B.pg.click('#ce-save');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  assert.ok(g.rows(S.CAT).some(r => r['分類'] === '飲料' && r['店別(全部/店名)'] === '大埔店'), '分類存到試算表');
+  assert.ok(g.rows(S.CAT).some(r => r['店別(全部/店名)'] === '中正店'), '中正店的分類保留');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-settings.png'), fullPage: true });
+  await B.pg.click('#tb-purchase');
+  assert.ok((await B.pg.textContent('#p-cats')).includes('飲料'), '進貨頁馬上有新分類');
+  console.log('裝置：員工名單、進貨分類 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
   await B.pg.setViewportSize({ width: 390, height: 844 });
@@ -282,6 +304,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#themeBtn'); const t1 = await B.pg.getAttribute('html', 'data-theme'); assert.ok(t1 !== t0 && (t1 === 'light' || t1 === 'dark'));
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-phone-dark.png'), fullPage: true });
   await B.pg.click('#themeBtn'); assert.strictEqual(await B.pg.getAttribute('html', 'data-theme'), t0, '只在亮色／暗色之間切換，沒有自動');
+  await B.pg.click('#bb-more'); await B.pg.click('#moregrid button:has-text("裝置")');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-phone-settings.png'), fullPage: true });
+  await B.pg.click('#bb-daily');
   console.log('手機分頁列 + 亮暗切換 ✓');
   // 登出時沒上傳的資料要保留：離線記一筆 → 登出 → 登入畫面提醒 → 同帳號再登入自動上傳
   const n0 = g.rows(S.PURCHASE).length;

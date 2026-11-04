@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.3.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '新店家只要在「設定_店家」加一列就能用：還沒設定進貨分類時，先用預設分類';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.4.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '管理可以在 App「裝置」直接改員工名單和進貨分類（不用再開試算表）';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -642,6 +642,46 @@ function applyServerOp_(store, op) {
     case 'purchase.del': deleteWhere_(S.PURCHASE, byId_(store, d.id)); return 'ok';
     case 'expense.del': deleteWhere_(S.EXPENSE, byId_(store, d.id)); return 'ok';
     case 'deduct.del': deleteWhere_(S.DEDUCT, byId_(store, d.id)); return 'ok';
+    // 管理在 App「裝置」改這家店的員工名單：整份換掉
+    case 'employees.set': {
+      const seen = {};
+      const rows = (d.items || []).filter(function (e) { return str_(e.name); }).map(function (e) {
+        const name = str_(e.name);
+        if (seen[name]) throw new Error('員工名字重複：' + name);
+        seen[name] = true;
+        return { '店別': store, '姓名': name, '類型(正職/計時)': e.type === '計時' ? '計時' : '正職',
+          '月薪': num_(e.salary) || '', '時薪': num_(e.hourly) || '', '員工自付健保': num_(e.selfHealth) || '', '員工自付勞保': num_(e.selfLabor) || '',
+          '公司勞退': num_(e.pension) || '', '公司健保': num_(e.health) || '', '公司勞保': num_(e.labor) || '', '在職(是/否)': e.active === false ? '否' : '是' };
+      });
+      deleteWhere_(S.EMP, function (x) { return str_(x['店別']) === store; });
+      append_(S.EMP, rows);
+      return 'ok';
+    }
+    // 管理在 App「裝置」改這家店的進貨分類：原本「全部」共用的，先複製給其他店（其他店不受影響），再換掉這家店的
+    case 'categories.set': {
+      const shared = rows_(S.CAT).filter(function (x) { return str_(x['店別(全部/店名)']) === '全部' && str_(x['分類']); });
+      if (shared.length) {
+        const others = stores_().map(function (x) { return x.name; }).filter(function (n) { return n !== store; });
+        const copy = [];
+        others.forEach(function (n) {
+          shared.forEach(function (x) {
+            copy.push({ '店別(全部/店名)': n, '分類': str_(x['分類']), '啟用月份(yyyy-MM)': monthKey_(x['啟用月份(yyyy-MM)']), '停用月份(yyyy-MM)': monthKey_(x['停用月份(yyyy-MM)']) });
+          });
+        });
+        deleteWhere_(S.CAT, function (x) { return str_(x['店別(全部/店名)']) === '全部'; });
+        append_(S.CAT, copy);
+      }
+      const seen = {};
+      const rows = (d.items || []).filter(function (c) { return str_(c.cat); }).map(function (c) {
+        const cat = str_(c.cat);
+        if (seen[cat]) throw new Error('進貨分類重複：' + cat);
+        seen[cat] = true;
+        return { '店別(全部/店名)': store, '分類': cat, '啟用月份(yyyy-MM)': monthKey_(c.from) || '', '停用月份(yyyy-MM)': monthKey_(c.to) || '' };
+      });
+      deleteWhere_(S.CAT, function (x) { return str_(x['店別(全部/店名)']) === store; });
+      append_(S.CAT, rows);
+      return 'ok';
+    }
     case 'presets.set': {
       const use = str_(d.use);
       if (PRESET_USES.indexOf(use) < 0) throw new Error('常用項目用途錯誤');
@@ -781,6 +821,7 @@ function pull_(s, role) {
     store: { name: s.name, fee: s.fee, cashIn: s.cashIn, cashWarn: s.cashWarn },
     categories: storeCats_(s.name),
     employees: all ? employees_(s.name) : [],
+    employeesAll: role === 'admin' ? employees_(s.name, true) : [],   // 管理在 App「裝置」編輯員工名單用（含離職）
     partners: all ? partners_().filter(mine) : [],
     kinds: PAYROLL_KINDS, expenseTypes: EXPENSE_TYPES, deductTypes: DEDUCT_TYPES
   };
@@ -840,14 +881,15 @@ function partners_() {
     .map(function (r) { return { store: str_(r['店別']), name: str_(r['股東']), pct: num_(r['比例(%)']) }; });
 }
 
-function employees_(store) {
+function employees_(store, withInactive) {
   return rows_(S.EMP).filter(function (r) {
-    return str_(r['店別']) === store && str_(r['姓名']) && str_(r['在職(是/否)']) !== '否';
+    return str_(r['店別']) === store && str_(r['姓名']) && (withInactive || str_(r['在職(是/否)']) !== '否');
   }).map(function (r) {
     return { name: str_(r['姓名']), type: str_(r['類型(正職/計時)']) || '正職',
       salary: num_(r['月薪']), hourly: num_(r['時薪']),
       selfHealth: num_(r['員工自付健保']), selfLabor: num_(r['員工自付勞保']),
-      pension: num_(r['公司勞退']), health: num_(r['公司健保']), labor: num_(r['公司勞保']) };
+      pension: num_(r['公司勞退']), health: num_(r['公司健保']), labor: num_(r['公司勞保']),
+      active: str_(r['在職(是/否)']) !== '否' };
   });
 }
 

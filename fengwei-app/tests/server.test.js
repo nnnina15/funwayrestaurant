@@ -225,4 +225,20 @@ assert.ok(r.ok, JSON.stringify(r).slice(0, 200)); assert.ok(r.stores.includes('�
 assert.ok(r.config.categories.length > 5 && r.config.categories.some(c => c.cat === '麵'), '新店沒有分類時用預設分類');
 const sd = computeAll_({ stores: [r.config.store], partners: r.config.partners, employees: r.config.employees, ...r.data }, '2026-11-04');
 assert.ok(sd, '沒有股東也能算總覽');
+// 管理在 App 改員工名單、進貨分類
+r = g.post({ action: 'sync', store: '師大店', account: adm.account, token: adm.token, ops: [
+  op('employees.set', { items: [{ name: '小明', type: '正職', salary: 40000, selfHealth: 500, active: true }, { name: '阿華', type: '計時', hourly: 200, active: false }] }),
+  op('categories.set', { items: [{ cat: '麵', from: '', to: '' }, { cat: '飲料', from: '', to: '2026-12' }] })] });
+assert.ok(r.results.every(x => x.status === 'ok'), JSON.stringify(r.results));
+assert.deepStrictEqual(r.config.employees.map(e => e.name), ['小明'], '離職的不在人事名單');
+assert.deepStrictEqual(r.config.employeesAll.map(e => e.name + e.active), ['小明true', '阿華false']);
+assert.deepStrictEqual(r.config.categories.map(c => c.cat + c.to), ['麵', '飲料2026-12']);
+const other = g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, ops: [] });
+assert.ok(other.config.categories.length > 5, '別家店的分類不受影響');
+assert.ok(g.rows(S.EMP).some(e => e['店別'] === '大埔店'), '別家店的員工不受影響');
+addAcc('師大店長', '店長', '師大店', 'Temp#0009');
+const sdm = login('師大店長', 'Temp#0009', { newPin: 'Shida#2026' });
+const mgrTry = g.post({ action: 'sync', store: '師大店', account: sdm.account, token: sdm.token, ops: [op('employees.set', { items: [] })] });
+assert.ok(mgrTry.ok && mgrTry.results[0].status === 'error' && /權限/.test(mgrTry.results[0].error), '店長不能改員工名單：' + JSON.stringify(mgrTry).slice(0, 150));
+assert.strictEqual(mgrTry.config.employeesAll.length, 0, '店長拿不到含離職的員工名單');
 console.log('同步服務測試通過 ✓');

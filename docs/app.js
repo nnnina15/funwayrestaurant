@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.6.7';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.7.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -680,7 +680,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.3.1';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.4.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -1782,8 +1782,117 @@ function peSave() {
   toast('常用項目已儲存 ✓（所有裝置同步後都會更新）');
 }
 
+/* ---------- 員工名單、進貨分類（管理在「裝置」直接改，存到試算表「設定_員工」「設定_進貨分類」） ---------- */
+var EE_NUMS = [['salary', '月薪'], ['hourly', '時薪'], ['selfHealth', '員工自付健保'], ['selfLabor', '員工自付勞保'], ['pension', '公司勞退'], ['health', '公司健保'], ['labor', '公司勞保']];
+function renderEmpEditor() {
+  var card = $('set-emp-card');
+  if (!isAdmin()) { card.classList.add('hide'); return; }
+  card.classList.remove('hide');
+  if (!ST.ee || ST.ee.store !== ST.sess.store) {
+    var src = ST.snap.config.employeesAll || ST.snap.config.employees || [];
+    ST.ee = { store: ST.sess.store, open: -1, dirty: false, items: src.map(function (e) { return Object.assign({ active: true }, e); }) };
+  }
+  $('ee-h').textContent = '員工名單（' + ST.sess.store + '）';
+  $('ee-list').innerHTML = ST.ee.items.map(function (e, i) {
+    var pay = e.type === '計時' ? '時薪 ' + money(e.hourly || 0) : '月薪 ' + money(e.salary || 0);
+    var head = '<button class="ee-head' + (i === ST.ee.open ? ' on' : '') + (e.active === false ? ' off' : '') + '" onclick="eeOpen(' + i + ')"><b>' + esc(e.name || '（未命名）') + '</b>' +
+      '<span class="muted">' + esc(e.type === '計時' ? '計時' : '正職') + '｜' + pay + (e.active === false ? '｜已離職' : '') + '</span><span class="ee-arrow">' + (i === ST.ee.open ? '▴' : '▾') + '</span></button>';
+    if (i !== ST.ee.open) return '<div class="ee-item">' + head + '</div>';
+    var nums = EE_NUMS.filter(function (n) { return e.type === '計時' ? n[0] !== 'salary' : n[0] !== 'hourly'; }).map(function (n) {
+      return '<label>' + n[1] + '<input value="' + esc(e[n[0]] || '') + '" inputmode="numeric" oninput="eeSet(' + i + ',\'' + n[0] + '\',this.value)"></label>';
+    }).join('');
+    return '<div class="ee-item open">' + head + '<div class="ee-body">' +
+      '<label>姓名<input value="' + esc(e.name || '') + '" oninput="eeSet(' + i + ',\'name\',this.value)"></label>' +
+      '<div class="seg">' + ['正職', '計時'].map(function (t) { return '<button class="' + ((e.type || '正職') === t ? 'on' : '') + '" onclick="eeSet(' + i + ',\'type\',\'' + t + '\',true)">' + t + '</button>'; }).join('') + '</div>' +
+      '<div class="ee-nums">' + nums + '</div>' +
+      '<div class="ee-foot"><label class="chk"><input type="checkbox"' + (e.active !== false ? ' checked' : '') + ' onchange="eeSet(' + i + ',\'active\',this.checked,true)"> 在職</label>' +
+      '<button class="ghost ee-del" onclick="eeDel(' + i + ')">✕ 刪除</button></div></div></div>';
+  }).join('') || '<p class="muted">還沒有員工，按下面「＋ 新增員工」</p>';
+  $('ee-save').disabled = !ST.ee.dirty;
+  $('ee-save').textContent = ST.ee.dirty ? '儲存員工名單' : '沒有變更';
+}
+function eeOpen(i) { ST.ee.open = ST.ee.open === i ? -1 : i; renderEmpEditor(); }
+function eeSet(i, k, v, redraw) {
+  ST.ee.items[i][k] = v; ST.ee.dirty = true;
+  if (redraw) renderEmpEditor(); else { $('ee-save').disabled = false; $('ee-save').textContent = '儲存員工名單'; }
+}
+function eeDel(i) {
+  if (!confirm('從名單刪除 ' + (ST.ee.items[i].name || '這位') + '？\n（以前的薪資紀錄會留著；只是暫時不做，建議取消勾選「在職」就好）')) return;
+  ST.ee.items.splice(i, 1); ST.ee.open = -1; ST.ee.dirty = true; renderEmpEditor();
+}
+function eeAdd() {
+  ST.ee.items.push({ name: '', type: '正職', active: true }); ST.ee.open = ST.ee.items.length - 1; ST.ee.dirty = true;
+  renderEmpEditor();
+  var b = $('ee-list').querySelector('.ee-item.open input'); if (b) b.focus();
+}
+function eeSave() {
+  var bad = '', items = ST.ee.items.map(function (e) {
+    var o = { name: String(e.name || '').trim(), type: e.type === '計時' ? '計時' : '正職', active: e.active !== false };
+    EE_NUMS.forEach(function (n) { var v = expr(e[n[0]]); if (isNaN(v)) bad = (o.name || '員工') + ' 的' + n[1]; o[n[0]] = v || ''; });
+    return o;
+  }).filter(function (o) { return o.name; });
+  if (bad) return toast(bad + '看不懂，請打數字');
+  var names = items.map(function (o) { return o.name; });
+  var dup = names.filter(function (n, i) { return names.indexOf(n) !== i; })[0];
+  if (dup) return toast('名字重複：' + dup);
+  enqueue('employees.set', { items: items });
+  // 先改這台裝置的設定，同步後試算表也會更新
+  ST.snap.config.employeesAll = items.map(function (o) { return Object.assign({}, o, { salary: Number(o.salary) || 0, hourly: Number(o.hourly) || 0 }); });
+  ST.snap.config.employees = ST.snap.config.employeesAll.filter(function (o) { return o.active; });
+  LS.set(k_('snap'), ST.snap);
+  ST.ee = null; renderEmpEditor();
+  toast('員工名單已儲存 ✓');
+}
+
+function renderCatEditor() {
+  var card = $('set-cat-card');
+  if (!isAdmin()) { card.classList.add('hide'); return; }
+  card.classList.remove('hide');
+  if (!ST.ce || ST.ce.store !== ST.sess.store) {
+    ST.ce = { store: ST.sess.store, dirty: false, items: (ST.snap.config.categories || []).map(function (c) { return { cat: c.cat, from: c.from || '', to: c.to || '' }; }) };
+  }
+  $('ce-h').textContent = '進貨分類（' + ST.sess.store + '）';
+  $('ce-list').innerHTML = ST.ce.items.map(function (c, i) {
+    return '<div class="ce-row' + (c.to && c.to <= todayStr().slice(0, 7) ? ' off' : '') + '"><input value="' + esc(c.cat) + '" placeholder="分類名稱" oninput="ceSet(' + i + ',\'cat\',this.value)">' +
+      (c.to || c.editTo ? '<input type="month" value="' + esc(c.to) + '" title="從這個月開始不用（清空＝一直用）" onchange="ceSet(' + i + ',\'to\',this.value,true)">'
+        : '<button class="ghost ce-stop" onclick="ceStop(' + i + ')">一直用</button>') +
+      '<button class="pe-mv" onclick="ceMove(' + i + ',-1)" aria-label="上移">↑</button><button class="pe-mv" onclick="ceMove(' + i + ',1)" aria-label="下移">↓</button>' +
+      '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="ceDel(' + i + ')">✕</button></div>';
+  }).join('') || '<p class="muted">還沒有分類，按下面「＋ 新增分類」</p>';
+  $('ce-save').disabled = !ST.ce.dirty;
+  $('ce-save').textContent = ST.ce.dirty ? '儲存進貨分類' : '沒有變更';
+}
+function ceSet(i, k, v, redraw) { ST.ce.items[i][k] = v; ST.ce.dirty = true; if (redraw) renderCatEditor(); else { $('ce-save').disabled = false; $('ce-save').textContent = '儲存進貨分類'; } }
+function ceStop(i) {
+  ST.ce.items[i].editTo = true; renderCatEditor();
+  var inp = $('ce-list').querySelectorAll('.ce-row')[i].querySelector('input[type=month]');
+  if (inp) { inp.focus(); try { inp.showPicker(); } catch (e) { /* 舊瀏覽器沒有 showPicker */ } }
+}
+function ceMove(i, d) { var j = i + d; if (j < 0 || j >= ST.ce.items.length) return; var t = ST.ce.items[i]; ST.ce.items[i] = ST.ce.items[j]; ST.ce.items[j] = t; ST.ce.dirty = true; renderCatEditor(); }
+function ceDel(i) {
+  if (!confirm('刪除分類「' + (ST.ce.items[i].cat || '') + '」？\n（以前的進貨紀錄還在；只是不再用的話，建議填「停用月份」就好）')) return;
+  ST.ce.items.splice(i, 1); ST.ce.dirty = true; renderCatEditor();
+}
+function ceAdd() {
+  ST.ce.items.push({ cat: '', from: '', to: '' }); ST.ce.dirty = true; renderCatEditor();
+  var rows = $('ce-list').querySelectorAll('.ce-row'); rows[rows.length - 1].querySelector('input').focus();
+}
+function ceSave() {
+  var items = ST.ce.items.map(function (c) { return { cat: String(c.cat || '').trim(), from: c.from || '', to: c.to || '' }; }).filter(function (c) { return c.cat; });
+  var names = items.map(function (c) { return c.cat; });
+  var dup = names.filter(function (n, i) { return names.indexOf(n) !== i; })[0];
+  if (dup) return toast('分類重複：' + dup);
+  enqueue('categories.set', { items: items });
+  ST.snap.config.categories = items.map(function (c) { return { store: ST.sess.store, cat: c.cat, from: c.from, to: c.to }; });
+  LS.set(k_('snap'), ST.snap);
+  ST.ce = null; renderCatEditor();
+  toast('進貨分類已儲存 ✓');
+}
+
 function renderSettingsTab() {
   renderPresetEditor();
+  renderEmpEditor();
+  renderCatEditor();
   applyFont();
   if (!ST.swVersion && navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
   $('set-info').innerHTML =
