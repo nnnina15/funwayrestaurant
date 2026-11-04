@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.6.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.6.5';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -172,7 +172,7 @@ function showView(name) {
     $('setupBack').classList.toggle('hide', !ST.cfg && !DEFAULT_URL);
     $('setupBack').textContent = ST.sess ? '← 回 App（不改網址）' : '← 回登入畫面';
   }
-  if (name === 'login') { $('title').textContent = '登入'; if (!$('login-acc').value) $('login-acc').value = LS.get('fw_lastAcc', ''); }
+  if (name === 'login') { $('title').textContent = '登入'; if (!$('login-acc').value) $('login-acc').value = LS.get('fw_lastAcc', ''); renderLeftover(); }
 }
 
 /* ---------- 日期／月份／年份左右的 ‹ › ---------- */
@@ -271,6 +271,27 @@ function boot() {
   if (!ST.cfg) return showView('setup');
   if (!ST.sess || !ST.sess.account) { ST.sess = null; return showView('login'); }
   enterApp();
+}
+
+// 登入畫面：這台裝置上有哪些帳號還有沒上傳的資料（登出時保留下來的）
+function leftover() {
+  var by = {};
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var m = /^fw_(outbox|failed)_(.+)@(.+)$/.exec(localStorage.key(i) || '');
+      if (!m) continue;
+      var n = (LS.get(m[0], []) || []).length;
+      if (n) by[m[2]] = (by[m[2]] || 0) + n;
+    }
+  } catch (e) { /* ignore */ }
+  return by;
+}
+function renderLeftover() {
+  var by = leftover(), names = Object.keys(by), el = $('login-left');
+  el.classList.toggle('hide', !names.length);
+  el.innerHTML = names.length ? '⚠ 這台裝置還有沒上傳的資料：' + names.map(function (a) {
+    return '<b>' + esc(a) + '</b> ' + by[a] + ' 筆';
+  }).join('、') + '<br>用那個帳號登入就會自動上傳。' : '';
 }
 
 /* ---------- 第一次設定 ---------- */
@@ -387,9 +408,12 @@ function switchStore(name) {
 function logout() {
   var stores = (ST.sess && ST.sess.stores) || [], n = 0;
   stores.forEach(function (st) { n += (LS.get(k_('outbox', st), []) || []).length; });
-  if (n && !confirm('還有 ' + n + ' 筆資料沒有上傳！\n登出會把它們刪掉，確定嗎？\n\n（建議先連上網路按「立即同步」）')) return;
-  if (!n && !confirm('確定登出並清除這台裝置上的資料？（雲端資料不受影響）')) return;
-  stores.forEach(function (st) { ['snap', 'outbox', 'failed', 'last'].forEach(function (x) { LS.del(k_(x, st)); }); });
+  if (!confirm(n ? '還有 ' + n + ' 筆資料沒有上傳。\n登出後會留在這台裝置，下次用同一個帳號登入就會自動上傳。\n\n確定登出？' : '確定登出？（雲端資料不受影響）')) return;
+  // 沒上傳的（outbox／failed）留著，等同一個帳號再登入時上傳；其他快取清掉
+  stores.forEach(function (st) {
+    ['snap', 'last'].forEach(function (x) { LS.del(k_(x, st)); });
+    ['outbox', 'failed'].forEach(function (x) { if (!(LS.get(k_(x, st), []) || []).length) LS.del(k_(x, st)); });
+  });
   LS.del('fw_sess');
   ST.sess = null; ST.snap = null; ST.outbox = []; ST.failed = [];
   showView('login');

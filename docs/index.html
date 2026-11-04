@@ -493,6 +493,7 @@
   <div class="hero"><img class="logo-light" src="logo-ink.png" alt="風味食堂"><img class="logo-dark" src="logo-white.png" alt="風味食堂"><p>每日結帳・進貨・分紅</p></div>
   <div class="card">
     <h2>登入</h2>
+    <div id="login-left" class="banner hide"></div>
     <label>帳號</label>
     <input id="login-acc" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="管理者給你的帳號">
     <label>PIN</label>
@@ -690,7 +691,7 @@
       <button class="ghost wide" onclick="trySync(true)">立即同步</button>
       <button class="ghost wide" onclick="checkUpdate()">檢查 App 更新</button>
       <button class="ghost wide" onclick="showView('setup')">修改同步網址</button>
-      <button class="ghost wide" onclick="logout()" style="color:var(--bad)">登出並清除這台裝置的資料</button>
+      <button class="ghost wide" onclick="logout()" style="color:var(--bad)">登出（沒上傳的資料會保留）</button>
     </div>
     <div class="card">
       <h2>字體大小</h2>
