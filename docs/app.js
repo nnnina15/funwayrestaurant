@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.2.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.3.0';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -157,7 +157,7 @@ function showView(name) {
 }
 
 /* ---------- 日期／月份／年份左右的 ‹ › ---------- */
-var STEP_IDS = ['d-date', 'p-date', 's-month', 'v-month', 'e-month', 'x-month', 'm-month', 'y-year'];
+var STEP_IDS = ['d-date', 'p-date', 's-month', 'v-month', 'e-month', 'x-year', 'm-month', 'y-year'];
 function addSteppers() {
   STEP_IDS.forEach(function (id) {
     var el = $(id); if (!el || el.parentNode.classList.contains('stepper')) return;
@@ -385,7 +385,7 @@ function enterApp() {
   var t = todayStr(), m = t.slice(0, 7);
   ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
   ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });
-  $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除', '股東分紅（已發）']).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
+  $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).filter(function (x) { return x !== '股東分紅（已發）'; }).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
   var mine = TABS.filter(function (x) { return !x[2] || isAdmin(); });
   $('tabs').innerHTML = mine.map(function (x) {
     return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
@@ -408,7 +408,7 @@ function closeMore() { $('moresheet').classList.add('hide'); }
 
 /* ---------- 日期／月份置頂：切換分頁時，把那頁的日期／月份搬到上方固定列 ---------- */
 var PIN_MAP = { daily: [['d-date', '日期']], purchase: [['p-date', '日期']], expense: [['e-month', '月份']],
-  overview: [['ov-seg'], ['ov-month-pick'], ['ov-year-pick']], payroll: [['s-month', '月份']], delivery: [['v-month', '月份']], deduct: [['x-month', '月份']] };
+  overview: [['ov-seg'], ['ov-month-pick'], ['ov-year-pick']], payroll: [['s-month', '月份']], delivery: [['v-month', '月份']], deduct: [['x-year', '年份']] };
 function pinPickers(name) {
   (ST.pinned || []).forEach(function (p) { p.ph.parentNode.insertBefore(p.node, p.ph); p.ph.remove(); if (p.cap) p.cap.remove(); });
   ST.pinned = [];
@@ -1168,17 +1168,62 @@ function copyFixed() {
 }
 
 /* ---------- 分紅扣除 ---------- */
+// 分紅扣除：每年看一次；上方選年份，新增時各自選月份
+function deductYears() {
+  var ys = {}; ys[todayStr().slice(0, 4)] = true;
+  var V = view();
+  ['deduct', 'daily', 'expense'].forEach(function (k) { (V[k] || []).forEach(function (x) { var mo = x.month || (x.date || '').slice(0, 7); if (mo) ys[mo.slice(0, 4)] = true; }); });
+  return Object.keys(ys).sort();
+}
+function onDeductYear() {
+  var y = $('x-year').value, m = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12';
+  ['x-month', 'xp-month'].forEach(function (id) { if (($(id).value || '').slice(0, 4) !== y) $(id).value = m; });
+  renderDeductTab();
+}
+function payoutNames() {
+  var names = ((ST.snap.config.partners || []).map(function (p) { return p.name; }));
+  view().deduct.forEach(function (d) {
+    var n = d.type === '股東分紅（已發）' ? String(d.note || '').replace(/（.*?）/g, '').trim() : (d.type === '其他扣除' && /分紅/.test(d.note || '') ? String(d.note).replace(/（.*?）/g, '').replace(/分紅.*$/, '').trim() : '');
+    if (n && names.indexOf(n) < 0) names.push(n);
+  });
+  return names;
+}
 function renderDeductTab() {
-  var month = $('x-month').value;
-  var list = view().deduct.filter(function (x) { return x.month === month; });
-  $('x-list').innerHTML = list.map(function (x) {
-    return '<tr><td>' + esc(x.type) + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
+  var sel = $('x-year'), ys = deductYears(), y = sel.value || todayStr().slice(0, 4);
+  if (ys.indexOf(y) < 0) y = ys[ys.length - 1];
+  sel.innerHTML = ys.map(function (x) { return '<option' + (x === y ? ' selected' : '') + '>' + x + '</option>'; }).join('');
+  ['x-month', 'xp-month'].forEach(function (id) { if (!$(id).value || $(id).value.slice(0, 4) !== y) $(id).value = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12'; });
+  var names = payoutNames();
+  $('xp-names').innerHTML = names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
+  $('xp-chips').innerHTML = names.map(function (n) { return '<button type="button" class="who' + ($('xp-who').value === n ? ' on' : '') + '" onclick="$(\'xp-who\').value=\'' + jsq(n) + '\';renderDeductTab()">' + esc(n) + '</button>'; }).join('');
+  var list = view().deduct.filter(function (x) { return String(x.month || '').slice(0, 4) === y; }).sort(function (a, b) { return a.month < b.month ? -1 : a.month > b.month ? 1 : 0; });
+  $('x-list-h').textContent = y + ' 年的分紅和扣除';
+  var h = '', last = '', tot = 0;
+  list.forEach(function (x) {
+    if (x.month !== last) { last = x.month; h += '<tr class="mh"><th colspan="4">' + Number(x.month.slice(5, 7)) + ' 月</th></tr>'; }
+    tot += Number(x.amount || 0);
+    var t = x.type === '股東分紅（已發）' ? '股東分紅' : x.type;
+    h += '<tr><td class="nowrap">' + esc(t) + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
       '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delDeduct(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
-  }).join('') || '<tr><td class="muted">這個月沒有扣除項目</td></tr>';
+  });
+  $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
+}
+// 記錄實際發出的股東分紅：設定裡的股東（浩勤、豐吉…）記「股東分紅（已發）」；其他人（佳茹、Nina…）記「其他扣除・某某分紅」
+function addPayout() {
+  var who = $('xp-who').value.trim(), amt = v('xp-amount'), month = $('xp-month').value;
+  if (!who) return toast('請選股東');
+  if (isNaN(amt) || !amt) return toast('請填金額');
+  if (!month) return toast('請選月份');
+  var isPartner = (ST.snap.config.partners || []).some(function (p) { return p.name === who; });
+  enqueue('deduct.add', { id: uid(), month: month, type: isPartner ? '股東分紅（已發）' : '其他扣除', amount: amt, note: isPartner ? who : who + '分紅' });
+  $('xp-amount').value = '';
+  renderDeductTab();
+  toast('已記錄 ' + who + ' ' + money(amt) + ' ✓');
 }
 function addDeduct() {
   var amt = v('x-amount');
   if (isNaN(amt) || !amt) return toast('請填金額');
+  if (!$('x-month').value) return toast('請選月份');
   enqueue('deduct.add', { id: uid(), month: $('x-month').value, type: $('x-type').value, amount: amt, note: $('x-note').value });
   $('x-amount').value = ''; $('x-note').value = '';
   renderDeductTab();
@@ -1357,7 +1402,7 @@ function renderYearTab() {
   var h = '<div class="kpis">' + kpi(cur + ' 盈餘', carry + sum(months, function (m) { return m.profit; }), '今年 ' + money(sum(months, function (m) { return m.profit; })) + '＋上一年結餘 ' + money(carry), true) +
     kpi('可分配給股東', sum(months, function (m) { return m.dist; })) +
     kpi('年底結餘', months.length ? bal[months[months.length - 1].month] : carry, '上一年結餘 ' + money(carry) + '｜已發分紅 ' + money(sum(months, function (m) { return m.paid || 0; }))) +
-    kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th>' +
+    kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
     cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' + carryRow;
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
@@ -1386,13 +1431,12 @@ function renderYearTab() {
     return '<tr class="' + cls + '"><th>' + name + '</th><td class="n">' + sum(list, function (m) { return m.days; }) + '</td>' +
       dcols.map(function (c, i) { var v = dv(list, c[1]) * (i === 0 ? 1 : -1); return '<td class="n' + (i === 0 ? ' em' : '') + sgn(v) + '">' + money(v) + '</td>'; }).join('') + '</tr>';
   };
-  h += '<div class="h2row"><h2>平均細項</h2><select onchange="setYMode(this.value)"><option value="day"' + (perDay ? ' selected' : '') + '>每個工作天平均</option><option value="total"' + (perDay ? '' : ' selected') + '>每月合計</option></select></div><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
+  h += '<div class="h2row"><h2>平均細項</h2><select onchange="setYMode(this.value)"><option value="day"' + (perDay ? ' selected' : '') + '>每個工作天平均</option><option value="total"' + (perDay ? '' : ' selected') + '>每月合計</option></select></div><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + (dcols.length + 1) * 84) + 'px"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
     dcols.map(function (c, i) { return '<th class="n' + (i >= 5 ? ' cat' : '') + '">' + esc(c[0]) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
     if (!qm.length) return;
     qm.forEach(function (m) { h += drow([m], label(m), ''); });
-    h += drow(qm, '<span class="qtag">Q' + q + '</span><small>' + (perDay ? '平均' : '合計') + '</small>', 'qrow');
   });
   h += drow(months, cur + (perDay ? ' 全年平均' : ' 全年'), 'yrow') + '</tbody></table></div>';
   h += '<p class="muted">電費、水費是從「固定／其他支出」裡項目名稱有「電費」「水費」的金額抓的。季、全年的每天平均＝合計 ÷ 總工作天。</p>';

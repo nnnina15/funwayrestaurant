@@ -231,6 +231,9 @@
     background: transparent; border: 0; color: var(--muted); display: flex; align-items: center; justify-content: center;
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
   .pw .eye.on { color: var(--brand); }
+  .xlist tr.mh th { text-align: left; background: var(--soft); font-size: 14px; padding: 6px 10px; }
+  .xlist tr.yt td, .xlist tr.yt th { font-weight: 800; border-top: 2px solid var(--amber); }
+  .chips .who.on { background: var(--brand); color: #fff; }
   .pinrule { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .pinrule span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
   .pinrule span.ok { background: color-mix(in srgb, var(--ok) 15%, var(--card)); color: var(--ok); font-weight: 700; }
@@ -287,6 +290,10 @@
   .ytable tr.qrow th { white-space: nowrap; }
   .ytable tr.carry th, .ytable tr.carry td { background: var(--soft); color: var(--muted); font-weight: 700; }
   .ytable td.bal { background: color-mix(in srgb, var(--amber) 9%, transparent); }
+  /* 年總覽：數字欄一樣寬（月份欄固定），欄位多時左右滑 */
+  .ytable.eq { table-layout: fixed; width: 100%; }
+  .ytable.eq th:first-child { width: 128px; }
+  .ytable.eq th.n { width: auto; text-align: right; }
   .ytable .qtag { display: inline-block; background: var(--amber); color: #3d2600; font-weight: 800; font-size: 12px; line-height: 1; padding: 4px 7px; border-radius: 6px; margin-right: 6px; vertical-align: 1px; }
   .ytable tr.qrow th small { color: var(--muted); font-weight: 600; font-size: 13px; }
   .ytable tr.yrow th, .ytable tr.yrow td { background: var(--yrow); font-weight: 800; border-top: 2px solid var(--amber); }
@@ -588,18 +595,30 @@
   </section>
 
   <section id="tab-deduct" class="hide">
+    <div><label>年份</label><select id="x-year" onchange="onDeductYear()"></select></div>
+    <div class="card">
+      <h2>記錄股東分紅（實際發出）</h2>
+      <p class="muted">每次真的發分紅時記一筆（中正：1、4、7、10 月）。年總覽的分紅、結餘就是照這裡算。</p>
+      <div class="grid3">
+        <div><label>月份</label><input id="xp-month" type="month"></div>
+        <div><label>股東</label><input id="xp-who" list="xp-names" placeholder="例：浩勤" autocomplete="off"><datalist id="xp-names"></datalist></div>
+        <div><label>金額</label><input id="xp-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this)"></div>
+      </div>
+      <div class="chips" id="xp-chips"></div>
+      <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
+    </div>
     <div class="card">
       <h2>分配前扣除</h2>
       <p class="muted">股東分紅前要先扣掉的錢：員工分紅（每月不一定）、年終預留…</p>
-      <label>月份</label><input id="x-month" type="month" onchange="renderDeductTab()">
-      <div class="grid2">
+      <div class="grid3">
+        <div><label>月份</label><input id="x-month" type="month"></div>
         <div><label>類型</label><select id="x-type"></select></div>
         <div><label>金額</label><input id="x-amount" inputmode="decimal"></div>
       </div>
       <label>備註（例：Q4 員工季分紅）</label><input id="x-note">
       <button class="primary" onclick="addDeduct()">新增</button>
     </div>
-    <div class="card"><h2>這個月的扣除</h2><table><tbody id="x-list"></tbody></table></div>
+    <div class="card"><h2 id="x-list-h">這一年的分紅和扣除</h2><table class="xlist"><tbody id="x-list"></tbody></table></div>
   </section>
 
   <section id="tab-overview" class="hide">
