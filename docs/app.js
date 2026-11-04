@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.8.7';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.8.8';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1708,21 +1708,22 @@ function renderYearTab() {
   var cols = ['月盈餘', '分紅合計'].concat(people, ['員工分紅', '存年終', '其他扣除'], hasLoan ? ['借還款'] : [], ['結餘']);
   var neg = function (v) { return v ? td(-v) : '<td class="n"></td>'; };
   var rowOf = function (list, name, cls) {
-    var tot = sum(list, function (m) { return paidOf(m) + m.bonus + m.reserve; });   // 分紅合計：股東＋店長／固定分紅＋員工分紅＋存年終
+    var tot = sum(list, function (m) { return paidOf(m) + m.bonus; });   // 分紅合計：股東＋店長／固定分紅＋員工分紅（不含存年終）
     return '<tr class="' + cls + '"><th>' + name + '</th>' + td(sum(list, function (m) { return m.profit; })) +
       (tot ? td(-tot, 'em') : '<td class="n"></td>') +
       people.map(function (p) { return neg(sum(list, function (m) { return payBy[m.month + '|' + p] || 0; })); }).join('') +
       neg(sum(list, function (m) { return m.bonus; })) + neg(sum(list, function (m) { return m.reserve; })) + neg(sum(list, function (m) { return otherBy[m.month] || 0; })) +
       (hasLoan ? neg(sum(list, function (m) { return (m.loan || 0) - (m.repay || 0); })) : '') +
-      td(sum(list, function (m) { return m.profit; }) - tot - sum(list, function (m) { return otherBy[m.month] || 0; }), 'em bal') + '</tr>';   // 結餘＝這個月（這一年）盈餘−分紅合計−其他扣除
+      td(sum(list, function (m) { return m.profit - m.reserve - (otherBy[m.month] || 0); }) - tot, 'em bal') + '</tr>';   // 結餘＝這個月（這一年）盈餘−分紅合計−其他扣除
   };
   var carryRow = '<tr class="carry"><th>上一年結餘</th>' + cols.map(function (c, i) { return i === cols.length - 1 ? td(carry, 'em bal') : '<td></td>'; }).join('') + '</tr>';
   var yDays = sum(months, function (m) { return m.days; }), yAct = sum(months, function (m) { return m.actual; });
   // 今年盈餘：扣掉分紅（股東＋店長／固定分紅＋員工分紅＋存年終）和其他扣除之後，今年留下來的錢
-  var yProfit = sum(months, function (m) { return m.profit; }), yPaid = sum(months, function (m) { return paidOf(m) + m.bonus + m.reserve; });
+  var yProfit = sum(months, function (m) { return m.profit; }), yPaid = sum(months, function (m) { return paidOf(m) + m.bonus; });
+  var yRes = sum(months, function (m) { return m.reserve; });
   var yDed = sum(months, function (m) { return otherBy[m.month] || 0; });
-  // 當年盈餘＝月盈餘合計（年表第一欄）−當年分紅合計−其他扣除＋上一年盈餘
-  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', yProfit - yPaid - yDed + carry, '月盈餘合計 ' + money(yProfit) + '－分紅 ' + money(yPaid) + (yDed ? '－扣除 ' + money(yDed) : '') + '＋上一年盈餘 ' + money(carry), true) +
+  // 當年盈餘＝月盈餘合計−當年分紅合計（含員工分紅）−存年終−其他扣除＋上一年盈餘
+  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', yProfit - yPaid - yRes - yDed + carry, '月盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－存年終 ' + money(yRes) + (yDed ? '－其他扣除 ' + money(yDed) : '') + '＋上一年盈餘 ' + money(carry), true) +
     kpi('可分配給股東', sum(months, function (m) { return m.dist; })) +
     kpi('年底結餘', months.length ? bal[months[months.length - 1].month] : carry, '上一年結餘 ' + money(carry) + '｜已發分紅 ' + money(sum(months, function (m) { return m.paid || 0; }))) +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
@@ -1733,7 +1734,7 @@ function renderYearTab() {
     qm.forEach(function (m) { h += rowOf([m], label(m), ''); });   // 盈餘與分紅：像舊表一樣不放季合計
   });
   h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
-  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝當月盈餘−分紅合計−其他扣除，也就是那個月分完還留下的錢；全年那列是今年加總。上面「年底結餘」卡片才有加上一年留下來的（借給員工的錢另外看「借還款」）。每月「應該分多少」請看「月」總覽。</p>';
+  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝當月盈餘−分紅合計−存年終−其他扣除，也就是那個月分完還留下的錢；全年那列是今年加總。上面「年底結餘」卡片才有加上一年留下來的（借給員工的錢另外看「借還款」）。每月「應該分多少」請看「月」總覽。</p>';
 
   // 表二：平均細項
   var catSet = {}; R.cats.forEach(function (c) { if (c.month.slice(0, 4) === cur) catSet[c.cat] = (catSet[c.cat] || 0) + c.amount; });
