@@ -269,7 +269,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   console.log('帳號登入、切店、改 PIN ✓');
   // 裝置：管理可以改員工名單、進貨分類；字體大小併進「這台裝置」，卡片順序：常用項目 → 員工 → 分類
   await B.pg.click('#tb-settings');
-  assert.deepStrictEqual(await B.pg.$$eval('#tab-settings > .card:not(.hide) h2', h => h.map(x => x.textContent)).then(x => x.slice(1, 4)), ['常用項目設定', '員工名單（大埔店）', '進貨分類（大埔店）']);
+  assert.deepStrictEqual(await B.pg.$$eval('#tab-settings > .card:not(.hide) h2', h => h.map(x => x.textContent)).then(x => x.slice(0, 3)), ['這台裝置', '預設', '更改 PIN']);
+  assert.deepStrictEqual(await B.pg.$$eval('#pe-uses button', b => b.map(x => x.textContent)), ['每日結帳・支出明細', '固定／其他支出', '人事', '員工名單', '進貨分類']);
+  await B.pg.click('#pe-uses button:has-text("員工名單")');
   await B.pg.click('text=＋ 新增員工');
   await B.pg.fill('.ee-item.open .ee-body > label input', '阿寶');
   await B.pg.fill('.ee-nums label:has-text("月薪") input', '45000');
@@ -279,6 +281,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tb-payroll');
   assert.ok((await B.pg.textContent('#s-roster')).includes('＋阿寶'), '人事頁馬上有阿寶');
   await B.pg.click('#tb-settings');
+  await B.pg.click('#pe-uses button:has-text("進貨分類")');
   await B.pg.click('text=＋ 新增分類');
   await B.pg.fill('.ce-row:last-child input >> nth=0', '飲料');
   await B.pg.click('#ce-save');
