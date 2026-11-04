@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.6.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.6.3';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1100,7 +1100,7 @@ function applyFixed() {
     var hr = take(function (x) { return hasRate(x) && !SLIP_RE.test(String(x.item || '')); });
     if (!hr) hr = { item: '時薪', hours: '', rate: emp && emp.hourly || '', kind: '薪資', auto: true };
     if (String(hr.rate === undefined || hr.rate === null ? '' : hr.rate) === '') hr.rate = emp && emp.hourly || '';
-    hr.fixed = true; hr.hourly = true; hr.rateLock = String(hr.rate) !== '';
+    hr.fixed = true; hr.hourly = true;   // 時薪先帶設定（或上次存的），可以再改
     fixed.push(hr);
   }
   ST.items = fixed.concat(ST.items);
@@ -1132,7 +1132,7 @@ function renderItems() {
   var kinds = ST.snap.config.kinds || ['薪資', '公司負擔', '預支'];
   $('s-items').innerHTML = ST.items.map(function (it, i) {
     var amt = hasRate(it)
-      ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="上班時數" inputmode="text" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal"' + (it.rateLock ? ' readonly tabindex="-1" class="ro-in"' : '') + ' oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
+      ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="上班時數" inputmode="text" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal"' + '' + ' oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
       : '<input' + (it.neg ? ' class="neg-in"' : '') + ' value="' + esc(it.amount) + '" inputmode="text" placeholder="' + (it.neg ? (it.fixed ? '扣多少' : '扣多少（打正數就好）') : (it.fixed ? '金額' : '金額（扣款打負數）')) + '" oninput="setItem(' + i + ',\'amount\',this.value)">';
     var fx = it.fixed;
     if (fx) return '<div class="item-row fixed' + (hasRate(it) ? ' rate' : '') + '"><span class="fx-name">' + esc(it.item) + '</span>' + amt + '</div>';

@@ -125,8 +125,8 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-payroll-fixed.png'), fullPage: false });
   await B.pg.click('#s-roster button:has-text("範例計時")');
   assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('1/2'), '換成範例計時（剛剛沒存的範例正職不留在名單）');
-  // 計時：固定一行「上班時數 × 時薪」，時薪照設定（250）不能改、不能刪
-  assert.strictEqual(await B.pg.inputValue('.hours input >> nth=1'), '250'); assert.ok(await B.pg.$eval('.hours input >> nth=1', e => e.readOnly), '時薪固定');
+  // 計時：固定一行「上班時數 × 時薪」，時薪先帶設定（250），可以調，這行不能刪
+  assert.strictEqual(await B.pg.inputValue('.hours input >> nth=1'), '250'); assert.ok(!(await B.pg.$eval('.hours input >> nth=1', e => e.readOnly)), '時薪可以調');
   assert.strictEqual(await B.pg.$$eval('.item-row >> nth=0', r => r[0].querySelector('.danger') === null), true, '時薪那行不能刪');
   await B.pg.fill('.hours input >> nth=0', '106'); await B.pg.dispatchEvent('.hours input >> nth=0', 'input');
   await B.pg.click('text=＋ 新增項目'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=0', '加班費'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=1', '700'); await B.pg.dispatchEvent('.item-row >> nth=1 >> input >> nth=1', 'input');
