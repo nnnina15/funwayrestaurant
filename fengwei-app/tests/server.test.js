@@ -33,6 +33,12 @@ const two = login('雙店店長', 'Temp#0002', { newPin: 'Two#5678x', store: '�
 assert.deepStrictEqual(two.stores, ['大埔店', '中正店']); assert.strictEqual(two.store, '中正店');
 // 帳號打錯、PIN 打錯都進不了（不透露是哪個錯）
 assert.ok(login('大埔店長 ', 'Shop#1234').ok, '前後空白可以容忍');
+// 帳號不分大小寫：Nina 建立的帳號，打 nina、NINA 都能登入，而且回傳試算表上的寫法
+addAcc('Nina', '店長', '大埔店', 'Temp#0003');
+const nina = login('nina', 'Temp#0003', { newPin: 'Nina#2026x' });
+assert.ok(nina.ok, '小寫帳號要能登入'); assert.strictEqual(nina.account, 'Nina');
+assert.ok(login('NINA', 'Nina#2026x').ok, '大寫帳號要能登入');
+assert.ok(g.post({ action: 'sync', account: 'nINa', token: nina.token, store: '大埔店', ops: [] }).ok, '同步時大小寫不同也認得');
 assert.strictEqual(login('大埔店', 'Shop#1234').error.startsWith('帳號或 PIN 錯誤'), true);
 assert.strictEqual(login('大埔店長', 'Shop#12345').error.startsWith('帳號或 PIN 錯誤'), true);
 // 店長只能用自己有權限的店

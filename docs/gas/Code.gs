@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.2.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '新增角色「員工」（只能用每日結帳、進貨、固定／其他支出）；店長可以看總覽、人事、外送對帳、分紅扣除，也能記固定／其他支出。按「① 初始化」會把角色欄變成 管理／店長／員工 下拉選單';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.2.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '登入帳號不分大小寫（例如 Nina、nina、NINA 都可以）';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -423,7 +423,8 @@ function accounts_() {
   });
 }
 function account_(name) {
-  return accounts_().filter(function (a) { return a.name === str_(name); })[0] || null;
+  const k = str_(name).toLowerCase();   // 帳號不分大小寫
+  return accounts_().filter(function (a) { return a.name.toLowerCase() === k; })[0] || null;
 }
 // 這個帳號可以用哪些店（管理＝全部；店長＝設定裡列的店）
 function storesOf_(acc) {
@@ -463,7 +464,7 @@ function checkPin_(acc, pin) {
 }
 
 function fail_(acc, name, device) {
-  const cache = CacheService.getScriptCache(), key = 'fail_' + name;
+  const cache = CacheService.getScriptCache(), key = 'fail_' + name.toLowerCase();
   const fails = Number(cache.get(key) || 0) + 1;
   cache.put(key, String(fails), LOCK_SECONDS);
   if (fails === MAX_FAIL) alertLock_(name, device, !!acc);
@@ -472,7 +473,7 @@ function fail_(acc, name, device) {
 
 function login_(req) {
   const name = str_(req.account), pin = String(req.pin || '');
-  const cache = CacheService.getScriptCache(), key = 'fail_' + name;
+  const cache = CacheService.getScriptCache(), key = 'fail_' + name.toLowerCase();
   if (Number(cache.get(key) || 0) >= MAX_FAIL) throw new Error('錯太多次，這個帳號已鎖定 15 分鐘，請稍後再試');
   const acc = account_(name);
   if (!acc || !acc.active) throw new Error(fail_(acc, name, req.device));
