@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.5.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.5.1';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -169,6 +169,8 @@ function showView(name) {
     $('cfg-url').value = ST.cfg && !isBuiltinUrl(ST.cfg.url) ? ST.cfg.url : '';
     $('cfg-url').placeholder = DEFAULT_URL ? '空白＝用內建網址（建議）' : 'https://script.google.com/macros/s/…/exec';
     $('title').textContent = '裝置設定';
+    $('setupBack').classList.toggle('hide', !ST.cfg && !DEFAULT_URL);
+    $('setupBack').textContent = ST.sess ? '← 回 App（不改網址）' : '← 回登入畫面';
   }
   if (name === 'login') { $('title').textContent = '登入'; if (!$('login-acc').value) $('login-acc').value = LS.get('fw_lastAcc', ''); }
 }
@@ -288,6 +290,12 @@ function saveSetup() {
     ST.cfg = old;
     toast(e.network ? '連不上這個網址，請確認有網路、網址正確、部署權限是「所有人」' : '⚠ ' + e.message);
   });
+}
+
+// 不改網址，直接回去（還沒設定過就用內建網址）
+function backFromSetup() {
+  if (!ST.cfg) { if (!DEFAULT_URL) return; ST.cfg = { url: DEFAULT_URL, device: '', custom: false }; LS.set('fw_cfg', ST.cfg); }
+  if (ST.sess && ST.sess.account) enterApp(); else showView('login');
 }
 
 /* ---------- 登入（帳號＋PIN） ---------- */
