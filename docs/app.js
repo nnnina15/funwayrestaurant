@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.3.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.4.0';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -113,6 +113,13 @@ function v(id) { return expr($(id).value); }
 function showExpr(id, hint) { var s = $(id).value; var n = expr(s); $(hint).textContent = /[+-]./.test(s.slice(1)) ? (isNaN(n) ? '格式看不懂' : '＝ ' + money(n)) : ''; }
 function setNum(id, n) { $(id).value = n ? n : ''; }
 function isAdmin() { return ST.sess && ST.sess.role === 'admin'; }
+// 角色：管理（全部）／店長（看全部，人事・外送對帳・分紅扣除只能看）／員工（每日結帳、進貨、固定／其他支出）
+var ROLE_TABS = { manager: ['daily', 'purchase', 'expense', 'overview', 'payroll', 'delivery', 'deduct', 'settings'], staff: ['daily', 'purchase', 'expense', 'settings'] };
+var RO_TABS = { manager: ['payroll', 'delivery', 'deduct'] };
+var ROLE_NAMES = { admin: '管理', manager: '店長', staff: '員工' };
+function myRole() { return (ST.sess && ST.sess.role) || 'manager'; }
+function canSee(tab) { var t = ROLE_TABS[myRole()]; return !t || t.indexOf(tab) >= 0; }
+function readOnly(tab) { return (RO_TABS[myRole()] || []).indexOf(tab) >= 0; }
 
 /* ---------- 和 Google 溝通 ---------- */
 // 手機有網路，但連不到試算表的同步服務（試算表程式剛更新需要授權、出錯，或同步網址換了）
@@ -392,7 +399,7 @@ function enterApp() {
   ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
   ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });
   $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).filter(function (x) { return x !== '股東分紅（已發）'; }).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
-  var mine = TABS.filter(function (x) { return !x[2] || isAdmin(); });
+  var mine = TABS.filter(function (x) { return canSee(x[0]); });
   $('tabs').innerHTML = mine.map(function (x) {
     return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
   }).join('');
@@ -404,7 +411,7 @@ function enterApp() {
     return '<button onclick="closeMore();showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
   }).join('');
   ST.moreTabs = rest.map(function (x) { return x[0]; });
-  if (TABS.some(function (x) { return x[0] === ST.tab && x[2]; }) && !isAdmin()) ST.tab = 'daily';
+  if (!canSee(ST.tab)) ST.tab = 'daily';
   showTab(ST.tab);
   renderStatus();
 }
@@ -462,6 +469,7 @@ function showTab(name) {
   pinPickers(name);
   ST.hiddenLbls = ST.pinned.lbl || [];
   document.body.classList.toggle('page-wide', name === 'overview' && ST.ov !== 'month');
+  TABS.forEach(function (x) { var sec = $('tab-' + x[0]); if (sec) sec.classList.toggle('ro', readOnly(x[0])); });   // 店長：只能看
   TABS.forEach(function (x) {
     $('tab-' + x[0]).classList.toggle('hide', x[0] !== name);
     var b = $('tb-' + x[0]); if (b) b.classList.toggle('on', x[0] === name);
@@ -591,7 +599,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.1.2';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.2.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -1569,7 +1577,7 @@ function renderSettingsTab() {
   applyFont();
   if (!ST.swVersion && navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
   $('set-info').innerHTML =
-    '帳號：<b>' + esc(ST.sess.account) + '</b>（' + (isAdmin() ? '管理' : '店長') + '）<br>' +
+    '帳號：<b>' + esc(ST.sess.account) + '</b>（' + (ROLE_NAMES[myRole()] || '店長') + '）<br>' +
     '可用的店：' + esc((ST.sess.stores || [ST.sess.store]).join('、')) + '｜目前：<b>' + esc(ST.sess.store) + '</b><br>' +
     'App 版本：' + APP_VERSION + (ST.swVersion && ST.swVersion !== APP_VERSION ? '（離線快取 ' + esc(ST.swVersion) + '）' : '') + '<br>' +
     '網路：' + (navigator.onLine === false ? '<span class="warn">離線</span>' : '<span class="ok">連線中</span>') + '<br>' +

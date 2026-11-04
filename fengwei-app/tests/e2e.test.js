@@ -180,10 +180,15 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   const mb = await B.pg.textContent('#m-body');
   assert.ok(mb.includes('線上支付手續費') && !mb.includes('線上支付手續費（估計）'), '對帳後不再是估計');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-summary.png'), fullPage: true });
-  // 店長看不到管理分頁
+  // 店長：看得到總覽、人事、外送對帳、分紅扣除；人事／外送／分紅只能看
   const tabsA = await A.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent));
-  assert.ok(!tabsA.includes('人事') && !tabsA.includes('總覽'));
-  assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '裝置'], '店長只有三個分頁');
+  assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '固定/其他支出', '總覽', '人事', '外送對帳', '分紅扣除', '裝置'], '店長的分頁');
+  await A.pg.click('#tb-payroll'); await A.pg.waitForTimeout(200);
+  assert.ok(await A.pg.isVisible('#tab-payroll .ro-note'), '店長在人事頁看到「只能看」');
+  assert.ok(!(await A.pg.isVisible('#tab-payroll button.ghost')), '店長看不到新增按鈕');
+  await A.pg.click('#tb-expense'); await A.pg.waitForTimeout(200);
+  assert.ok(!(await A.pg.isVisible('#tab-expense .ro-note')) && await A.pg.isVisible('#tab-expense .primary'), '固定／其他支出店長可以新增');
+  await A.pg.click('#tb-daily');
   console.log('多裝置 + 權限 ✓');
   // 常用項目設定：把每日結帳的清單改成「豬肉、米」，存檔同步後平板（店長）也看得到
   await B.pg.click('#tb-settings');

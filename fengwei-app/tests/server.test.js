@@ -41,7 +41,7 @@ assert.strictEqual(x.ok, false); assert.ok(x.error.includes('權限'));
 assert.strictEqual(g.post({ action: 'sync', account: '雙店店長', token: two.token, store: '大埔店', ops: [] }).ok, true, '雙店店長可以切到大埔店');
 assert.ok(!mgr.config.categories.some(c => c.cat === '牛亨' && !c.to), '牛亨要有停用月份');
 assert.strictEqual(adm.config.partners.length, 3);
-assert.strictEqual(mgr.config.partners.length, 0, '店長看不到股東資料');
+assert.strictEqual(mgr.config.partners.length, 3, '店長看得到股東比例（App 裡分紅扣除只能看）');
 
 const op = (type, data) => ({ id: Math.random().toString(36).slice(2), type, data });
 
@@ -56,8 +56,21 @@ r = g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mg
   op('expense.add', { id: 'E20261001abc', month: '2026-10', type: '其他', item: '燉滷', amount: 500 }),
   op('expense.add', { id: 'x1', month: '2026-10', type: '固定', item: '房租', amount: 1 })
 ]});
-assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'error'], '店長只能記結帳單產生的其他支出');
-g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [op('expense.del', { id: 'E20261001abc' })] });
+assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'ok'], '店長可以記固定／其他支出');
+g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [op('expense.del', { id: 'E20261001abc' }), op('expense.del', { id: 'x1' })] });
+// 員工：只能每日結帳、進貨、固定／其他支出；拿不到人事、外送、分紅、股東
+g.sheets['設定_帳號'].cells.push(['大埔員工', '員工', '大埔店', '是', 'Staff#2026a', '', '']);
+const stf = g.post({ action: 'login', account: '大埔員工', pin: 'Staff#2026a', newPin: 'Staff#2026b' });
+assert.ok(stf.ok && stf.role === 'staff', '員工角色');
+assert.deepStrictEqual([stf.data.payroll.length, stf.data.delivery.length, stf.data.deduct.length, stf.config.partners.length, stf.config.employees.length], [0, 0, 0, 0, 0], '員工看不到人事、外送、分紅、股東、員工名單');
+r = g.post({ action: 'sync', store: '大埔店', account: stf.account, token: stf.token, ops: [
+  op('expense.add', { id: 'st1', month: '2026-10', type: '其他', item: '清潔劑', amount: 120 }),
+  op('payroll.upsert', { month: '2026-10', name: 'X', items: [], editedAt: '2026-10-01 21:00:00' }),
+  op('deduct.add', { id: 'dd1', month: '2026-10', type: '員工分紅', amount: 1 })
+]});
+assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'error', 'error'], '員工可以記支出，不能改人事、分紅');
+assert.ok(r.results[1].error.includes('員工沒有權限'));
+g.post({ action: 'sync', store: '大埔店', account: stf.account, token: stf.token, ops: [op('expense.del', { id: 'st1' })] });
 assert.strictEqual(g.rows(S.DAILY)[0]['應有現金'], 23605);
 assert.strictEqual(g.rows(S.DAILY)[0]['現金差額'], 0);
 

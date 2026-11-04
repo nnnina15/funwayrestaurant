@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.1.2';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '登入變快很多（PIN 檢查不再每一圈讀設定）；修正新帳號第一次登入會逾時、顯示「連不到同步服務」';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.2.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '新增角色「員工」（只能用每日結帳、進貨、固定／其他支出）；店長可以看總覽、人事、外送對帳、分紅扣除，也能記固定／其他支出。按「① 初始化」會把角色欄變成 管理／店長／員工 下拉選單';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -60,7 +60,8 @@ const DEFAULT_PRESETS = [
   ['人事', '勞退(公司)', '公司負擔', '加'], ['人事', '健保(公司)', '公司負擔', '加'], ['人事', '勞保(公司)', '公司負擔', '加']
 ];
 const PRESET_USES = ['每日結帳', '固定支出', '人事'];
-const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del', 'payroll.slip'];
+// 店長、員工都能做的：每日結帳、進貨、固定／其他支出（日結的 PT／預支會自動記到人事）。其他只有管理能改
+const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del', 'expense.add', 'expense.del', 'payroll.slip'];
 
 /* ============================================================
  * 試算表選單 & 初始化
@@ -221,6 +222,12 @@ function setup() {
   ]);
 
   seed_(S.ACCOUNT, [['管理員', '管理', '全部', '是', 'Funway#2026', '', '']]);
+  // 角色下拉選單：管理／店長／員工
+  try {
+    const ash = ss.getSheetByName(S.ACCOUNT), ri = cols_(ash, S.ACCOUNT).indexOf('角色(管理/店長)');
+    if (ri >= 0) ash.getRange(2, ri + 1, Math.max(ash.getMaxRows() - 1, 1), 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(['管理', '店長', '員工'], true).setAllowInvalid(false).build());
+  } catch (e) {}
   seed_(S.PRESET, DEFAULT_PRESETS.map(function (p) { return ['全部'].concat(p); }));
   secret_();   // 建立登入用的密鑰
   MailApp.getRemainingDailyQuota();   // 先要求寄信權限，之後鎖定通知才寄得出去
@@ -410,7 +417,7 @@ const MAX_FAIL = 5, LOCK_SECONDS = 15 * 60;
 
 function accounts_() {
   return rows_(S.ACCOUNT).filter(function (r) { return str_(r['帳號']); }).map(function (r) {
-    return { name: str_(r['帳號']), role: str_(r['角色(管理/店長)']) === '管理' ? 'admin' : 'manager',
+    return { name: str_(r['帳號']), role: ({ '管理': 'admin', '員工': 'staff' })[str_(r['角色(管理/店長)'])] || 'manager',   // 管理／店長／員工
       stores: str_(r['店別(全部 或 店名,店名)']) || '全部', active: str_(r['啟用(是/否)']) !== '否',
       temp: str_(r['臨時PIN']), hash: str_(r['PIN(加密，勿改)']), _row: r._row };
   });
@@ -538,7 +545,7 @@ function sync_(req) {
       ops.forEach(function (op) {
         try {
           const fromSlip = /^expense\.(add|del)$/.test(op.type) && /^E\d{8}/.test(str_((op.data || {}).id));   // 每日結帳自動產生的其他支出
-          if (role !== 'admin' && MANAGER_OPS.indexOf(op.type) < 0 && !fromSlip) throw new Error('店長沒有權限：' + op.type);
+          if (role !== 'admin' && MANAGER_OPS.indexOf(op.type) < 0 && !fromSlip) throw new Error((role === 'staff' ? '員工' : '店長') + '沒有權限：' + op.type);
           const st = applyServerOp_(s.name, op);
           if (st === 'ok') changed++;
           results.push({ id: op.id, status: st });
@@ -740,14 +747,14 @@ function byId_(store, id) { return function (x) { return str_(x['店別']) === s
 /* ---------- 回傳給 App 的資料 ---------- */
 
 function pull_(s, role) {
-  const all = role === 'admin';
-  const since = prevMonth_(Utilities.formatDate(new Date(), TZ, 'yyyy-MM'));   // 店長只拿上個月起
+  const all = role === 'admin' || role === 'manager';   // 管理、店長：全部資料（店長在 App 裡人事／外送／分紅只能看）
+  const since = prevMonth_(Utilities.formatDate(new Date(), TZ, 'yyyy-MM'));   // 員工只拿上個月起的結帳、進貨、支出
   const mine = function (r) { return r.store === s.name; };
   const recent = function (r) { return all || r.date.slice(0, 7) >= since; };
   const data = {
     daily: rows_(S.DAILY).map(rec_.daily).filter(mine).filter(recent),
     purchase: rows_(S.PURCHASE).map(rec_.purchase).filter(mine).filter(recent),
-    expense: all ? rows_(S.EXPENSE).map(rec_.expense).filter(mine) : [],
+    expense: rows_(S.EXPENSE).map(rec_.expense).filter(mine).filter(function (r) { return all || r.month >= since; }),
     payroll: all ? rows_(S.PAYROLL).map(rec_.payroll).filter(mine) : [],
     delivery: all ? deliveryGroups_(rows_(S.DELIVERY)).filter(mine) : [],
     deduct: all ? rows_(S.DEDUCT).map(rec_.deduct).filter(mine) : [],

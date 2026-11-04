@@ -234,6 +234,12 @@
   .xlist tr.mh th { text-align: left; background: var(--soft); font-size: 14px; padding: 6px 10px; }
   .xlist tr.yt td, .xlist tr.yt th { font-weight: 800; border-top: 2px solid var(--amber); }
   .chips .who.on { background: var(--brand); color: #fff; }
+  /* 店長只能看的頁：隱藏新增／儲存／刪除，輸入格不能改 */
+  .ro-note { display: none; }
+  section.ro .ro-note { display: block; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--soft); color: var(--muted); font-weight: 600; font-size: 14px; }
+  section.ro .primary, section.ro .danger, section.ro .del-x, section.ro button.ghost, section.ro .chips, section.ro .edit-card,
+  section.ro .presets-h, section.ro label.split { display: none !important; }
+  section.ro input, section.ro select:not(#x-year), section.ro textarea { pointer-events: none; }
   .pinrule { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .pinrule span { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
   .pinrule span.ok { background: color-mix(in srgb, var(--ok) 15%, var(--card)); color: var(--ok); font-weight: 700; }
@@ -545,6 +551,7 @@
   </section>
 
   <section id="tab-payroll" class="hide">
+    <p class="ro-note">🔒 店長只能看，不能修改（要改請找管理）</p>
     <div class="card">
       <h2>人事薪資</h2>
       <label>月份</label><input id="s-month" type="month" onchange="onPayMonth()">
@@ -567,6 +574,7 @@
   </section>
 
   <section id="tab-delivery" class="hide">
+    <p class="ro-note">🔒 店長只能看，不能修改（要改請找管理）</p>
     <div class="card">
       <h2>外送／線上支付對帳</h2>
       <label>月份</label><input id="v-month" type="month" onchange="renderDeliveryTab()">
@@ -595,8 +603,9 @@
   </section>
 
   <section id="tab-deduct" class="hide">
+    <p class="ro-note">🔒 店長只能看，不能修改（要改請找管理）</p>
     <div><label>年份</label><select id="x-year" onchange="onDeductYear()"></select></div>
-    <div class="card">
+    <div class="card edit-card">
       <h2>記錄股東分紅（實際發出）</h2>
       <p class="muted">每次真的發分紅時記一筆（中正：1、4、7、10 月）。年總覽的分紅、結餘就是照這裡算。</p>
       <div class="grid3">
@@ -607,7 +616,7 @@
       <div class="chips" id="xp-chips"></div>
       <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
     </div>
-    <div class="card">
+    <div class="card edit-card">
       <h2>分配前扣除</h2>
       <p class="muted">股東分紅前要先扣掉的錢：員工分紅（每月不一定）、年終預留…</p>
       <div class="grid3">
