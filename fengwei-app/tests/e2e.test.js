@@ -112,10 +112,17 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#s-roster button:has-text("範例正職")');
   assert.ok((await B.pg.textContent('#s-emps')).includes('範例正職'), '點了才加入名單');
   assert.ok((await B.pg.textContent('#s-name')).includes('1/2'), '範例正職，加上日結自動記的 PT');
-  assert.ok(await B.pg.isHidden('#s-temp'), '名單上的人不能改名／改分組');
+  assert.ok(await B.pg.isVisible('#s-temp .seg') && !(await B.pg.$('#s-temp .rename')), '名單上的人可以選正職／計時，但不能改名');
+  assert.ok(await B.pg.isVisible('#s-temp .del-emp'), '要有刪除這位');
   // 正職：月薪、扣健保(自付)、扣勞保(自付) 固定在最上面，沒有刪除鈕，常用項目也不再出現
-  assert.deepStrictEqual(await B.pg.$$eval('.item-row.fixed', rs => rs.map(r => r.querySelector('input').value + (r.querySelector('.danger') ? 'X' : ''))), ['月薪', '扣健保(自付)', '扣勞保(自付)'], '正職固定三項');
+  assert.deepStrictEqual(await B.pg.$$eval('.item-row.fixed', rs => rs.map(r => r.querySelector('.fx-name').textContent + (r.querySelector('.danger') || r.querySelector('select') ? 'X' : ''))), ['月薪', '扣健保(自付)', '扣勞保(自付)'], '正職固定三項');
   assert.ok(!(await B.pg.textContent('#s-presets')).includes('扣健保'), '固定項目不能再加一次');
+  // 換成計時：固定項目變成「上班時數 × 時薪」；再換回正職
+  await B.pg.click('#s-temp .seg button:has-text("計時")');
+  assert.strictEqual(await B.pg.$$eval('.item-row.fixed', rs => rs.length), 1); assert.ok(await B.pg.isVisible('.item-row.fixed .hours'), '計時要有時數×時薪');
+  await B.pg.click('#s-temp .seg button:has-text("正職")');
+  assert.strictEqual(await B.pg.$$eval('.item-row.fixed', rs => rs.length), 3);
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-payroll-fixed.png'), fullPage: false });
   await B.pg.click('#s-roster button:has-text("範例計時")');
   assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('1/2'), '換成範例計時（剛剛沒存的範例正職不留在名單）');
   // 計時：固定一行「上班時數 × 時薪」，時薪照設定（250）不能改、不能刪
@@ -143,13 +150,20 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok((await B.pg.textContent('#s-name')).includes('小王'), '改名');
   B.pg.__ans = undefined;
   await B.pg.click('#s-temp .seg button:has-text("計時")');
-  await B.pg.fill('.item-row >> nth=0 >> input >> nth=1', '1500'); await B.pg.dispatchEvent('.item-row >> nth=0 >> input >> nth=1', 'input');
+  assert.strictEqual(await B.pg.$$eval('.item-row', r => r.length), 1, '選計時後，空白的「薪資」預設項目拿掉');
+  await B.pg.fill('.hours input >> nth=0', '10'); await B.pg.fill('.hours input >> nth=1', '150'); await B.pg.dispatchEvent('.hours input >> nth=1', 'input');
   await B.pg.click('text=儲存這位員工');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   const wang = g.rows(S.PAYROLL).filter(r => r['姓名'] === '小王');
   assert.ok(wang.length === 1 && wang[0]['分組'] === '計時' && wang[0]['金額'] === 1500, '小王存成計時：' + JSON.stringify(wang));
   assert.ok(!g.rows(S.PAYROLL).some(r => r['姓名'] === '臨時工'), '舊名字不留');
   const grpText = await B.pg.$$eval('#s-emps .grp', gs => gs.map(x => x.textContent));
+  // 刪除這位：小王這個月的資料拿掉
+  await B.pg.click('#s-emps button:has-text("小王")');
+  await B.pg.click('#s-temp .del-emp');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  assert.ok(!g.rows(S.PAYROLL).some(r => r['姓名'] === '小王'), '刪除這位');
+  assert.ok(!(await B.pg.textContent('#s-emps')).includes('小王'));
   assert.ok(grpText.some(t => t.startsWith('計時') && t.includes('小王')), '小王要在計時組：' + grpText.join(' / '));
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-payroll-temp.png'), fullPage: true });
   await B.pg.click('#tb-expense'); await B.pg.fill('#e-month', '2026-01'); await B.pg.dispatchEvent('#e-month', 'change');
