@@ -173,7 +173,6 @@
   .font-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 4px; padding: 8px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .font-row > span { font-weight: 700; white-space: nowrap; }
   .font-row .seg { margin: 0; }
-  .pane-note { margin: 12px 0 10px; }
   .ce-stop { margin: 0; padding: 10px 6px; font-size: 14px; color: var(--muted); }
   .ce-row.off input:first-child { color: var(--muted); text-decoration: line-through; }
   @media (max-width: 560px) { .ce-row { grid-template-columns: minmax(0, 1fr) 120px 32px 32px 24px; gap: 4px; } }
@@ -720,23 +719,24 @@
       <button class="ghost wide" onclick="logout()" style="color:var(--bad)">登出（沒上傳的資料會保留）</button>
     </div>
     <div class="card hide" id="set-presets-card">
-      <h2>預設</h2>
+      <h2>常用項目設定</h2>
+      <p class="muted">每日結帳、固定／其他支出、人事的「常用項目」按鈕，照這裡的清單和順序顯示。改完按儲存，所有裝置同步後都會更新。</p>
       <div class="chips" id="pe-uses"></div>
-      <div id="pe-pane">
-        <p class="muted pane-note">每日結帳、固定／其他支出、人事的「常用項目」按鈕，照這裡的清單和順序顯示。改完按儲存，所有裝置同步後都會更新。</p>
-        <div id="pe-list"></div>
-        <button class="ghost addline" onclick="peAdd()">＋ 新增項目</button>
-        <button class="primary" id="pe-save" onclick="peSave()">沒有變更</button>
-        <button class="ghost wide" onclick="peReset()">恢復成預設項目</button>
-      </div>
-      <div id="ee-pane" class="hide">
-        <p class="muted pane-note" id="ee-h"></p>
+      <div id="pe-list" style="margin-top:12px"></div>
+      <button class="ghost addline" onclick="peAdd()">＋ 新增項目</button>
+      <button class="primary" id="pe-save" onclick="peSave()">沒有變更</button>
+      <button class="ghost wide" onclick="peReset()">恢復成預設項目</button>
+    </div>
+    <div class="card hide" id="set-def-card">
+      <h2>預設</h2>
+      <p class="muted" id="def-note"></p>
+      <div class="chips" id="def-tabs"></div>
+      <div id="ee-pane" style="margin-top:12px">
         <div id="ee-list"></div>
         <button class="ghost addline" onclick="eeAdd()">＋ 新增員工</button>
         <button class="primary" id="ee-save" onclick="eeSave()">沒有變更</button>
       </div>
-      <div id="ce-pane" class="hide">
-        <p class="muted pane-note" id="ce-h"></p>
+      <div id="ce-pane" class="hide" style="margin-top:12px">
         <div id="ce-list"></div>
         <button class="ghost addline" onclick="ceAdd()">＋ 新增分類</button>
         <button class="primary" id="ce-save" onclick="ceSave()">沒有變更</button>

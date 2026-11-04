@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.7.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.7.2';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1727,8 +1727,7 @@ function checkUpdate() {
 }
 /* ---------- 常用項目設定（管理） ---------- */
 var PE_USES = [['每日結帳', '每日結帳・支出明細'], ['固定支出', '固定／其他支出'], ['人事', '人事']];
-// 「預設」卡片的分頁：三種常用項目＋員工名單＋進貨分類
-var SET_TABS = PE_USES.concat([['員工', '員工名單'], ['分類', '進貨分類']]);
+
 function peCatOptions(use) {
   if (use === '每日結帳') return [['進貨', categoriesFor(todayStr().slice(0, 7))], ['其他', [LINE_OTHER, LINE_PT, LINE_ADV]]];
   if (use === '固定支出') return [['', ['固定', '其他']]];
@@ -1738,16 +1737,10 @@ function renderPresetEditor() {
   if (!isAdmin()) { $('set-presets-card').classList.add('hide'); return; }
   $('set-presets-card').classList.remove('hide');
   if (!ST.pe) ST.pe = { use: '每日結帳', items: null, dirty: false };
-  var tab = ST.setTab || '每日結帳';
-  $('pe-uses').innerHTML = SET_TABS.map(function (u) {
-    return '<button class="' + (u[0] === tab ? 'on' : '') + '" onclick="setTabGo(\'' + u[0] + '\')">' + u[1] + '</button>';
-  }).join('');
-  $('pe-pane').classList.toggle('hide', tab === '員工' || tab === '分類');
-  $('ee-pane').classList.toggle('hide', tab !== '員工');
-  $('ce-pane').classList.toggle('hide', tab !== '分類');
-  if (tab === '員工') return renderEmpEditor();
-  if (tab === '分類') return renderCatEditor();
   if (!ST.pe.items) ST.pe.items = presetsFor(ST.pe.use);
+  $('pe-uses').innerHTML = PE_USES.map(function (u) {
+    return '<button class="' + (u[0] === ST.pe.use ? 'on' : '') + '" onclick="peUse(\'' + u[0] + '\')">' + u[1] + '</button>';
+  }).join('');
   var groups = peCatOptions(ST.pe.use), isPay = ST.pe.use === '人事';
   $('pe-list').innerHTML = ST.pe.items.map(function (it, i) {
     var sel = '<select onchange="peSet(' + i + ',\'cat\',this.value)">' + groups.map(function (g) {
@@ -1762,16 +1755,29 @@ function renderPresetEditor() {
   $('pe-save').disabled = !ST.pe.dirty;
   $('pe-save').textContent = ST.pe.dirty ? '儲存「' + PE_USES.filter(function (u) { return u[0] === ST.pe.use; })[0][1] + '」常用項目' : '沒有變更';
 }
-// 切換「預設」卡片的分頁（還沒存的會先問）
-function setTabGo(t) {
-  var cur = ST.setTab || '每日結帳';
+// 「預設」卡片：員工名單／進貨分類（這家店的，管理才看得到）
+var DEF_TABS = [['員工', '員工名單'], ['分類', '進貨分類']];
+function renderDefaults() {
+  if (!isAdmin()) { $('set-def-card').classList.add('hide'); return; }
+  $('set-def-card').classList.remove('hide');
+  var tab = ST.defTab || '員工';
+  $('def-tabs').innerHTML = DEF_TABS.map(function (u) {
+    return '<button class="' + (u[0] === tab ? 'on' : '') + '" onclick="defGo(\'' + u[0] + '\')">' + u[1] + '</button>';
+  }).join('');
+  $('def-note').textContent = tab === '員工'
+    ? ST.sess.store + '的員工。人事頁的「＋名字」、月薪／時薪和勞健保照這裡帶入。點名字展開修改；不做了的取消勾選「在職」就好，以前的薪資紀錄會留著。'
+    : ST.sess.store + '的進貨分類，進貨頁的分類按鈕照這裡的順序顯示。點「一直用」可以選從哪個月開始停用。';
+  $('ee-pane').classList.toggle('hide', tab !== '員工');
+  $('ce-pane').classList.toggle('hide', tab !== '分類');
+  if (tab === '員工') renderEmpEditor(); else renderCatEditor();
+}
+function defGo(t) {
+  var cur = ST.defTab || '員工';
   if (t === cur) return;
-  var dirty = cur === '員工' ? ST.ee && ST.ee.dirty : cur === '分類' ? ST.ce && ST.ce.dirty : ST.pe && ST.pe.dirty;
+  var dirty = cur === '員工' ? ST.ee && ST.ee.dirty : ST.ce && ST.ce.dirty;
   if (dirty && !confirm('這一頁還沒儲存，確定要切換？（改的內容會不見）')) return;
-  if (cur === '員工') ST.ee = null; else if (cur === '分類') ST.ce = null; else ST.pe = null;
-  ST.setTab = t;
-  if (t !== '員工' && t !== '分類') ST.pe = { use: t, items: null, dirty: false };
-  renderPresetEditor();
+  if (cur === '員工') ST.ee = null; else ST.ce = null;
+  ST.defTab = t; renderDefaults();
 }
 function peUse(u) {
   if (ST.pe.dirty && !confirm('這一類還沒儲存，確定要切換？（改的內容會不見）')) return;
@@ -1809,7 +1815,6 @@ function renderEmpEditor() {
     var src = ST.snap.config.employeesAll || ST.snap.config.employees || [];
     ST.ee = { store: ST.sess.store, open: -1, dirty: false, items: src.map(function (e) { return Object.assign({ active: true }, e); }) };
   }
-  $('ee-h').textContent = ST.sess.store + '的員工。人事頁的「＋名字」、月薪／時薪和勞健保照這裡帶入。點名字展開修改；不做了的取消勾選「在職」就好，以前的薪資紀錄會留著。';
   $('ee-list').innerHTML = ST.ee.items.map(function (e, i) {
     var pay = e.type === '計時' ? '時薪 ' + money(e.hourly || 0) : '月薪 ' + money(e.salary || 0);
     var head = '<button class="ee-head' + (i === ST.ee.open ? ' on' : '') + (e.active === false ? ' off' : '') + '" onclick="eeOpen(' + i + ')"><b>' + esc(e.name || '（未命名）') + '</b>' +
@@ -1857,7 +1862,7 @@ function eeSave() {
   ST.snap.config.employeesAll = items.map(function (o) { return Object.assign({}, o, { salary: Number(o.salary) || 0, hourly: Number(o.hourly) || 0 }); });
   ST.snap.config.employees = ST.snap.config.employeesAll.filter(function (o) { return o.active; });
   LS.set(k_('snap'), ST.snap);
-  ST.ee = null; renderPresetEditor();
+  ST.ee = null; renderDefaults();
   toast('員工名單已儲存 ✓');
 }
 
@@ -1866,7 +1871,6 @@ function renderCatEditor() {
   if (!ST.ce || ST.ce.store !== ST.sess.store) {
     ST.ce = { store: ST.sess.store, dirty: false, items: (ST.snap.config.categories || []).map(function (c) { return { cat: c.cat, from: c.from || '', to: c.to || '' }; }) };
   }
-  $('ce-h').textContent = ST.sess.store + '的進貨分類，進貨頁的分類按鈕照這裡的順序顯示。點「一直用」可以選從哪個月開始停用。';
   $('ce-list').innerHTML = ST.ce.items.map(function (c, i) {
     return '<div class="ce-row' + (c.to && c.to <= todayStr().slice(0, 7) ? ' off' : '') + '"><input value="' + esc(c.cat) + '" placeholder="分類名稱" oninput="ceSet(' + i + ',\'cat\',this.value)">' +
       (c.to || c.editTo ? '<input type="month" value="' + esc(c.to) + '" title="從這個月開始不用（清空＝一直用）" onchange="ceSet(' + i + ',\'to\',this.value,true)">'
@@ -1900,12 +1904,13 @@ function ceSave() {
   enqueue('categories.set', { items: items });
   ST.snap.config.categories = items.map(function (c) { return { store: ST.sess.store, cat: c.cat, from: c.from, to: c.to }; });
   LS.set(k_('snap'), ST.snap);
-  ST.ce = null; renderPresetEditor();
+  ST.ce = null; renderDefaults();
   toast('進貨分類已儲存 ✓');
 }
 
 function renderSettingsTab() {
   renderPresetEditor();
+  renderDefaults();
   applyFont();
   if (!ST.swVersion && navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('version');
   $('set-info').innerHTML =
