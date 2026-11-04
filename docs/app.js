@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.8.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.8.2';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -15,7 +15,7 @@ function isBuiltinUrl(u) { return !!DEFAULT_URL && u === DEFAULT_URL; }
 var TABS = [
   ['daily', '每日結帳', false], ['purchase', '進貨', false], ['expense', '固定/其他支出', true],
   ['overview', '總覽', true], ['payroll', '人事', true], ['delivery', '外送對帳', true],
-  ['deduct', '分紅扣除', true], ['settings', '裝置', false]
+  ['deduct', '分紅扣除', true], ['loan', '借還款', true], ['settings', '裝置', false]
 ];
 var SHORT = { daily: '結帳', purchase: '進貨', expense: '支出', overview: '總覽', settings: '裝置' };
 function svg(d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; }
@@ -27,6 +27,7 @@ var ICONS = {
   delivery: svg('<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/>'),
   expense: svg('<path d="M4 6h16v13H4z"/><path d="M4 10h16M8 15h3"/>'),
   deduct: svg('<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>'),
+  loan: svg('<path d="M4 8h13l-3-3M20 16H7l3 3"/>'),
   settings: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
   more: svg('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
@@ -122,8 +123,8 @@ function showExpr(id, hint) { var s = $(id).value; var n = expr(s); $(hint).text
 function setNum(id, n) { $(id).value = n ? n : ''; }
 function isAdmin() { return ST.sess && ST.sess.role === 'admin'; }
 // 角色：管理（全部）／店長（看全部，人事・外送對帳・分紅扣除只能看）／員工（每日結帳、進貨、固定／其他支出）
-var ROLE_TABS = { manager: ['daily', 'purchase', 'expense', 'overview', 'payroll', 'delivery', 'deduct', 'settings'], staff: ['daily', 'purchase', 'expense', 'settings'] };
-var RO_TABS = { manager: ['payroll', 'delivery', 'deduct'] };
+var ROLE_TABS = { manager: ['daily', 'purchase', 'expense', 'overview', 'payroll', 'delivery', 'deduct', 'loan', 'settings'], staff: ['daily', 'purchase', 'expense', 'settings'] };
+var RO_TABS = { manager: ['payroll', 'delivery', 'deduct', 'loan'] };
 var ROLE_NAMES = { admin: '管理', manager: '店長', staff: '員工' };
 function myRole() { return (ST.sess && ST.sess.role) || 'manager'; }
 function canSee(tab) { var t = ROLE_TABS[myRole()]; return !t || t.indexOf(tab) >= 0; }
@@ -543,6 +544,7 @@ function refreshTab(full) {
     case 'delivery': if (full) renderDeliveryTab(); break;
     case 'expense': renderExpenseTab(); break;
     case 'deduct': renderDeductTab(); break;
+    case 'loan': renderLoanTab(); break;
     case 'overview': renderOverview(); break;
     case 'settings': renderSettingsTab(); break;
     case 'daily': if (!full) renderDailyExist(); break;
@@ -703,7 +705,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.5.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.5.1';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -1425,7 +1427,7 @@ function deductYears() {
 }
 function onDeductYear() {
   var y = $('x-year').value, m = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12';
-  ['x-month', 'xp-month', 'xl-month'].forEach(function (id) { if (($(id).value || '').slice(0, 4) !== y) $(id).value = m; });
+  ['x-month', 'xp-month'].forEach(function (id) { if (($(id).value || '').slice(0, 4) !== y) $(id).value = m; });
   renderDeductTab();
 }
 function payoutNames() {
@@ -1440,22 +1442,21 @@ function renderDeductTab() {
   var sel = $('x-year'), ys = deductYears(), y = sel.value || todayStr().slice(0, 4);
   if (ys.indexOf(y) < 0) y = ys[ys.length - 1];
   sel.innerHTML = ys.map(function (x) { return '<option' + (x === y ? ' selected' : '') + '>' + x + '</option>'; }).join('');
-  ['x-month', 'xp-month', 'xl-month'].forEach(function (id) { if (!$(id).value || $(id).value.slice(0, 4) !== y) $(id).value = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12'; });
-  renderLoans();
+  ['x-month', 'xp-month'].forEach(function (id) { if (!$(id).value || $(id).value.slice(0, 4) !== y) $(id).value = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12'; });
   var names = payoutNames();
   $('xp-names').innerHTML = names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
   $('xp-chips').innerHTML = names.map(function (n) { return '<button type="button" class="who' + ($('xp-who').value === n ? ' on' : '') + '" onclick="$(\'xp-who\').value=\'' + jsq(n) + '\';renderDeductTab()">' + esc(n) + '</button>'; }).join('');
-  var list = view().deduct.filter(function (x) { return String(x.month || '').slice(0, 4) === y; }).sort(function (a, b) { return a.month < b.month ? -1 : a.month > b.month ? 1 : 0; });
+  var list = view().deduct.filter(function (x) { return String(x.month || '').slice(0, 4) === y && x.type !== '員工借款' && x.type !== '員工還款'; }).sort(function (a, b) { return a.month < b.month ? -1 : a.month > b.month ? 1 : 0; });
   $('x-list-h').textContent = y + ' 年的分紅和扣除';
   var h = '', last = '', tot = 0;
   list.forEach(function (x) {
     if (x.month !== last) { last = x.month; h += '<tr class="mh"><th colspan="4">' + Number(x.month.slice(5, 7)) + ' 月</th></tr>'; }
-    if (x.type !== '員工借款' && x.type !== '員工還款') tot += Number(x.amount || 0);   // 合計不算借還款（借還款看「員工欠款」）
+    tot += Number(x.amount || 0);
     var t = x.type === '股東分紅（已發）' ? '股東分紅' : x.type === '員工借款' ? '借出' : x.type === '員工還款' ? '還款' : x.type;
     h += '<tr><td class="nowrap">' + esc(t) + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
       '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delDeduct(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
   });
-  $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計（不含借還款）</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
+  $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
 }
 // 記錄實際發出的股東分紅：設定裡的股東（浩勤、豐吉…）記「股東分紅（已發）」；其他人（佳茹、Nina…）記「其他扣除・某某分紅」
 function addPayout() {
@@ -1505,9 +1506,25 @@ function renderLoans() {
     list.map(function (o) {
       return '<tr' + (o.owe > 0 ? '' : ' class="muted"') + '><td>' + esc(o.name) + '</td><td class="n">' + money(o.lent) + '</td><td class="n">' + money(o.back) + '</td><td class="n' + (o.owe > 0 ? ' neg' : '') + '">' + (o.owe ? money(o.owe) : '已還清') + '</td></tr>';
     }).join('') + '<tr class="yt"><th>還沒收回</th><td></td><td></td><td class="n neg">' + money(owe) + '</td></tr></tbody></table>' +
-    '<p class="muted">每一筆的月份和摘要在下面「這一年的分紅和扣除」。</p>'
+    ''
     : '<p class="muted">還沒有借還款紀錄</p>';
 }
+// 借還款分頁：記錄、欠款總表、每一筆紀錄（新的在上面）
+function renderLoanTab() {
+  if (!$('xl-month').value) $('xl-month').value = todayStr().slice(0, 7);
+  renderLoans();
+  var list = view().deduct.filter(function (d) { return d.type === '員工借款' || d.type === '員工還款'; })
+    .sort(function (a, b) { return a.month < b.month ? 1 : a.month > b.month ? -1 : 0; });
+  var h = '', last = '';
+  list.forEach(function (x) {
+    if (x.month !== last) { last = x.month; h += '<tr class="mh"><th colspan="4">' + x.month.slice(0, 4) + '/' + Number(x.month.slice(5, 7)) + ' 月</th></tr>'; }
+    var out = x.type === '員工借款';
+    h += '<tr><td class="nowrap">' + (out ? '借出' : '還款') + pendTag('deduct', x.id) + '</td><td>' + esc(x.note) + '</td><td class="n' + (out ? ' neg' : ' pos') + '">' + (out ? '-' : '+') + money(x.amount) +
+      '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delLoan(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
+  });
+  $('xl-list').innerHTML = h || '<tr><td class="muted">還沒有借還款紀錄</td></tr>';
+}
+function delLoan(id) { if (confirm('確定刪除這筆借還款？')) { enqueue('deduct.del', { id: id }); renderLoanTab(); } }
 function addLoan() {
   var who = $('xl-who').value.trim(), amt = v('xl-amount'), month = $('xl-month').value, memo = $('xl-note').value.trim();
   if (!who) return toast('請選借款人');
@@ -1516,7 +1533,7 @@ function addLoan() {
   var back = ST.loanKind === '還';
   enqueue('deduct.add', { id: uid(), month: month, type: back ? '員工還款' : '員工借款', amount: amt, note: who + (memo ? '（' + memo + '）' : '') });
   $('xl-amount').value = ''; $('xl-note').value = '';
-  renderDeductTab();
+  renderLoanTab();
   toast((back ? '已記錄 ' + who + ' 還款 ' : '已記錄借給 ' + who + ' ') + money(amt) + ' ✓');
 }
 function addDeduct() {
@@ -1683,11 +1700,11 @@ function renderYearTab() {
   people = people.filter(function (p) { return months.some(function (m) { return payBy[m.month + '|' + p]; }) || partners.indexOf(p) >= 0; });
   var paidOf = function (m) { return people.reduce(function (a, p) { return a + (payBy[m.month + '|' + p] || 0); }, 0); };
   // 結餘：上一年留下來的錢 ＋ 盈餘 − 員工分紅 − 存年終 − 其他扣除 − 發出去的分紅（＝還沒分掉的錢）
-  var net = function (m) { return m.dist - (m.paid || 0) - (m.loan || 0) + (m.repay || 0); };   // 借給員工的錢先從結餘扣，還了再加回
+  var net = function (m) { return m.dist - (m.paid || 0); };   // 借還款另外在「借還款」分頁看，不放總覽
   var carry = R.months.filter(function (m) { return m.month.slice(0, 4) < cur; }).reduce(function (a, m) { return a + net(m); }, 0);
   var bal = {}, run = carry;
   months.forEach(function (m) { run += net(m); bal[m.month] = run; });
-  var hasLoan = R.months.some(function (m) { return m.loan || m.repay; });
+  var hasLoan = false;
   var cols = ['盈餘', '分紅合計'].concat(people, ['員工分紅', '存年終', '其他扣除'], hasLoan ? ['借還款'] : [], ['結餘']);
   var neg = function (v) { return v ? td(-v) : '<td class="n"></td>'; };
   var rowOf = function (list, name, cls) {
@@ -1712,7 +1729,7 @@ function renderYearTab() {
     qm.forEach(function (m) { h += rowOf([m], label(m), ''); });   // 盈餘與分紅：像舊表一樣不放季合計
   });
   h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
-  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝上一年結餘＋盈餘−分紅−員工分紅−存年終−其他扣除−借給員工＋員工還款，也就是店裡還有的錢。借還款欄：負數＝這個月借出比還款多。每月「應該分多少」請看「月」總覽。</p>';
+  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝上一年結餘＋盈餘−分紅−員工分紅−存年終−其他扣除，也就是還沒分掉的錢（借給員工的錢另外看「借還款」）。每月「應該分多少」請看「月」總覽。</p>';
 
   // 表二：平均細項
   var catSet = {}; R.cats.forEach(function (c) { if (c.month.slice(0, 4) === cur) catSet[c.cat] = (catSet[c.cat] || 0) + c.amount; });
@@ -1833,7 +1850,7 @@ function renderPresetEditor() {
   $('pe-save').textContent = ST.pe.dirty ? '儲存「' + PE_USES.filter(function (u) { return u[0] === ST.pe.use; })[0][1] + '」常用項目' : '沒有變更';
 }
 // 「預設」卡片：員工名單／進貨分類（這家店的，管理才看得到）
-var DEF_TABS = [['員工', '員工名單'], ['分類', '進貨分類']];
+var DEF_TABS = [['員工', '員工名單'], ['股東', '股東'], ['分類', '進貨分類']];
 function renderDefaults() {
   if (!isAdmin()) { $('set-def-card').classList.add('hide'); return; }
   $('set-def-card').classList.remove('hide');
@@ -1843,17 +1860,19 @@ function renderDefaults() {
   }).join('');
   $('def-note').textContent = tab === '員工'
     ? ST.sess.store + '的員工。人事頁的「＋名字」、月薪／時薪和勞健保照這裡帶入。點名字展開修改；不做了的取消勾選「在職」就好，以前的薪資紀錄會留著。'
+    : tab === '股東' ? ST.sess.store + '的股東和分紅比例，總覽的「應分多少」照這裡算，比例加起來要 100%。改了比例，以前月份的應分金額也會照新比例重算。'
     : ST.sess.store + '的進貨分類，進貨頁的分類按鈕照這裡的順序顯示。點「一直用」可以選從哪個月開始停用。';
   $('ee-pane').classList.toggle('hide', tab !== '員工');
+  $('pp-pane').classList.toggle('hide', tab !== '股東');
   $('ce-pane').classList.toggle('hide', tab !== '分類');
-  if (tab === '員工') renderEmpEditor(); else renderCatEditor();
+  if (tab === '員工') renderEmpEditor(); else if (tab === '股東') renderPartnerEditor(); else renderCatEditor();
 }
 function defGo(t) {
   var cur = ST.defTab || '員工';
   if (t === cur) return;
-  var dirty = cur === '員工' ? ST.ee && ST.ee.dirty : ST.ce && ST.ce.dirty;
+  var dirty = cur === '員工' ? ST.ee && ST.ee.dirty : cur === '股東' ? ST.pp && ST.pp.dirty : ST.ce && ST.ce.dirty;
   if (dirty && !confirm('這一頁還沒儲存，確定要切換？（改的內容會不見）')) return;
-  if (cur === '員工') ST.ee = null; else ST.ce = null;
+  if (cur === '員工') ST.ee = null; else if (cur === '股東') ST.pp = null; else ST.ce = null;
   ST.defTab = t; renderDefaults();
 }
 function peUse(u) {
@@ -1941,6 +1960,48 @@ function eeSave() {
   LS.set(k_('snap'), ST.snap);
   ST.ee = null; renderDefaults();
   toast('員工名單已儲存 ✓');
+}
+
+// ---- 股東和比例（設定_股東） ----
+function renderPartnerEditor() {
+  if (!isAdmin()) return;
+  if (!ST.pp || ST.pp.store !== ST.sess.store) {
+    ST.pp = { store: ST.sess.store, dirty: false, items: (ST.snap.config.partners || []).map(function (p) { return { name: p.name, pct: p.pct }; }) };
+  }
+  var sum = ST.pp.items.reduce(function (a, p) { return a + (Number(p.pct) || 0); }, 0);
+  $('pp-list').innerHTML = ST.pp.items.map(function (p, i) {
+    return '<div class="pp-row"><input value="' + esc(p.name) + '" placeholder="股東名字" oninput="ppSet(' + i + ',\'name\',this.value)">' +
+      '<div class="pp-pct"><input value="' + esc(p.pct) + '" inputmode="decimal" placeholder="比例" oninput="ppSet(' + i + ',\'pct\',this.value)"><span>%</span></div>' +
+      '<button class="pe-mv" onclick="ppMove(' + i + ',-1)" aria-label="上移">↑</button><button class="pe-mv" onclick="ppMove(' + i + ',1)" aria-label="下移">↓</button>' +
+      '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="ppDel(' + i + ')">✕</button></div>';
+  }).join('') + (ST.pp.items.length ? '<p class="pp-sum' + (Math.abs(sum - 100) > 0.001 ? ' bad' : '') + '" id="pp-sum">合計 ' + Math.round(sum * 100) / 100 + '%' + (Math.abs(sum - 100) > 0.001 ? '（要等於 100%）' : ' ✓') + '</p>' : '<p class="muted">還沒有股東，按下面「＋ 新增股東」</p>');
+  $('pp-save').disabled = !ST.pp.dirty;
+  $('pp-save').textContent = ST.pp.dirty ? '儲存股東' : '沒有變更';
+}
+function ppSet(i, k, v) {
+  ST.pp.items[i][k] = v; ST.pp.dirty = true; $('pp-save').disabled = false; $('pp-save').textContent = '儲存股東';
+  if (k === 'pct') { var sum = ST.pp.items.reduce(function (a, p) { return a + (Number(p.pct) || 0); }, 0), el = $('pp-sum'), bad = Math.abs(sum - 100) > 0.001;
+    if (el) { el.className = 'pp-sum' + (bad ? ' bad' : ''); el.textContent = '合計 ' + Math.round(sum * 100) / 100 + '%' + (bad ? '（要等於 100%）' : ' ✓'); } }
+}
+function ppMove(i, d) { var j = i + d; if (j < 0 || j >= ST.pp.items.length) return; var t = ST.pp.items[i]; ST.pp.items[i] = ST.pp.items[j]; ST.pp.items[j] = t; ST.pp.dirty = true; renderPartnerEditor(); }
+function ppDel(i) { if (!confirm('刪除股東「' + (ST.pp.items[i].name || '') + '」？\n（以前記的分紅還在）')) return; ST.pp.items.splice(i, 1); ST.pp.dirty = true; renderPartnerEditor(); }
+function ppAdd() {
+  ST.pp.items.push({ name: '', pct: '' }); ST.pp.dirty = true; renderPartnerEditor();
+  var rows = $('pp-list').querySelectorAll('.pp-row'); rows[rows.length - 1].querySelector('input').focus();
+}
+function ppSave() {
+  var bad = '', items = ST.pp.items.map(function (p) { var pct = Number(String(p.pct).replace('%', '')); if (isNaN(pct)) bad = p.name; return { name: String(p.name || '').trim(), pct: pct || 0 }; }).filter(function (p) { return p.name; });
+  if (bad) return toast(bad + ' 的比例看不懂，請打數字');
+  var names = items.map(function (p) { return p.name; });
+  var dup = names.filter(function (n, i) { return names.indexOf(n) !== i; })[0];
+  if (dup) return toast('名字重複：' + dup);
+  var sum = items.reduce(function (a, p) { return a + p.pct; }, 0);
+  if (items.length && Math.abs(sum - 100) > 0.001 && !confirm('比例加起來是 ' + sum + '%，不是 100%，還是要儲存嗎？')) return;
+  enqueue('partners.set', { items: items });
+  ST.snap.config.partners = items.map(function (p) { return { store: ST.sess.store, name: p.name, pct: p.pct }; });
+  LS.set(k_('snap'), ST.snap);
+  ST.pp = null; renderDefaults();
+  toast('股東已儲存 ✓');
 }
 
 function renderCatEditor() {

@@ -173,6 +173,11 @@
   .font-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 4px; padding: 8px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .font-row > span { font-weight: 700; white-space: nowrap; }
   .font-row .seg { margin: 0; }
+  .pp-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 40px 40px auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .pp-row input { font-size: 16px; padding: 10px; min-width: 0; }
+  .pp-pct { position: relative; } .pp-pct input { padding-right: 28px; } .pp-pct span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .pp-sum { margin: 4px 0 10px; font-weight: 700; } .pp-sum.bad { color: var(--bad); }
+  @media (max-width: 560px) { .pp-row { grid-template-columns: minmax(0, 1fr) 90px 32px 32px 24px; gap: 4px; } }
   .ce-stop { margin: 0; padding: 10px 6px; font-size: 14px; color: var(--muted); }
   .ce-row.off input:first-child { color: var(--muted); text-decoration: line-through; }
   @media (max-width: 560px) { .ce-row { grid-template-columns: minmax(0, 1fr) 120px 32px 32px 24px; gap: 4px; } }
@@ -274,6 +279,7 @@
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
   .pw .eye.on { color: var(--brand); }
   .xlist tr.mh th { text-align: left; background: var(--soft); font-size: 14px; padding: 6px 10px; }
+  .xlist tr.mh th.n { text-align: right; }
   .xlist tr.yt td, .xlist tr.yt th { font-weight: 800; border-top: 2px solid var(--amber); }
   .chips .who.on { background: var(--brand); color: #fff; }
   /* 店長只能看的頁：隱藏新增／儲存／刪除，輸入格不能改 */
@@ -675,20 +681,6 @@
       <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
     </div>
     <div class="card edit-card">
-      <h2>員工借還款</h2>
-      <p class="muted">借錢給員工、員工還錢都記在這裡（不影響盈餘和股東分紅，只影響結餘＝店裡還有多少錢）。</p>
-      <div class="seg" id="xl-kind"><button data-v="借" onclick="setLoanKind('借')">借出</button><button data-v="還" onclick="setLoanKind('還')">還款</button></div>
-      <div class="grid3">
-        <div><label>月份</label><input id="xl-month" type="month"></div>
-        <div><label>借款人</label><input id="xl-who" list="xl-names" placeholder="例：建燁" autocomplete="off"><datalist id="xl-names"></datalist></div>
-        <div><label>金額</label><input id="xl-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this)"></div>
-      </div>
-      <div class="chips" id="xl-chips"></div>
-      <label>摘要（可不填，例：預支10月薪水、10/15 從店長分紅扣）</label><input id="xl-note">
-      <button class="primary" id="xl-btn" onclick="addLoan()">記錄借出</button>
-    </div>
-    <div class="card" id="xl-sum-card"><h2>員工欠款</h2><div id="xl-sum"></div></div>
-    <div class="card edit-card">
       <h2>分配前扣除</h2>
       <p class="muted">股東分紅前要先扣掉的錢：員工分紅（每月不一定）、年終預留…</p>
       <div class="grid3">
@@ -700,6 +692,25 @@
       <button class="primary" onclick="addDeduct()">新增</button>
     </div>
     <div class="card"><h2 id="x-list-h">這一年的分紅和扣除</h2><table class="xlist"><tbody id="x-list"></tbody></table></div>
+  </section>
+
+  <section id="tab-loan" class="hide">
+    <p class="ro-note">🔒 店長只能看，不能修改（要改請找管理）</p>
+    <div class="card edit-card">
+      <h2>記錄借還款</h2>
+      <p class="muted">借錢給員工、員工還錢都記在這裡（不影響盈餘、股東分紅和總覽）。</p>
+      <div class="seg" id="xl-kind"><button data-v="借" onclick="setLoanKind('借')">借出</button><button data-v="還" onclick="setLoanKind('還')">還款</button></div>
+      <div class="grid3">
+        <div><label>月份</label><input id="xl-month" type="month"></div>
+        <div><label>借款人</label><input id="xl-who" list="xl-names" placeholder="例：建燁" autocomplete="off"><datalist id="xl-names"></datalist></div>
+        <div><label>金額</label><input id="xl-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this)"></div>
+      </div>
+      <div class="chips" id="xl-chips"></div>
+      <label>摘要（可不填，例：預支10月薪水、10/15 從店長分紅扣）</label><input id="xl-note">
+      <button class="primary" id="xl-btn" onclick="addLoan()">記錄借出</button>
+    </div>
+    <div class="card" id="xl-sum-card"><h2>員工欠款</h2><div id="xl-sum"></div></div>
+    <div class="card"><h2>借還款紀錄</h2><table class="xlist"><tbody id="xl-list"></tbody></table></div>
   </section>
 
   <section id="tab-overview" class="hide">
@@ -749,6 +760,11 @@
         <div id="ee-list"></div>
         <button class="ghost addline" onclick="eeAdd()">＋ 新增員工</button>
         <button class="primary" id="ee-save" onclick="eeSave()">沒有變更</button>
+      </div>
+      <div id="pp-pane" class="hide" style="margin-top:12px">
+        <div id="pp-list"></div>
+        <button class="ghost addline" onclick="ppAdd()">＋ 新增股東</button>
+        <button class="primary" id="pp-save" onclick="ppSave()">沒有變更</button>
       </div>
       <div id="ce-pane" class="hide" style="margin-top:12px">
         <div id="ce-list"></div>

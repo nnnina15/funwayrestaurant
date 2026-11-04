@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.5.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '新增員工借還款：在 App「分紅扣除」記借出／還款，年總覽的結餘會跟著扣';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.5.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '員工借還款；管理可以在 App「裝置 → 預設」改股東和比例';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -655,6 +655,19 @@ function applyServerOp_(store, op) {
       });
       deleteWhere_(S.EMP, function (x) { return str_(x['店別']) === store; });
       append_(S.EMP, rows);
+      return 'ok';
+    }
+    // 管理在 App「裝置」改這家店的股東和比例：整份換掉
+    case 'partners.set': {
+      const seen = {};
+      const rows = (d.items || []).filter(function (p) { return str_(p.name); }).map(function (p) {
+        const name = str_(p.name);
+        if (seen[name]) throw new Error('股東名字重複：' + name);
+        seen[name] = true;
+        return { '店別': store, '股東': name, '比例(%)': num_(p.pct) };
+      });
+      deleteWhere_(S.PARTNER, function (x) { return str_(x['店別']) === store; });
+      append_(S.PARTNER, rows);
       return 'ok';
     }
     // 管理在 App「裝置」改這家店的進貨分類：原本「全部」共用的，先複製給其他店（其他店不受影響），再換掉這家店的
