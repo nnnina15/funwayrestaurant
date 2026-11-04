@@ -13,7 +13,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   const b = await chromium.launch();
   async function device(name) {
     const ctx = await b.newContext({ viewport: { width: 1100, height: 1300 } });
-    await ctx.route(URL_, async (route) => { const body = JSON.parse(route.request().postData()); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(g.post(body)) }); });
+    await ctx.route(URL_, async (route) => { const body = JSON.parse(route.request().postData()); const res = g.post(body); if (ctx.__delay) await new Promise(r => setTimeout(r, ctx.__delay)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(res) }); });
     const pg = await ctx.newPage(); pg.on('pageerror', e => console.log(name, 'PAGEERROR', e.message)); pg.on('dialog', d => d.accept(pg.__ans));
     await pg.goto('http://localhost:8765/?api=' + encodeURIComponent(URL_));   // 測試用的同步網址（正式的是內建網址）
     await pg.waitForSelector('#login-acc');
@@ -263,6 +263,22 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.selectOption('#storeSel', '大埔店'); await B.pg.waitForFunction(() => ST.sess.store === '大埔店');
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
   assert.ok(!(await B.pg.textContent('#p-list')).includes('還沒有進貨紀錄'), '切回大埔店資料還在');
+  // 快速切換店別：大埔店記一筆、同步還沒回來就切到中正店 → 中正店不能出現大埔店的資料，那筆只上傳一次
+  const dp0 = g.rows(S.PURCHASE).filter(r => r['店別'] === '大埔店').length;
+  B.ctx.__delay = 1200;
+  await B.pg.click('#p-cats button:has-text("麵")'); await B.pg.fill('#p-amount', '777'); await B.pg.click('text=新增這筆');
+  await B.pg.selectOption('#storeSel', '中正店'); await B.pg.waitForFunction(() => ST.sess.store === '中正店');
+  await B.pg.selectOption('#storeSel', '大埔店'); await B.pg.waitForFunction(() => ST.sess.store === '大埔店');
+  await B.pg.selectOption('#storeSel', '中正店'); await B.pg.waitForFunction(() => ST.sess.store === '中正店');
+  await B.pg.waitForTimeout(4000); B.ctx.__delay = 0;
+  await B.pg.waitForFunction(() => !ST.syncing && ST.outbox.length === 0, null, { timeout: 8000 });
+  await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
+  assert.ok((await B.pg.textContent('#p-list')).includes('還沒有進貨紀錄'), '快速切換後，中正店不能出現大埔店的進貨');
+  assert.ok(await B.pg.evaluate(() => ST.snap.config.store.name === '中正店'), '中正店的畫面要是中正店的資料');
+  assert.strictEqual(g.rows(S.PURCHASE).filter(r => r['店別'] === '大埔店').length, dp0 + 1, '那筆只上傳一次');
+  await B.pg.selectOption('#storeSel', '大埔店'); await B.pg.waitForFunction(() => ST.sess.store === '大埔店');
+  await B.pg.waitForFunction(() => ST.outbox.length === 0 && ST.snap.config.store.name === '大埔店', null, { timeout: 8000 });
+  assert.ok((await B.pg.textContent('#p-list')).includes('777'), '切回大埔店看得到剛剛那筆');
   // 更改 PIN（規則要符合）
   await B.pg.click('#tb-settings'); await B.pg.fill('#cp-old', 'Nina#2026x'); await B.pg.fill('#cp-new', 'Nina#2027y'); await B.pg.fill('#cp-new2', 'Nina#2027y');
   await B.pg.click('#set-pin-card .primary'); await B.pg.waitForFunction(() => /PIN 已更改/.test(document.getElementById('toast').textContent));

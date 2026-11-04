@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.7.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.7.3';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -399,9 +399,13 @@ function switchStore(name) {
   if (navigator.onLine === false) { ST.sess.store = prev; LS.set('fw_sess', ST.sess); loadLocal(); enterApp(); return toast('「' + name + '」還沒下載過，請先連上網路'); }
   busy(true);
   api('sync', { account: ST.sess.account, token: ST.sess.token, store: name, ops: [] }).then(function (r) {
-    busy(false); acceptPull(r); enterApp(); toast('已切換到 ' + name);
+    busy(false); acceptPull(r, name);
+    if (ST.sess.store !== name) return;  // 又切去別家了
+    enterApp(); toast('已切換到 ' + name);
   }, function (e) {
-    busy(false); ST.sess.store = prev; LS.set('fw_sess', ST.sess); loadLocal(); enterApp();
+    busy(false);
+    if (ST.sess.store !== name) return;
+    ST.sess.store = prev; LS.set('fw_sess', ST.sess); loadLocal(); enterApp();
     toast('⚠ ' + (e.network ? '切換需要網路' : e.message));
   });
 }
@@ -576,8 +580,14 @@ function trySync(manual) {
   if (ST.authLost) { if (manual) relogin(); return; }
   if (navigator.onLine === false) { renderStatus(); if (manual) toast('目前沒有網路，資料已存在這台裝置'); return; }
   ST.syncing = true; renderStatus();
-  var batch = ST.outbox.slice(0, 40);
-  api('sync', { account: ST.sess.account, store: ST.sess.store, token: ST.sess.token, ops: batch }).then(function (r) {
+  var batch = ST.outbox.slice(0, 40), store = ST.sess.store;
+  api('sync', { account: ST.sess.account, store: store, token: ST.sess.token, ops: batch }).then(function (r) {
+    // 同步途中切換了店：結果記回原本那家店，不能蓋到現在這家店
+    if (!ST.sess || ST.sess.store !== store) {
+      ST.syncing = false;
+      if (ST.sess) { finishOther(store, batch, r); renderStatus(); setTimeout(trySync, 100); }
+      return;
+    }
     var done = {};
     (r.results || []).forEach(function (x) {
       done[x.id] = true;
@@ -610,16 +620,29 @@ function syncOtherStores() {
     if (!ob.length) return;
     var batch = ob.slice(0, 40);
     api('sync', { account: ST.sess.account, store: st, token: ST.sess.token, ops: batch }).then(function (r) {
-      var done = {}, failed = LS.get(k_('failed', st), []);
-      (r.results || []).forEach(function (x) {
-        done[x.id] = true;
-        if (x.status === 'error') failed.push({ at: nowStr(), op: batch.filter(function (o) { return o.id === x.id; })[0], msg: st + '：' + x.error });
-      });
-      LS.set(k_('outbox', st), LS.get(k_('outbox', st), []).filter(function (o) { return !done[o.id]; }));
-      LS.set(k_('failed', st), failed.slice(-50));
-      acceptPull(r, st);
+      if (ST.sess) finishOther(st, batch, r);
     }, function () { /* 下次再試 */ });
   });
+}
+// 某家店（不一定是現在這家）的同步結果：已上傳的從那家店的待上傳拿掉，資料存到那家店
+function finishOther(st, batch, r) {
+  var done = {}, fails = [];
+  (r.results || []).forEach(function (x) {
+    done[x.id] = true;
+    var op = batch.filter(function (o) { return o.id === x.id; })[0];
+    if (x.status === 'error') fails.push({ at: nowStr(), op: op, msg: st + '：' + x.error });
+    if (x.status === 'stale') fails.push({ at: nowStr(), op: op, msg: st + '：別台裝置已經存了更新的版本，這筆沒有覆蓋' });
+  });
+  var keep = function (o) { return !done[o.id]; };
+  if (st === ST.sess.store) {            // 又切回這家店了：畫面上用的也要一起更新
+    ST.outbox = ST.outbox.filter(keep); ST.failed = ST.failed.concat(fails).slice(-50);
+    saveOutbox();
+  } else {
+    LS.set(k_('outbox', st), LS.get(k_('outbox', st), []).filter(keep));
+    LS.set(k_('failed', st), LS.get(k_('failed', st), []).concat(fails).slice(-50));
+  }
+  acceptPull(r, st);
+  if (st === ST.sess.store) refreshTab(false);
 }
 function relogin() {
   $('login-acc').value = ST.sess.account;
