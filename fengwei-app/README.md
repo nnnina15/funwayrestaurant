@@ -167,6 +167,7 @@ node fengwei-app/tests/server.test.js    # 同步服務（模擬 Google 試算�
 node fengwei-app/tests/reorder.test.js   # 試算表欄位自己換順序也照欄名讀寫
 node fengwei-app/tests/update.test.js    # ⑤ 更新程式（模擬 GitHub 和 Apps Script API）
 node fengwei-app/tests/slip.test.js      # 每日結帳的 PT 薪資／預支 → 自動記到人事
+node fengwei-app/tests/speed.test.js     # 登入時不會一直讀設定（PIN 檢查要快）
 node fengwei-app/tests/publish.test.js   # docs/gas 和 Code.gs 一致
 node fengwei-app/tests/e2e.test.js       # 瀏覽器：離線記帳 → 恢復網路 → 自動同步 → 多裝置（需要 Playwright）
 node fengwei-app/tests/offline-root.test.js  # 瀏覽器：網址離線也打得開

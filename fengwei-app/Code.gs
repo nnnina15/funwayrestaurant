@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.1.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '分紅扣除新增「股東分紅（已發）」，年總覽可以算上一年結餘和年底結餘';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.1.2';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '登入變快很多（PIN 檢查不再每一圈讀設定）；修正新帳號第一次登入會逾時、顯示「連不到同步服務」';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -93,11 +93,11 @@ function bundle_() {
   if (BUNDLE_CACHE_ !== undefined) return BUNDLE_CACHE_;
   BUNDLE_CACHE_ = null;
   try {
-    const p = PropertiesService.getScriptProperties();
-    const ver = p.getProperty(BUNDLE_KEY + '_VER'), n = Number(p.getProperty(BUNDLE_KEY + '_N') || 0);
+    const all = PropertiesService.getScriptProperties().getProperties();   // 一次讀完（一段一段讀很慢）
+    const ver = all[BUNDLE_KEY + '_VER'], n = Number(all[BUNDLE_KEY + '_N'] || 0);
     if (!ver || !n || verNum_(ver) <= verNum_(SERVER_VERSION)) return null;
     let src = '';
-    for (let i = 0; i < n; i++) src += p.getProperty(BUNDLE_KEY + '_' + i) || '';
+    for (let i = 0; i < n; i++) src += all[BUNDLE_KEY + '_' + i] || '';
     BUNDLE_CACHE_ = compileBundle_(src);
   } catch (e) {
     console.error('新版程式載入失敗，先用內建版本：' + e);
@@ -444,8 +444,9 @@ function pinRule_(pin) {
 function hashPin_(pin, salt) {
   salt = salt || Utilities.getUuid().slice(0, 12);
   let d = salt + '|' + pin;
+  const sec = secret_();     // 只讀一次（以前每一圈都去讀設定，登入要等很久）；算出來的結果和以前完全一樣
   for (let i = 0; i < 500; i++) {
-    d = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, d + '|' + secret_()));
+    d = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, d + '|' + sec));
   }
   return salt + '$' + d;
 }

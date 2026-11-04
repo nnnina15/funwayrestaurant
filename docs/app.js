@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.3.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.3.2';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -119,7 +119,7 @@ function isAdmin() { return ST.sess && ST.sess.role === 'admin'; }
 var SYNC_DOWN_MSG = '連不到試算表的同步服務。手機有網路，是試算表那邊的問題：請管理者打開試算表，按「風味記帳 → ⑤ 更新程式」（第一次會要求授權，按允許），或確認同步網址沒有換。';
 function api(action, body) {
   var ctrl = window.AbortController ? new AbortController() : null;
-  var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 25000);
+  var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 60000);   // 試算表有時比較慢，最多等 60 秒
   return fetch(ST.cfg.url, {
     method: 'POST', redirect: 'follow', signal: ctrl ? ctrl.signal : undefined,
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -136,6 +136,7 @@ function api(action, body) {
   }, function (err) {
     clearTimeout(timer);
     var off = navigator.onLine === false;
+    if (err && err.name === 'AbortError') { var t = new Error('試算表回應太慢（超過 60 秒），請稍後再試一次。資料都還在這台裝置。'); t.slow = true; throw t; }
     var e = new Error(off ? '連不上網路' : SYNC_DOWN_MSG);
     e.network = off; e.down = !off; e.cause = err; e.detail = err && err.detail; throw e;
   });
@@ -590,7 +591,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.1.1';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.1.2';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
