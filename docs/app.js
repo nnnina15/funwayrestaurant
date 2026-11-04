@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.3.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.3.1';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -318,7 +318,12 @@ function login() {
       if ($('login-new').value) toast('⚠ ' + e.message); else { toast(e.message); $('login-new').focus(); }
       return;
     }
-    if (e.down) { alert(SYNC_DOWN_MSG + (e.detail ? '\n\n（試算表回應：' + e.detail + '）' : '')); return; }
+    if (e.down) {
+      var u = (ST.cfg && ST.cfg.url) || '';
+      alert(SYNC_DOWN_MSG + (e.detail ? '\n\n（試算表回應：' + e.detail + '）' : '') +
+        '\n\n這台裝置用的同步網址：\n' + u + '\n\n檢查方法：把這個網址貼到瀏覽器打開，看到「風味記帳同步服務」就是網址正確；看到錯誤頁或要登入，就是網址錯了，請按「修改同步網址」換成手機上在用的那個。');
+      return;
+    }
     toast(e.network ? '手機目前沒有網路，第一次登入（或重新登入）需要網路' : '⚠ ' + e.message);
   });
 }
