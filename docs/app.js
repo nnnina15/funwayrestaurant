@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.4.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.4.1';   // 和 sw.js 的 VERSION 一起改
 var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
@@ -467,6 +467,7 @@ function showTab(name) {
   ST.tab = name;
   (ST.hiddenLbls || []).forEach(function (l) { l.classList.remove('hide'); });
   pinPickers(name);
+  updateWarns();
   ST.hiddenLbls = ST.pinned.lbl || [];
   document.body.classList.toggle('page-wide', name === 'overview' && ST.ov !== 'month');
   TABS.forEach(function (x) { var sec = $('tab-' + x[0]); if (sec) sec.classList.toggle('ro', readOnly(x[0])); });   // 店長：只能看
@@ -587,7 +588,37 @@ function syncAutoClose() {
   ST.syncCloseT = setTimeout(function () { if (!ST.syncing) $('sync').classList.remove('open'); else syncAutoClose(); }, 4000);
 }
 
+// 右下角「需要注意」：這個月和上個月的提醒（員工看不到）
+function warnItems(month) {
+  if (!ST.sess || !ST.snap || myRole() === 'staff') return [];
+  var R; try { R = computeLocal().R; } catch (e) { return []; }
+  var cur = todayStr().slice(0, 7), last = prevMonth_(cur);
+  return R.warns.filter(function (w) { return month ? (w.month === month || w.month === '') : (w.month === cur || w.month === last || w.month === ''); });
+}
+function updateWarns() {
+  clearTimeout(ST.warnT);
+  ST.warnT = setTimeout(function () {
+    var n = warnItems(warnMonth()).length, b = $('warnBtn');
+    b.classList.toggle('hide', !n || !$('v-app') || $('v-app').classList.contains('hide'));
+    $('warnN').textContent = n > 99 ? '99+' : n;
+  }, 300);
+}
+// 在月總覽看某個月時，就顯示那個月的；其他頁顯示這個月和上個月的
+function warnMonth() { return ST.tab === 'overview' && ST.ov === 'month' && $('m-month').value ? $('m-month').value : ''; }
+function openWarns(month) {
+  var list = warnItems(month || warnMonth()), by = {};
+  list.forEach(function (w) { (by[w.month || ''] = by[w.month || ''] || []).push(w); });
+  $('warnTitle').textContent = '⚠ 需要注意（' + list.length + '）';
+  $('warnlist').innerHTML = list.length ? Object.keys(by).sort().reverse().map(function (m) {
+    return '<h3><span>' + (m ? m.slice(0, 4) + '/' + Number(m.slice(5, 7)) + '月' : '一般') + '</span>' +
+      (m ? '<button class="ghost go" onclick="closeWarns();showTab(\'overview\');$(\'m-month\').value=\'' + m + '\';setOverview(\'month\')">看這個月 ›</button>' : '') + '</h3><ul>' +
+      by[m].map(function (w) { return '<li><b>' + esc(w.type) + '</b>：' + esc(w.text) + '</li>'; }).join('') + '</ul>';
+  }).join('') : '<p class="ok">✓ 沒有需要注意的</p>';
+  $('warnsheet').classList.remove('hide');
+}
+function closeWarns() { $('warnsheet').classList.add('hide'); }
 function renderStatus() {
+  updateWarns();
   renderBanner();
   var b = $('sync'), n = ST.outbox.length;
   b.classList.remove('pending', 'err');
@@ -1491,8 +1522,7 @@ function renderSummaryTab() {
   h += '<h2 style="margin-top:18px">股東分紅</h2><table>' + shares.map(function (s) {
     return '<tr><td>' + esc(s.name) + '</td><td class="n muted">' + s.pct + '%</td><td class="n big">' + money(s.amount) + '</td></tr>';
   }).join('') + '</table>';
-  h += warns.length ? '<h2 style="margin-top:18px" class="warn">⚠ 需要注意（' + warns.length + '）</h2><ul>' +
-    warns.map(function (w) { return '<li><b>' + esc(w.type) + '</b>：' + esc(w.text) + '</li>'; }).join('') + '</ul>' : '<p class="ok">✓ 沒有警示</p>';
+  updateWarns();   // 需要注意：在右下角顯示模式上面的 ⚠ 圓鈕
   if (cats.length) h += '<h2 style="margin-top:18px">進貨分類</h2><table>' + cats.map(function (c) {
     return '<tr><td>' + esc(c.cat) + '</td><td class="n">' + money(c.amount) + '</td><td class="n muted">' + pct(c.pct) + '</td></tr>';
   }).join('') + '</table>';

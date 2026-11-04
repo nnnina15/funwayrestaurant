@@ -85,6 +85,19 @@
     #bottombar button.on { color: var(--brand); font-weight: 700; }
     body.has-bar main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   }
+  /* 需要注意：顯示模式上面的圓鈕（有幾項就顯示數字），點了跳出清單 */
+  #warnBtn { position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 7; width: 48px; height: 48px; padding: 0; border-radius: 50%;
+    background: var(--amber); color: #3d2600; border: 0; box-shadow: 0 6px 18px rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 900; box-sizing: border-box; min-height: 0; -webkit-appearance: none; appearance: none; }
+  #warnBtn.hide { display: none; }
+  #warnBtn b { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--bad); color: #fff; font-size: 12px; line-height: 20px; box-sizing: border-box; }
+  @media (max-width: 899px) { body.has-bar #warnBtn { bottom: calc(202px + env(safe-area-inset-bottom)); } }
+  #warnsheet { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; justify-content: center; }
+  #warnsheet .panel { background: var(--card); width: 100%; max-width: 720px; max-height: 75vh; overflow: auto; border-radius: 20px 20px 0 0; padding: 10px 18px calc(20px + env(safe-area-inset-bottom)); }
+  #warnsheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 10px; }
+  #warnsheet h3 { font-size: 15px; margin: 14px 0 6px; display: flex; justify-content: space-between; align-items: center; }
+  #warnsheet ul { margin: 0; padding-left: 20px; line-height: 1.7; }
+  #warnsheet .go { font-size: 13px; padding: 4px 10px; min-height: 0; }
   #moresheet { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; }
   #moresheet .panel { background: var(--card); width: 100%; border-radius: 20px 20px 0 0; padding: 10px 16px calc(20px + env(safe-area-inset-bottom)); }
   #moresheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 14px; }
@@ -688,6 +701,8 @@
 
 <nav id="bottombar" class="hide"></nav>
 <div id="moresheet" class="hide" onclick="if(event.target===this)closeMore()"><div class="panel"><div class="grab"></div><div class="grid" id="moregrid"></div></div></div>
+<button id="warnBtn" class="hide" onclick="openWarns()" aria-label="需要注意"><span>!</span><b id="warnN"></b></button>
+<div id="warnsheet" class="hide" onclick="if(event.target===this)closeWarns()"><div class="panel"><div class="grab"></div><h2 class="warn" id="warnTitle">⚠ 需要注意</h2><div id="warnlist"></div></div></div>
 <button id="themeBtn" onclick="cycleTheme()" aria-label="切換亮色／暗色"></button>
 <p id="ver" class="muted" style="text-align:center;margin:8px 0 24px;font-size:13px"></p>
 <div id="toast"></div>
