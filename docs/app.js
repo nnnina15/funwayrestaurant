@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.8.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.8.3';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1718,7 +1718,10 @@ function renderYearTab() {
   };
   var carryRow = '<tr class="carry"><th>上一年結餘</th>' + cols.map(function (c, i) { return i === cols.length - 1 ? td(carry, 'em bal') : '<td></td>'; }).join('') + '</tr>';
   var yDays = sum(months, function (m) { return m.days; }), yAct = sum(months, function (m) { return m.actual; });
-  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', carry + sum(months, function (m) { return m.profit; }), '今年 ' + money(sum(months, function (m) { return m.profit; })) + '＋上一年結餘 ' + money(carry), true) +
+  // 今年盈餘：扣掉分紅（股東＋店長／固定分紅）和員工分紅、存年終、其他扣除之後，今年留下來的錢
+  var yProfit = sum(months, function (m) { return m.profit; }), yPaid = sum(months, paidOf);
+  var yDed = sum(months, function (m) { return m.bonus + m.reserve + (otherBy[m.month] || 0); });
+  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', yProfit - yPaid - yDed, '盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－扣除 ' + money(yDed), true) +
     kpi('可分配給股東', sum(months, function (m) { return m.dist; })) +
     kpi('年底結餘', months.length ? bal[months[months.length - 1].month] : carry, '上一年結餘 ' + money(carry) + '｜已發分紅 ' + money(sum(months, function (m) { return m.paid || 0; }))) +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
