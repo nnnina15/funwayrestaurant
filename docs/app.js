@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.6.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.6.4';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -926,7 +926,7 @@ function renderPayrollTab(full) {
     if (x.rate !== '' && x.rate !== undefined && x.rate !== null) by[x.name].hourly = true;
   });
   // 只列出這個月有填的人（和正在編輯的人）；名單上還沒填的放在「＋ 其他人」後面，點了才加入
-  var groups = { '正職': [], '計時': [], '其他': [] };
+  var groups = { '正職': [], '計時': [] };
   var shown = Object.keys(by);
   if (ST.emp && ST.empMonth === month && shown.indexOf(ST.emp) < 0) shown.push(ST.emp);
   var rosterNames = (ST.snap.config.employees || []).map(function (e) { return e.name; });
@@ -944,8 +944,8 @@ function renderPayrollTab(full) {
   }
   function sub(list) { return list.reduce(function (a, n) { return a + (by[n] ? by[n].cost : 0); }, 0); }
   var h = '';
-  ST.empOrder = groups['正職'].concat(groups['計時'], groups['其他']);   // 編輯區 ‹ › 切換用的順序
-  [['正職', '正職'], ['計時', '計時（時薪）'], ['其他', '其他（不在員工名單）']].forEach(function (g) {
+  ST.empOrder = groups['正職'].concat(groups['計時']);   // 編輯區 ‹ › 切換用的順序
+  [['正職', '正職'], ['計時', '計時（時薪）']].forEach(function (g) {
     var list = groups[g[0]];
     if (!list.length) return;
     h += '<div class="grp"><div class="grp-h"><b>' + g[1] + '</b><span class="muted">' + list.length + ' 人｜小計 ' + money(sub(list)) + '</span></div>' + list.map(btn).join('') + '</div>';
@@ -959,12 +959,18 @@ function renderPayrollTab(full) {
 // 這個人放哪一組：員工名單的類型 → 自己選過的（正職／計時） → 有時數×時薪就算計時 → 其他
 function inRoster(n) { return (ST.snap.config.employees || []).some(function (e) { return e.name === n; }); }
 function empGroup(n, hourly) {
-  if (ST.emp === n && ST.empGroup !== undefined) return ST.empGroup || '其他';
+  if (ST.emp === n && ST.empGroup) return ST.empGroup;
   var g = savedGroup(n);
   if (g) return g;
   var e = rosterEmp(n);
   if (e) return e.type === '計時' ? '計時' : '正職';
-  return hourly ? '計時' : '其他';
+  return guessGroup(n);
+}
+// 名單外、也沒選過分組的人：這個月有月薪／扣健保／扣勞保就是正職，其他（PT、臨時工）當計時
+function guessGroup(n) {
+  var month = $('s-month').value;
+  var ft = view().payroll.some(function (x) { return x.month === month && x.name === n && FIXED_PAY.some(function (f) { return f[0] === String(x.item || '').trim(); }); });
+  return ft ? '正職' : '計時';
 }
 // 這個人最近一次選的分組（這個月沒有就看以前的月份）
 function savedGroup(n) {
@@ -982,7 +988,7 @@ function renderTempBar() {
   bar.classList.toggle('hide', !ST.emp);
   if (!ST.emp) return;
   var g = ST.empGroup || '', temp = !inRoster(ST.emp);
-  var opts = [['正職', '正職'], ['計時', '計時']].concat(temp ? [['', '其他']] : []);
+  var opts = [['正職', '正職'], ['計時', '計時']];
   bar.innerHTML = '<span class="seg">' + opts.map(function (o) {
       return '<button class="' + (g === o[0] ? 'on' : '') + '" onclick="setEmpGroup(\'' + o[0] + '\')">' + o[1] + '</button>';
     }).join('') + '</span>' +
@@ -1051,7 +1057,7 @@ function openEmp(name, stay) {
   ST.empSaved = saved;
   // 分組：這個人選過的（正職／計時） → 員工名單的類型 → 其他
   var emp = rosterEmp(name);
-  ST.empGroup = savedGroup(name) || (emp ? (emp.type === '計時' ? '計時' : '正職') : '');
+  ST.empGroup = savedGroup(name) || (emp ? (emp.type === '計時' ? '計時' : '正職') : guessGroup(name));
   applyFixed();
   renderPayrollTab(false);
   empTitle();

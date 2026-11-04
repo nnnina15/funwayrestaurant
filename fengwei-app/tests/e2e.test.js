@@ -144,7 +144,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   // 其他人：可以改名、分到計時
   B.pg.__ans = '臨時工';
   await B.pg.click('text=＋ 其他人（不在員工名單）');
-  assert.ok(await B.pg.isVisible('#s-temp'), '其他人要有改名／分組');
+  assert.ok(await B.pg.isVisible('#s-temp'), '名單外的人要有改名／分組');
   B.pg.__ans = '小王';
   await B.pg.click('#s-temp .rename');
   assert.ok((await B.pg.textContent('#s-name')).includes('小王'), '改名');
@@ -165,6 +165,8 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok(!g.rows(S.PAYROLL).some(r => r['姓名'] === '小王'), '刪除這位');
   assert.ok(!(await B.pg.textContent('#s-emps')).includes('小王'));
   assert.ok(grpText.some(t => t.startsWith('計時') && t.includes('小王')), '小王要在計時組：' + grpText.join(' / '));
+  assert.ok(!grpText.some(t => t.startsWith('其他')), '不再有「其他」組');
+  assert.ok(grpText.some(t => t.startsWith('計時') && t.includes('PT')), '日結記的 PT 放計時');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-payroll-temp.png'), fullPage: true });
   await B.pg.click('#tb-expense'); await B.pg.fill('#e-month', '2026-01'); await B.pg.dispatchEvent('#e-month', 'change');
   await B.pg.locator('.stepper:has(#e-month) .step').first().click(); assert.strictEqual(await B.pg.inputValue('#e-month'), '2025-12', '月份 ‹ 要能跨年');
