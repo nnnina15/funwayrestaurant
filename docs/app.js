@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.8.6';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.8.7';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1705,7 +1705,7 @@ function renderYearTab() {
   var bal = {}, run = carry;
   months.forEach(function (m) { run += net(m); bal[m.month] = run; });
   var hasLoan = false;
-  var cols = ['盈餘', '分紅合計'].concat(people, ['員工分紅', '存年終', '其他扣除'], hasLoan ? ['借還款'] : [], ['結餘']);
+  var cols = ['月盈餘', '分紅合計'].concat(people, ['員工分紅', '存年終', '其他扣除'], hasLoan ? ['借還款'] : [], ['結餘']);
   var neg = function (v) { return v ? td(-v) : '<td class="n"></td>'; };
   var rowOf = function (list, name, cls) {
     var tot = sum(list, function (m) { return paidOf(m) + m.bonus + m.reserve; });   // 分紅合計：股東＋店長／固定分紅＋員工分紅＋存年終
@@ -1721,7 +1721,8 @@ function renderYearTab() {
   // 今年盈餘：扣掉分紅（股東＋店長／固定分紅＋員工分紅＋存年終）和其他扣除之後，今年留下來的錢
   var yProfit = sum(months, function (m) { return m.profit; }), yPaid = sum(months, function (m) { return paidOf(m) + m.bonus + m.reserve; });
   var yDed = sum(months, function (m) { return otherBy[m.month] || 0; });
-  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', yProfit - yPaid - yDed, '盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－扣除 ' + money(yDed), true) +
+  // 當年盈餘＝月盈餘合計（年表第一欄）−當年分紅合計−其他扣除＋上一年盈餘
+  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', yProfit - yPaid - yDed + carry, '月盈餘合計 ' + money(yProfit) + '－分紅 ' + money(yPaid) + (yDed ? '－扣除 ' + money(yDed) : '') + '＋上一年盈餘 ' + money(carry), true) +
     kpi('可分配給股東', sum(months, function (m) { return m.dist; })) +
     kpi('年底結餘', months.length ? bal[months[months.length - 1].month] : carry, '上一年結餘 ' + money(carry) + '｜已發分紅 ' + money(sum(months, function (m) { return m.paid || 0; }))) +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
