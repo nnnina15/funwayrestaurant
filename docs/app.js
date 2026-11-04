@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.6.6';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.6.7';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -421,7 +421,11 @@ function logout() {
 
 function acceptPull(r, store) {
   var snap = { config: r.config, data: r.data, serverTime: r.serverTime };
-  if (r.stores && ST.sess) { ST.sess.stores = r.stores; if (r.role) ST.sess.role = r.role; LS.set('fw_sess', ST.sess); }
+  if (r.stores && ST.sess) {
+    var changed = (ST.sess.stores || []).join('|') !== r.stores.join('|');
+    ST.sess.stores = r.stores; if (r.role) ST.sess.role = r.role; LS.set('fw_sess', ST.sess);
+    if (changed && !$('v-app').classList.contains('hide')) renderTitle();   // 試算表新增／移除店家：店別選單馬上更新
+  }
   if (store && store !== ST.sess.store) { LS.set(k_('snap', store), snap); LS.set(k_('last', store), nowStr()); return; }
   ST.snap = snap;
   ST.lastSync = nowStr();
@@ -430,13 +434,17 @@ function acceptPull(r, store) {
 }
 
 /* ---------- 進入主畫面 ---------- */
+// 左上角：店別選單（可用兩家以上才有）＋帳號
+function renderTitle() {
+  var sts = ST.sess.stores || [ST.sess.store];
+  $('title').innerHTML = (sts.length > 1 ? '<select id="storeSel" onchange="switchStore(this.value)">' + sts.map(function (n) { return '<option' + (n === ST.sess.store ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>' : esc(ST.sess.store)) +
+    '<span class="acc">・' + esc(ST.sess.account) + '</span>';
+}
 function enterApp() {
   if (!ST.snap) loadLocal();
   if (!ST.snap) { showView('login'); return; }
   showView('app');
-  var sts = ST.sess.stores || [ST.sess.store];
-  $('title').innerHTML = (sts.length > 1 ? '<select id="storeSel" onchange="switchStore(this.value)">' + sts.map(function (n) { return '<option' + (n === ST.sess.store ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>' : esc(ST.sess.store)) +
-    '<span class="acc">・' + esc(ST.sess.account) + '</span>';
+  renderTitle();
   var t = todayStr(), m = t.slice(0, 7);
   ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
   ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });

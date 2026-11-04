@@ -103,6 +103,11 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   const B = await device('Nina手機');
   await firstLogin(B, 'Nina手機', 'Funway#2026', 'Nina#2026x');
   assert.deepStrictEqual(await B.pg.$$eval('#storeSel option', o => o.map(x => x.textContent)), ['大埔店', '中正店'], '管理可以切兩家店');
+  // 試算表新增店家：同步後店別選單馬上多出來（不用重新登入）
+  g.sheets[S.STORE].cells.push(['師大店', 2, '否', 500]);
+  await B.pg.click('#sync'); await B.pg.waitForFunction(() => document.querySelectorAll('#storeSel option').length === 3, null, { timeout: 8000 });
+  g.sheets[S.STORE].cells.pop();
+  await B.pg.click('#sync'); await B.pg.waitForFunction(() => document.querySelectorAll('#storeSel option').length === 2, null, { timeout: 8000 });
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
   assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 3, '手機要看到平板的進貨（手動 2 + 結帳單 1）');
   await B.pg.click('#tb-payroll');
