@@ -61,4 +61,11 @@ const sep3 = R3.months.find(m => m.month === '2026-09');
 assert.strictEqual(sep3.fee, 420); assert.strictEqual(sep3.feeEst, false);
 assert.ok(!R3.warns.some(w => w.month === '2026-09' && w.type === '線上支付未對帳'));
 assert.ok(R.warns.some(w => w.month === '2026-09' && w.type === '線上支付未對帳'), '沒對帳要提醒');
+// 員工借還款：只記在借款／還款，不影響盈餘、可分配
+const D4 = JSON.parse(JSON.stringify(D));
+const base4 = ctx.computeAll_(D4, '2026-11-01').months.find(m => m.month === '2026-09');
+D4.deduct.push({ store: '大埔店', month: '2026-09', type: '員工借款', amount: 50000, note: '建燁' }, { store: '大埔店', month: '2026-09', type: '員工還款', amount: 20000, note: '建燁' });
+const sep4 = ctx.computeAll_(D4, '2026-11-01').months.find(m => m.month === '2026-09');
+assert.strictEqual(sep4.loan, 50000); assert.strictEqual(sep4.repay, 20000);
+assert.strictEqual(sep4.dist, base4.dist, '借還款不影響可分配'); assert.strictEqual(sep4.profit, base4.profit);
 console.log('全部測試通過 ✓');

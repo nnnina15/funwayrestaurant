@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.7.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.8.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -452,7 +452,7 @@ function enterApp() {
   var t = todayStr(), m = t.slice(0, 7);
   ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
   ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });
-  $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).filter(function (x) { return x !== '股東分紅（已發）'; }).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
+  $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).filter(function (x) { return ['股東分紅（已發）', '員工借款', '員工還款'].indexOf(x) < 0; }).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
   var mine = TABS.filter(function (x) { return canSee(x[0]); });
   $('tabs').innerHTML = mine.map(function (x) {
     return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
@@ -703,7 +703,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.4.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.5.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -1425,7 +1425,7 @@ function deductYears() {
 }
 function onDeductYear() {
   var y = $('x-year').value, m = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12';
-  ['x-month', 'xp-month'].forEach(function (id) { if (($(id).value || '').slice(0, 4) !== y) $(id).value = m; });
+  ['x-month', 'xp-month', 'xl-month'].forEach(function (id) { if (($(id).value || '').slice(0, 4) !== y) $(id).value = m; });
   renderDeductTab();
 }
 function payoutNames() {
@@ -1440,7 +1440,8 @@ function renderDeductTab() {
   var sel = $('x-year'), ys = deductYears(), y = sel.value || todayStr().slice(0, 4);
   if (ys.indexOf(y) < 0) y = ys[ys.length - 1];
   sel.innerHTML = ys.map(function (x) { return '<option' + (x === y ? ' selected' : '') + '>' + x + '</option>'; }).join('');
-  ['x-month', 'xp-month'].forEach(function (id) { if (!$(id).value || $(id).value.slice(0, 4) !== y) $(id).value = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12'; });
+  ['x-month', 'xp-month', 'xl-month'].forEach(function (id) { if (!$(id).value || $(id).value.slice(0, 4) !== y) $(id).value = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12'; });
+  renderLoans();
   var names = payoutNames();
   $('xp-names').innerHTML = names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
   $('xp-chips').innerHTML = names.map(function (n) { return '<button type="button" class="who' + ($('xp-who').value === n ? ' on' : '') + '" onclick="$(\'xp-who\').value=\'' + jsq(n) + '\';renderDeductTab()">' + esc(n) + '</button>'; }).join('');
@@ -1449,12 +1450,12 @@ function renderDeductTab() {
   var h = '', last = '', tot = 0;
   list.forEach(function (x) {
     if (x.month !== last) { last = x.month; h += '<tr class="mh"><th colspan="4">' + Number(x.month.slice(5, 7)) + ' 月</th></tr>'; }
-    tot += Number(x.amount || 0);
-    var t = x.type === '股東分紅（已發）' ? '股東分紅' : x.type;
+    if (x.type !== '員工借款' && x.type !== '員工還款') tot += Number(x.amount || 0);   // 合計不算借還款（借還款看「員工欠款」）
+    var t = x.type === '股東分紅（已發）' ? '股東分紅' : x.type === '員工借款' ? '借出' : x.type === '員工還款' ? '還款' : x.type;
     h += '<tr><td class="nowrap">' + esc(t) + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
       '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delDeduct(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
   });
-  $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
+  $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計（不含借還款）</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
 }
 // 記錄實際發出的股東分紅：設定裡的股東（浩勤、豐吉…）記「股東分紅（已發）」；其他人（佳茹、Nina…）記「其他扣除・某某分紅」
 function addPayout() {
@@ -1467,6 +1468,56 @@ function addPayout() {
   $('xp-amount').value = '';
   renderDeductTab();
   toast('已記錄 ' + who + ' ' + money(amt) + ' ✓');
+}
+// ---- 員工借還款：記在「分配前扣除」表，類型「員工借款／員工還款」，備註＝借款人（摘要） ----
+function loanWho(note) { return String(note || '').replace(/（.*?）|\(.*?\)/g, '').trim() || '（沒寫名字）'; }
+function setLoanKind(k) {
+  ST.loanKind = k;
+  Array.prototype.forEach.call($('xl-kind').children, function (b) { b.classList.toggle('on', b.dataset.v === k); });
+  $('xl-btn').textContent = k === '還' ? '記錄還款' : '記錄借出';
+}
+// 每個人：借了多少、還了多少、還欠多少（全部年份，到今天）
+function loanSummary() {
+  var by = {};
+  view().deduct.forEach(function (d) {
+    if (d.type !== '員工借款' && d.type !== '員工還款') return;
+    var w = loanWho(d.note), o = by[w] || (by[w] = { name: w, lent: 0, back: 0, last: '' });
+    if (d.type === '員工借款') o.lent += Number(d.amount || 0); else o.back += Number(d.amount || 0);
+    if (d.month > o.last) o.last = d.month;
+  });
+  return Object.keys(by).map(function (k) { var o = by[k]; o.owe = o.lent - o.back; return o; })
+    .sort(function (a, b) { return (b.owe > 0) - (a.owe > 0) || (b.last > a.last ? 1 : -1); });
+}
+function renderLoans() {
+  if (!ST.loanKind) setLoanKind('借');
+  var list = loanSummary();
+  var names = list.map(function (o) { return o.name; });
+  (ST.snap.config.employees || []).forEach(function (e) { if (names.indexOf(e.name) < 0) names.push(e.name); });
+  $('xl-names').innerHTML = names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
+  // 還款時：先列還有欠錢的人
+  var chips = ST.loanKind === '還' ? list.filter(function (o) { return o.owe > 0; }).map(function (o) { return o.name; }) : names;
+  $('xl-chips').innerHTML = chips.map(function (n) {
+    var o = list.filter(function (x) { return x.name === n; })[0];
+    return '<button type="button" class="who' + ($('xl-who').value === n ? ' on' : '') + '" onclick="$(\'xl-who\').value=\'' + jsq(n) + '\';renderLoans()">' + esc(n) + (o && o.owe > 0 ? '<small> 欠' + money(o.owe) + '</small>' : '') + '</button>';
+  }).join('');
+  var owe = list.reduce(function (a, o) { return a + Math.max(o.owe, 0); }, 0);
+  $('xl-sum').innerHTML = list.length ? '<table class="xlist"><tbody><tr class="mh"><th>借款人</th><th class="n">借出</th><th class="n">已還</th><th class="n">還欠</th></tr>' +
+    list.map(function (o) {
+      return '<tr' + (o.owe > 0 ? '' : ' class="muted"') + '><td>' + esc(o.name) + '</td><td class="n">' + money(o.lent) + '</td><td class="n">' + money(o.back) + '</td><td class="n' + (o.owe > 0 ? ' neg' : '') + '">' + (o.owe ? money(o.owe) : '已還清') + '</td></tr>';
+    }).join('') + '<tr class="yt"><th>還沒收回</th><td></td><td></td><td class="n neg">' + money(owe) + '</td></tr></tbody></table>' +
+    '<p class="muted">每一筆的月份和摘要在下面「這一年的分紅和扣除」。</p>'
+    : '<p class="muted">還沒有借還款紀錄</p>';
+}
+function addLoan() {
+  var who = $('xl-who').value.trim(), amt = v('xl-amount'), month = $('xl-month').value, memo = $('xl-note').value.trim();
+  if (!who) return toast('請選借款人');
+  if (isNaN(amt) || !amt) return toast('請填金額');
+  if (!month) return toast('請選月份');
+  var back = ST.loanKind === '還';
+  enqueue('deduct.add', { id: uid(), month: month, type: back ? '員工還款' : '員工借款', amount: amt, note: who + (memo ? '（' + memo + '）' : '') });
+  $('xl-amount').value = ''; $('xl-note').value = '';
+  renderDeductTab();
+  toast((back ? '已記錄 ' + who + ' 還款 ' : '已記錄借給 ' + who + ' ') + money(amt) + ' ✓');
 }
 function addDeduct() {
   var amt = v('x-amount');
@@ -1632,10 +1683,12 @@ function renderYearTab() {
   people = people.filter(function (p) { return months.some(function (m) { return payBy[m.month + '|' + p]; }) || partners.indexOf(p) >= 0; });
   var paidOf = function (m) { return people.reduce(function (a, p) { return a + (payBy[m.month + '|' + p] || 0); }, 0); };
   // 結餘：上一年留下來的錢 ＋ 盈餘 − 員工分紅 − 存年終 − 其他扣除 − 發出去的分紅（＝還沒分掉的錢）
-  var carry = R.months.filter(function (m) { return m.month.slice(0, 4) < cur; }).reduce(function (a, m) { return a + m.dist - (m.paid || 0); }, 0);
+  var net = function (m) { return m.dist - (m.paid || 0) - (m.loan || 0) + (m.repay || 0); };   // 借給員工的錢先從結餘扣，還了再加回
+  var carry = R.months.filter(function (m) { return m.month.slice(0, 4) < cur; }).reduce(function (a, m) { return a + net(m); }, 0);
   var bal = {}, run = carry;
-  months.forEach(function (m) { run += m.dist - (m.paid || 0); bal[m.month] = run; });
-  var cols = ['盈餘', '分紅合計'].concat(people, ['員工分紅', '存年終', '其他扣除', '結餘']);
+  months.forEach(function (m) { run += net(m); bal[m.month] = run; });
+  var hasLoan = R.months.some(function (m) { return m.loan || m.repay; });
+  var cols = ['盈餘', '分紅合計'].concat(people, ['員工分紅', '存年終', '其他扣除'], hasLoan ? ['借還款'] : [], ['結餘']);
   var neg = function (v) { return v ? td(-v) : '<td class="n"></td>'; };
   var rowOf = function (list, name, cls) {
     var tot = sum(list, paidOf);
@@ -1643,6 +1696,7 @@ function renderYearTab() {
       (tot ? td(-tot, 'em') : '<td class="n"></td>') +
       people.map(function (p) { return neg(sum(list, function (m) { return payBy[m.month + '|' + p] || 0; })); }).join('') +
       neg(sum(list, function (m) { return m.bonus; })) + neg(sum(list, function (m) { return m.reserve; })) + neg(sum(list, function (m) { return otherBy[m.month] || 0; })) +
+      (hasLoan ? neg(sum(list, function (m) { return (m.loan || 0) - (m.repay || 0); })) : '') +
       td(list.length ? bal[list[list.length - 1].month] : carry, 'em bal') + '</tr>';
   };
   var carryRow = '<tr class="carry"><th>上一年結餘</th>' + cols.map(function (c, i) { return i === cols.length - 1 ? td(carry, 'em bal') : '<td></td>'; }).join('') + '</tr>';
@@ -1658,7 +1712,7 @@ function renderYearTab() {
     qm.forEach(function (m) { h += rowOf([m], label(m), ''); });   // 盈餘與分紅：像舊表一樣不放季合計
   });
   h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
-  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝上一年結餘＋盈餘−分紅−員工分紅−存年終−其他扣除，也就是還沒分掉的錢。每月「應該分多少」請看「月」總覽。</p>';
+  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝上一年結餘＋盈餘−分紅−員工分紅−存年終−其他扣除−借給員工＋員工還款，也就是店裡還有的錢。借還款欄：負數＝這個月借出比還款多。每月「應該分多少」請看「月」總覽。</p>';
 
   // 表二：平均細項
   var catSet = {}; R.cats.forEach(function (c) { if (c.month.slice(0, 4) === cur) catSet[c.cat] = (catSet[c.cat] || 0) + c.amount; });

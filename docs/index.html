@@ -675,6 +675,20 @@
       <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
     </div>
     <div class="card edit-card">
+      <h2>員工借還款</h2>
+      <p class="muted">借錢給員工、員工還錢都記在這裡（不影響盈餘和股東分紅，只影響結餘＝店裡還有多少錢）。</p>
+      <div class="seg" id="xl-kind"><button data-v="借" onclick="setLoanKind('借')">借出</button><button data-v="還" onclick="setLoanKind('還')">還款</button></div>
+      <div class="grid3">
+        <div><label>月份</label><input id="xl-month" type="month"></div>
+        <div><label>借款人</label><input id="xl-who" list="xl-names" placeholder="例：建燁" autocomplete="off"><datalist id="xl-names"></datalist></div>
+        <div><label>金額</label><input id="xl-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this)"></div>
+      </div>
+      <div class="chips" id="xl-chips"></div>
+      <label>摘要（可不填，例：預支10月薪水、10/15 從店長分紅扣）</label><input id="xl-note">
+      <button class="primary" id="xl-btn" onclick="addLoan()">記錄借出</button>
+    </div>
+    <div class="card" id="xl-sum-card"><h2>員工欠款</h2><div id="xl-sum"></div></div>
+    <div class="card edit-card">
       <h2>分配前扣除</h2>
       <p class="muted">股東分紅前要先扣掉的錢：員工分紅（每月不一定）、年終預留…</p>
       <div class="grid3">

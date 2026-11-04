@@ -309,6 +309,23 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tb-purchase');
   assert.ok((await B.pg.textContent('#p-cats')).includes('飲料'), '進貨頁馬上有新分類');
   console.log('裝置：員工名單、進貨分類 ✓');
+  // 員工借還款：借出 5 萬、還 2 萬 → 欠 3 萬；年總覽多「借還款」欄，結餘扣 3 萬
+  await B.pg.click('#tb-deduct');
+  await B.pg.fill('#xl-month', '2026-10'); await B.pg.fill('#xl-who', '建燁'); await B.pg.fill('#xl-amount', '50000'); await B.pg.fill('#xl-note', '9月借');
+  await B.pg.click('#xl-btn');
+  await B.pg.click('#xl-kind button:has-text("還款")');
+  assert.ok((await B.pg.textContent('#xl-chips')).includes('建燁'), '還款時列出還有欠錢的人');
+  await B.pg.click('#xl-chips button:has-text("建燁")'); await B.pg.fill('#xl-amount', '20000'); await B.pg.click('#xl-btn');
+  assert.ok((await B.pg.textContent('#xl-sum')).includes('30,000'), '欠款要算出 30,000：' + await B.pg.textContent('#xl-sum'));
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  assert.ok(g.rows(S.DEDUCT).some(r => r['類型'] === '員工借款' && r['備註'] === '建燁（9月借）' && r['金額'] === 50000), '借款存到試算表');
+  await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="year"]'); await B.pg.waitForSelector('#y-body .ytable');
+  const heads = await B.pg.$$eval('#y-body table.ytable thead th', t => t.map(x => x.textContent));
+  assert.ok(heads.includes('借還款'), '年表要有借還款欄：' + heads.join(','));
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-loan-year.png'), fullPage: true });
+  await B.pg.click('#tb-deduct');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-loan.png'), fullPage: true });
+  console.log('員工借還款 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
   await B.pg.setViewportSize({ width: 390, height: 844 });

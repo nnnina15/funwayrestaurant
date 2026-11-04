@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.4.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '管理可以在 App「裝置」直接改員工名單和進貨分類（不用再開試算表）';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.5.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '新增員工借還款：在 App「分紅扣除」記借出／還款，年總覽的結餘會跟著扣';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -48,7 +48,7 @@ HEAD[S.R_WARN] = ['店別', '月份', '類型', '說明'];
 const TEXT_COLS = ['日期', '月份', '期間', '編號', '輸入時間', '帳號', '臨時PIN', 'PIN(加密，勿改)', '最後登入', '啟用月份(yyyy-MM)', '停用月份(yyyy-MM)'];
 const PAYROLL_KINDS = ['薪資', '公司負擔', '預支'];
 const EXPENSE_TYPES = ['固定', '其他'];
-const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除', '股東分紅（已發）'];   // 已發：實際發給股東的分紅，只用來算結餘
+const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除', '股東分紅（已發）', '員工借款', '員工還款'];   // 已發：實際發給股東的分紅；借款／還款：備註寫借款人。這三種只算結餘
 const PLATFORMS = ['Panda', 'Uber', '全支付', 'LINE Pay'];   // 後兩個是線上支付：記月底實際入帳
 // 常用項目的預設值（App 裡「裝置 → 常用項目設定」可以改）
 // 預設進貨分類：新店家在「設定_進貨分類」還沒有自己的分類時，先用這套
