@@ -1693,7 +1693,7 @@ function renderYearTab() {
   (V.deduct || []).forEach(function (d) {
     var amt = Number(d.amount || 0), p = '';
     if (d.type === '股東分紅（已發）') p = who(d.note) || '股東（未寫名字）';
-    else if (d.type === '其他扣除' && /分紅/.test(String(d.note || ''))) p = who(d.note);
+    else if (d.type === '其他扣除' && /分紅|秘笈/.test(String(d.note || ''))) p = who(d.note);   // 買秘笈也算分紅，自己一欄
     if (p) { payBy[d.month + '|' + p] = (payBy[d.month + '|' + p] || 0) + amt; if (people.indexOf(p) < 0 && d.month.slice(0, 4) === cur) people.push(p); }
     else if (d.type === '其他扣除') otherBy[d.month] = (otherBy[d.month] || 0) + amt;
   });
