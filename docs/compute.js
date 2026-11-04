@@ -206,7 +206,7 @@ function applyOp_(state, op, store) {
       state.payroll = keep(state.payroll, function (r) { return r.month === d.month && r.name === d.name; });
       (d.items || []).forEach(function (it) {
         state.payroll.push({ store: store, month: d.month, name: d.name, item: it.item, amount: it.amount,
-          kind: it.kind, hours: it.hours, rate: it.rate, editedAt: d.editedAt });
+          kind: it.kind, hours: it.hours, rate: it.rate, group: d.group || '', editedAt: d.editedAt });
       });
       break;
     case 'presets.set':

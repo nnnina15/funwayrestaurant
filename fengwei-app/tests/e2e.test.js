@@ -14,7 +14,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   async function device(name) {
     const ctx = await b.newContext({ viewport: { width: 1100, height: 1300 } });
     await ctx.route(URL_, async (route) => { const body = JSON.parse(route.request().postData()); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(g.post(body)) }); });
-    const pg = await ctx.newPage(); pg.on('pageerror', e => console.log(name, 'PAGEERROR', e.message)); pg.on('dialog', d => d.accept());
+    const pg = await ctx.newPage(); pg.on('pageerror', e => console.log(name, 'PAGEERROR', e.message)); pg.on('dialog', d => d.accept(pg.__ans));
     await pg.goto('http://localhost:8765/?api=' + encodeURIComponent(URL_));   // 測試用的同步網址（正式的是內建網址）
     await pg.waitForSelector('#login-acc');
     return { ctx, pg };
@@ -105,10 +105,16 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.deepStrictEqual(await B.pg.$$eval('#storeSel option', o => o.map(x => x.textContent)), ['大埔店', '中正店'], '管理可以切兩家店');
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
   assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 3, '手機要看到平板的進貨（手動 2 + 結帳單 1）');
-  await B.pg.click('#tb-payroll'); await B.pg.click('text=範例正職(請改名)');
-  assert.ok((await B.pg.textContent('#s-name')).includes('1/3'), '範例正職、範例計時，加上日結自動記的 PT');
-  await B.pg.click('#s-name .step >> nth=1');                        // › 下一位
-  assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('2/3'), '› 要切到下一位');
+  await B.pg.click('#tb-payroll');
+  // 沒填的員工不自動列出：只看到日結自動記的 PT，名單上的人在「＋ 其他人」後面
+  assert.ok(!(await B.pg.textContent('#s-emps')).includes('範例正職'), '沒填的員工不要自動列出來');
+  assert.ok((await B.pg.textContent('#s-roster')).includes('＋範例正職(請改名)'), '沒填的員工放在＋其他人後面');
+  await B.pg.click('#s-roster button:has-text("範例正職")');
+  assert.ok((await B.pg.textContent('#s-emps')).includes('範例正職'), '點了才加入名單');
+  assert.ok((await B.pg.textContent('#s-name')).includes('1/2'), '範例正職，加上日結自動記的 PT');
+  assert.ok(await B.pg.isHidden('#s-temp'), '名單上的人不能改名／改分組');
+  await B.pg.click('#s-roster button:has-text("範例計時")');
+  assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('1/2'), '換成範例計時（剛剛沒存的範例正職不留在名單）');
   await B.pg.fill('.hours input >> nth=0', '106'); await B.pg.fill('.hours input >> nth=1', '240'); await B.pg.dispatchEvent('.hours input >> nth=0', 'input');
   await B.pg.click('text=＋ 新增項目'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=0', '加班費'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=1', '700'); await B.pg.dispatchEvent('.item-row >> nth=1 >> input >> nth=1', 'input');
   assert.ok((await B.pg.textContent('#s-calc')).includes('26,140'));
@@ -122,6 +128,24 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('text=儲存這位員工');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 26140 + 800, '人事頁存的 26,140 ＋ 日結自動記的 PT 800');
+  // 其他人：可以改名、分到計時
+  B.pg.__ans = '臨時工';
+  await B.pg.click('text=＋ 其他人（不在員工名單）');
+  assert.ok(await B.pg.isVisible('#s-temp'), '其他人要有改名／分組');
+  B.pg.__ans = '小王';
+  await B.pg.click('#s-temp .rename');
+  assert.ok((await B.pg.textContent('#s-name')).includes('小王'), '改名');
+  B.pg.__ans = undefined;
+  await B.pg.click('#s-temp .seg button:has-text("計時")');
+  await B.pg.fill('.item-row >> nth=0 >> input >> nth=1', '1500'); await B.pg.dispatchEvent('.item-row >> nth=0 >> input >> nth=1', 'input');
+  await B.pg.click('text=儲存這位員工');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  const wang = g.rows(S.PAYROLL).filter(r => r['姓名'] === '小王');
+  assert.ok(wang.length === 1 && wang[0]['分組'] === '計時' && wang[0]['金額'] === 1500, '小王存成計時：' + JSON.stringify(wang));
+  assert.ok(!g.rows(S.PAYROLL).some(r => r['姓名'] === '臨時工'), '舊名字不留');
+  const grpText = await B.pg.$$eval('#s-emps .grp', gs => gs.map(x => x.textContent));
+  assert.ok(grpText.some(t => t.startsWith('計時') && t.includes('小王')), '小王要在計時組：' + grpText.join(' / '));
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-payroll-temp.png'), fullPage: true });
   await B.pg.click('#tb-expense'); await B.pg.fill('#e-month', '2026-01'); await B.pg.dispatchEvent('#e-month', 'change');
   await B.pg.locator('.stepper:has(#e-month) .step').first().click(); assert.strictEqual(await B.pg.inputValue('#e-month'), '2025-12', '月份 ‹ 要能跨年');
   // 固定支出常用項目：點「房租」帶入名稱和類型，記過就不再顯示；下個月會顯示上次金額

@@ -185,6 +185,13 @@
   .dv .split { font-size: 13px; color: var(--muted); padding: 8px 14px; display: flex; align-items: center; gap: 6px; }
 
   .emp-nav { display: flex; align-items: center; gap: 10px; }
+  #s-add { align-items: center; }
+  #s-add .ghost { margin: 0; }
+  .temp-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; }
+  .temp-bar .seg { display: inline-flex; background: var(--soft); border-radius: 12px; padding: 3px; gap: 3px; }
+  .temp-bar .seg button { background: transparent; color: var(--ink); padding: 8px 14px; font-size: 15px; border-radius: 9px; }
+  .temp-bar .seg button.on { background: var(--brand); color: #fff; font-weight: 700; }
+  .temp-bar .rename { padding: 8px 14px; font-size: 15px; }
   /* 人事：員工名字列往下滑時固定在日期列下面 */
   #s-name { position: sticky; top: calc(var(--sticky-top, 50px) / var(--fz, 1)); z-index: 3; background: var(--card);
     margin: -6px -2px 8px; padding: 6px 2px 8px; border-bottom: 1px solid var(--line); }
@@ -571,12 +578,17 @@
       <label>月份</label><input id="s-month" type="month" onchange="onPayMonth()">
       <label>員工（點一下編輯）</label>
       <div class="emp-list" id="s-emps"></div>
-      <button class="ghost" onclick="addTempEmployee()">＋ 其他人（不在員工名單）</button>
+      <div class="chips" id="s-add">
+        <button class="ghost" onclick="addTempEmployee()">＋ 其他人（不在員工名單）</button>
+        <span id="s-roster" class="chips"></span>
+      </div>
+      <p class="muted" id="s-roster-h"></p>
     </div>
     <div class="card hide" id="s-editor">
       <h2 id="s-name" class="emp-nav"></h2>
       <p class="muted">每個人可以自己加項目：加班費、全勤、津貼、扣款、預支…<br>
         <b>薪資</b>＝發給員工、也算公司成本；<b>公司負擔</b>＝勞健保勞退公司付的，只算成本；<b>預支</b>＝已先給的錢，只影響實發。</p>
+      <div id="s-temp" class="temp-bar hide"></div>
       <div id="s-items"></div>
       <label>常用項目（點一下加入）</label>
       <div class="chips" id="s-presets"></div>

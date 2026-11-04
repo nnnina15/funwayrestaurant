@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.5.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.6.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -648,7 +648,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.2.1';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.3.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -925,13 +925,18 @@ function renderPayrollTab(full) {
     if (x.kind !== '預支') by[x.name].cost += Number(x.amount || 0);
     if (x.rate !== '' && x.rate !== undefined && x.rate !== null) by[x.name].hourly = true;
   });
-  // 分組：依員工設定的類型；不在名單上的人，看薪資有沒有「時數×時薪」判斷
+  // 只列出這個月有填的人（和正在編輯的人）；名單上還沒填的放在「＋ 其他人」後面，點了才加入
   var groups = { '正職': [], '計時': [], '其他': [] };
-  var seen = {};
-  (ST.snap.config.employees || []).forEach(function (e) {
-    (groups[e.type === '計時' ? '計時' : '正職']).push(e.name); seen[e.name] = true;
+  var shown = Object.keys(by);
+  if (ST.emp && ST.empMonth === month && shown.indexOf(ST.emp) < 0) shown.push(ST.emp);
+  var rosterNames = (ST.snap.config.employees || []).map(function (e) { return e.name; });
+  // 名單上的照名單順序，其他人照填的順序
+  shown.sort(function (a, b) {
+    var ia = rosterNames.indexOf(a), ib = rosterNames.indexOf(b);
+    return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib);
   });
-  Object.keys(by).forEach(function (n) { if (!seen[n]) (by[n].hourly ? groups['計時'] : groups['其他']).push(n); });
+  shown.forEach(function (n) { groups[empGroup(n, by[n] && by[n].hourly)].push(n); });
+  var notYet = rosterNames.filter(function (n) { return shown.indexOf(n) < 0; });
   var total = Object.keys(by).reduce(function (a, n) { return a + by[n].cost; }, 0);
   function btn(n) {
     return '<button class="' + (n === ST.emp ? 'on' : '') + '" onclick="openEmp(\'' + jsq(n) + '\')"><span>' + esc(n) + pendTag('payroll', month + '|' + n) + '</span><span>' +
@@ -945,10 +950,55 @@ function renderPayrollTab(full) {
     if (!list.length) return;
     h += '<div class="grp"><div class="grp-h"><b>' + g[1] + '</b><span class="muted">' + list.length + ' 人｜小計 ' + money(sub(list)) + '</span></div>' + list.map(btn).join('') + '</div>';
   });
-  $('s-emps').innerHTML = (h || '<p class="muted">員工名單是空的，請到試算表「設定_員工」新增</p>') +
+  $('s-emps').innerHTML = (h || '<p class="muted">這個月還沒有人填，點下面的名字加入</p>') +
     '<p class="muted">本月人事成本合計：<b>' + money(total) + '</b></p>';
+  $('s-roster').innerHTML = notYet.map(function (n) { return '<button onclick="openEmp(\'' + jsq(n) + '\')">＋' + esc(n) + '</button>'; }).join('');
+  $('s-roster-h').textContent = rosterNames.length ? (notYet.length ? '名單上這個月還沒填的人，點名字加入' : '') : '員工名單是空的，可以到試算表「設定_員工」新增';
   if (full) $('s-editor').classList.toggle('hide', !ST.emp);
 }
+// 這個人放哪一組：員工名單的類型 → 自己選過的（正職／計時） → 有時數×時薪就算計時 → 其他
+function inRoster(n) { return (ST.snap.config.employees || []).some(function (e) { return e.name === n; }); }
+function empGroup(n, hourly) {
+  var e = (ST.snap.config.employees || []).filter(function (x) { return x.name === n; })[0];
+  if (e) return e.type === '計時' ? '計時' : '正職';
+  if (ST.emp === n && ST.empGroup !== undefined) return ST.empGroup || '其他';
+  var g = savedGroup(n);
+  if (g) return g;
+  return hourly ? '計時' : '其他';
+}
+// 這個人最近一次選的分組（這個月沒有就看以前的月份）
+function savedGroup(n) {
+  var month = $('s-month').value, best = null;
+  view().payroll.forEach(function (x) {
+    if (x.name !== n || !x.group) return;
+    var score = (x.month === month ? '9' : '0') + x.month;
+    if (!best || score > best.s) best = { s: score, g: x.group };
+  });
+  return best ? best.g : '';
+}
+// 不在名單上的人：可以改名、選正職／計時
+function renderTempBar() {
+  var bar = $('s-temp'), temp = ST.emp && !inRoster(ST.emp);
+  bar.classList.toggle('hide', !temp);
+  if (!temp) return;
+  var g = ST.empGroup || '';
+  bar.innerHTML = '<button class="ghost rename" onclick="renameEmp()">✎ 改名</button>' +
+    '<span class="seg">' + [['正職', '正職'], ['計時', '計時'], ['', '其他']].map(function (o) {
+      return '<button class="' + (g === o[0] ? 'on' : '') + '" onclick="setEmpGroup(\'' + o[0] + '\')">' + o[1] + '</button>';
+    }).join('') + '</span>';
+}
+function setEmpGroup(g) { ST.empGroup = g; ST.itemsDirty = true; renderTempBar(); renderPayrollTab(false); }
+function renameEmp() {
+  var n = prompt('改成什麼名字？', ST.emp);
+  if (!n || !(n = n.trim()) || n === ST.emp) return;
+  var month = $('s-month').value;
+  if (view().payroll.some(function (x) { return x.month === month && x.name === n; }) && !confirm(n + ' 這個月已經有資料，儲存後會被這邊的內容蓋掉，確定？')) return;
+  if (!ST.renameFrom) ST.renameFrom = ST.emp;
+  ST.emp = n; ST.itemsDirty = true;
+  renderPayrollTab(false); empTitle();
+  renderTempBar();
+}
+
 // 換月份：同一位員工直接換成新月份的資料（沒選人就只更新名單）
 function onPayMonth() {
   if (ST.emp) {
@@ -968,7 +1018,7 @@ function stepEmp(d) {
   openEmp(list[i], true);
 }
 function openEmp(name, stay) {
-  ST.emp = name; ST.itemsDirty = false;
+  ST.emp = name; ST.itemsDirty = false; ST.renameFrom = '';
   var month = $('s-month').value; ST.empMonth = month;
   var rows = view().payroll.filter(function (x) { return x.month === month && x.name === name; });
   var asItem = function (x) { return { item: x.item, amount: x.amount, kind: x.kind, hours: x.hours, rate: x.rate, neg: Number(x.amount) < 0 }; };
@@ -980,14 +1030,21 @@ function openEmp(name, stay) {
     var e = (ST.snap.config.employees || []).filter(function (x) { return x.name === name; })[0];
     ST.items = (e ? payrollDefaults(e) : (rows.length ? [] : [{ item: '薪資', amount: '', kind: '薪資' }])).concat(rows.map(asItem));
   }
+  ST.empSaved = saved;
+  ST.empGroup = inRoster(name) ? undefined : savedGroup(name);
   renderPayrollTab(false);
+  empTitle();
+  $('s-editor').classList.remove('hide');
+  renderTempBar();
+  renderItems();
+  if (!stay) $('s-editor').scrollIntoView({ behavior: 'smooth' });
+}
+function empTitle() {
+  var name = ST.emp, month = ST.empMonth, saved = ST.empSaved;
   var list = ST.empOrder || [], idx = list.indexOf(name);
   $('s-name').innerHTML = '<button class="step" onclick="stepEmp(-1)" aria-label="上一位"' + (idx <= 0 ? ' disabled' : '') + '>‹</button>' +
     '<span class="emp-t">' + esc(name) + '<small>' + month.slice(0, 4) + '/' + Number(month.slice(5, 7)) + '月' + (saved ? '・已儲存過' : '・帶入預設') + (idx >= 0 ? '・' + (idx + 1) + '/' + list.length : '') + '</small></span>' +
     '<button class="step" onclick="stepEmp(1)" aria-label="下一位"' + (idx < 0 || idx >= list.length - 1 ? ' disabled' : '') + '>›</button>';
-  $('s-editor').classList.remove('hide');
-  renderItems();
-  if (!stay) $('s-editor').scrollIntoView({ behavior: 'smooth' });
 }
 function hasRate(it) { return it.rate !== '' && it.rate !== undefined && it.rate !== null; }
 
@@ -1053,9 +1110,12 @@ function savePayroll() {
     return o;
   });
   if (bad) return toast('有金額格式看不懂');
-  enqueue('payroll.upsert', { month: $('s-month').value, name: ST.emp, items: items });
+  var month = $('s-month').value, op = { month: month, name: ST.emp, items: items };
+  if (!inRoster(ST.emp) && ST.empGroup) op.group = ST.empGroup;
+  if (ST.renameFrom && ST.renameFrom !== ST.emp) enqueue('payroll.upsert', { month: month, name: ST.renameFrom, items: [] });   // 改名：舊名字這個月的資料移除
+  enqueue('payroll.upsert', op);
   toast(ST.emp + ' 已儲存 ✓');
-  ST.emp = '';
+  ST.emp = ''; ST.renameFrom = ''; ST.empGroup = undefined;
   $('s-editor').classList.add('hide');
   renderPayrollTab(false);
 }

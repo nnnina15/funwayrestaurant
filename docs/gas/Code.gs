@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.2.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '登入帳號不分大小寫（例如 Nina、nina、NINA 都可以）';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.3.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '人事：臨時加的人可以改名、分到正職或計時（「人事明細」會自動多一欄「分組」）；帳號不分大小寫';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -31,7 +31,10 @@ HEAD[S.PRESET] = ['店別', '用途', '名稱', '分類', '加扣'];   // 用途
 HEAD[S.DAILY] = ['輸入時間', '日期', '店別', '公休', '現場', 'Panda', 'Uber', '全支付', 'LINE Pay', '現場支出', '點收現金', '應有現金', '現金差額', '備註', '裝置', '支出明細'];
 HEAD[S.PURCHASE] = ['編號', '輸入時間', '日期', '店別', '分類', '金額', '備註', '裝置'];
 HEAD[S.EXPENSE] = ['編號', '輸入時間', '月份', '店別', '類型', '項目', '金額', '備註', '裝置'];
-HEAD[S.PAYROLL] = ['輸入時間', '月份', '店別', '姓名', '項目', '金額', '類別', '時數', '時薪', '裝置'];
+HEAD[S.PAYROLL] = ['輸入時間', '月份', '店別', '姓名', '項目', '金額', '類別', '時數', '時薪', '裝置', '分組'];
+// 後來新加的欄：舊試算表沒有這欄時，程式會自動加在最右邊（不用先按初始化）
+const ADDED_COLS = ['分組'];
+const PAY_GROUPS = ['正職', '計時'];
 HEAD[S.DELIVERY] = ['輸入時間', '月份', '期間', '店別', '平台', '費用明細(訂單金額)', '佣金', '月費', '拒單費用', '其他調整', '實際入帳', '備註', '裝置'];   // 一列＝一期；同平台同月份的實際入帳加總＝當月入帳
 HEAD[S.DEDUCT] = ['編號', '輸入時間', '月份', '店別', '類型', '金額', '備註', '裝置'];
 HEAD[S.R_MONTH] = ['店別', '月份', '狀態', '工作天', '現場營收', 'Panda營業額', 'Panda入帳', 'Uber營業額', 'Uber入帳',
@@ -661,7 +664,8 @@ function applyServerOp_(store, op) {
         return { '輸入時間': at, '月份': month, '店別': store, '姓名': name, '項目': str_(it.item),
           '金額': hasRate ? Math.round(num_(it.hours) * num_(it.rate)) : num_(it.amount),
           '類別': PAYROLL_KINDS.indexOf(it.kind) >= 0 ? it.kind : '薪資',
-          '時數': hasRate ? num_(it.hours) : '', '時薪': hasRate ? num_(it.rate) : '', '裝置': dev };
+          '時數': hasRate ? num_(it.hours) : '', '時薪': hasRate ? num_(it.rate) : '', '裝置': dev,
+          '分組': PAY_GROUPS.indexOf(d.group) >= 0 ? d.group : '' };
       }));
       return 'ok';
     }
@@ -797,7 +801,7 @@ const rec_ = {
     return { store: str_(r['店別']), month: monthKey_(r['月份']), name: str_(r['姓名']), item: str_(r['項目']),
       amount: num_(r['金額']), kind: str_(r['類別']) || '薪資',
       hours: r['時數'] === '' ? '' : num_(r['時數']), rate: r['時薪'] === '' ? '' : num_(r['時薪']),
-      editedAt: tsKey_(r['輸入時間']) };
+      group: str_(r['分組']), editedAt: tsKey_(r['輸入時間']) };
   },
   deduct: function (r) {
     return { store: str_(r['店別']), id: str_(r['編號']), month: monthKey_(r['月份']), type: str_(r['類型']),
@@ -899,8 +903,13 @@ function cols_(sh, name) {
   const h = HEAD[name], lc = sh.getLastColumn();
   if (lc < 1) return h;
   const top = sh.getRange(1, 1, 1, lc).getValues()[0].map(str_);
-  if (!h.every(function (k) { return top.indexOf(k) >= 0; })) return h;
   let last = top.length; while (last > 0 && !top[last - 1]) last--;
+  const miss = h.filter(function (k) { return top.indexOf(k) < 0; });
+  if (miss.length && miss.length < h.length && miss.every(function (k) { return ADDED_COLS.indexOf(k) >= 0; })) {
+    sh.getRange(1, last + 1, 1, miss.length).setValues([miss]);
+    return top.slice(0, last).concat(miss);
+  }
+  if (miss.length) return h;
   return top.slice(0, last);
 }
 
