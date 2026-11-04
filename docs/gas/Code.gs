@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.3.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '人事：臨時加的人可以改名、分到正職或計時（「人事明細」會自動多一欄「分組」）；帳號不分大小寫';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.3.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '新店家只要在「設定_店家」加一列就能用：還沒設定進貨分類時，先用預設分類';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -51,6 +51,9 @@ const EXPENSE_TYPES = ['固定', '其他'];
 const DEDUCT_TYPES = ['員工分紅', '年終預留', '其他扣除', '股東分紅（已發）'];   // 已發：實際發給股東的分紅，只用來算結餘
 const PLATFORMS = ['Panda', 'Uber', '全支付', 'LINE Pay'];   // 後兩個是線上支付：記月底實際入帳
 // 常用項目的預設值（App 裡「裝置 → 常用項目設定」可以改）
+// 預設進貨分類：新店家在「設定_進貨分類」還沒有自己的分類時，先用這套
+const DEFAULT_CATS = ['麵', '雞蛋', '菜', '洋蔥/火腿丁', '瓦斯', '萬昌肉品', '豬肉攤', '牛亨', '雞肉', '海鮮/蒜', '蝦仁',
+  '米', '免洗', '銘利行', '乾貨/配菜', '鹽水/醬油', '五金/文具', '大禹商行', '員工飲/食'];
 const DEFAULT_PRESETS = [
   ['每日結帳', '米', '米', ''], ['每日結帳', '菜', '菜', ''], ['每日結帳', '蔥', '菜', ''], ['每日結帳', '油條', '其他支出', ''],
   ['每日結帳', '燉滷', '其他支出', ''], ['每日結帳', 'PT', 'PT薪資', ''],
@@ -216,9 +219,7 @@ function setup() {
   seed_(S.STORE, [['大埔店', 2, '否', 500], ['中正店', 2, '否', 500]]);
   seed_(S.PARTNER, [['大埔店', '豐吉', 60], ['大埔店', '浩勤', 20], ['大埔店', '呀肥', 20],
     ['中正店', '浩勤', 65], ['中正店', '豐吉', 35]]);
-  const cats = ['麵', '雞蛋', '菜', '洋蔥/火腿丁', '瓦斯', '萬昌肉品', '豬肉攤', '牛亨', '雞肉', '海鮮/蒜', '蝦仁',
-    '米', '免洗', '銘利行', '乾貨/配菜', '鹽水/醬油', '五金/文具', '大禹商行', '員工飲/食'];
-  seed_(S.CAT, cats.map(function (c) { return ['全部', c, '', c === '牛亨' ? '2026-10' : '']; }));
+  seed_(S.CAT, DEFAULT_CATS.map(function (c) { return ['全部', c, '', c === '牛亨' ? '2026-10' : '']; }));
   seed_(S.EMP, [
     ['大埔店', '範例正職(請改名)', '正職', 45000, '', 485, 738, 1770, 1428, 2368, '是'],
     ['大埔店', '範例計時(請改名)', '計時', '', 250, '', '', '', '', '', '是']
@@ -327,6 +328,16 @@ function importOldData() {
   if (!m) { ui.alert('看不懂這個網址，請貼上完整的試算表網址'); return; }
   const msg = withLock_(function () { return importFrom_(SpreadsheetApp.openById(m[0])); });
   ui.alert('匯入完成！\n\n' + msg + '\n\n打開 App 的「總覽」就能看到。');
+}
+
+// 這家店的進貨分類（共用＋自己的）；新店家一筆都沒有時，先用預設分類，不用先填設定
+function storeCats_(store) {
+  const list = rows_(S.CAT).filter(function (r) { return str_(r['分類']); }).map(function (r) {
+    return { store: str_(r['店別(全部/店名)']) || '全部', cat: str_(r['分類']),
+      from: monthKey_(r['啟用月份(yyyy-MM)']), to: monthKey_(r['停用月份(yyyy-MM)']) };
+  }).filter(function (c) { return c.store === '全部' || c.store === store; });
+  if (list.length) return list;
+  return DEFAULT_CATS.filter(function (c) { return c !== '牛亨'; }).map(function (c) { return { store: '全部', cat: c, from: '', to: '' }; });
 }
 
 function importFrom_(src) {
@@ -768,10 +779,7 @@ function pull_(s, role) {
   const config = {
     serverVersion: SERVER_VERSION,
     store: { name: s.name, fee: s.fee, cashIn: s.cashIn, cashWarn: s.cashWarn },
-    categories: rows_(S.CAT).filter(function (r) { return str_(r['分類']); }).map(function (r) {
-      return { store: str_(r['店別(全部/店名)']) || '全部', cat: str_(r['分類']),
-        from: monthKey_(r['啟用月份(yyyy-MM)']), to: monthKey_(r['停用月份(yyyy-MM)']) };
-    }).filter(function (c) { return c.store === '全部' || c.store === s.name; }),
+    categories: storeCats_(s.name),
     employees: all ? employees_(s.name) : [],
     partners: all ? partners_().filter(mine) : [],
     kinds: PAYROLL_KINDS, expenseTypes: EXPENSE_TYPES, deductTypes: DEDUCT_TYPES

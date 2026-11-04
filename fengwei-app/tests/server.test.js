@@ -217,4 +217,12 @@ assert.ok(!g.rows(S.EMP).some(r => String(r['姓名']).includes('範例')));
 im = g.ctx.importFrom_(g.ctx.SpreadsheetApp.openById('I'.repeat(30)));
 assert.ok(!/新增 [1-9]/.test(im), '第二次匯入不該新增');
 
+// 新店家：只在「設定_店家」加一列，沒有分類、股東、員工也能用
+g.sheets[S.STORE].cells.push(['師大店', 2, '否', 500]);
+g.sheets[S.CAT].cells = g.sheets[S.CAT].cells.filter((r, i) => i === 0 || r[0] !== '全部');   // 模擬已經改成每家店各自分類
+r = g.post({ action: 'sync', store: '師大店', account: adm.account, token: adm.token, ops: [op('daily.upsert', { date: '2026-11-03', site: 5000, cash: 5000, editedAt: '2026-11-03 22:00:00' })] });
+assert.ok(r.ok, JSON.stringify(r).slice(0, 200)); assert.ok(r.stores.includes('師大店'), '管理自動看得到新店');
+assert.ok(r.config.categories.length > 5 && r.config.categories.some(c => c.cat === '麵'), '新店沒有分類時用預設分類');
+const sd = computeAll_({ stores: [r.config.store], partners: r.config.partners, employees: r.config.employees, ...r.data }, '2026-11-04');
+assert.ok(sd, '沒有股東也能算總覽');
 console.log('同步服務測試通過 ✓');
