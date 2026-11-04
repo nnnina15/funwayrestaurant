@@ -1,7 +1,15 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.4.1';   // 和 sw.js 的 VERSION 一起改
-var DEFAULT_URL = '';   // 試算表「部署」後的網址（…/exec）。填了之後，新裝置不用再輸入同步網址
+var APP_VERSION = '4.5.0';   // 和 sw.js 的 VERSION 一起改
+// 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
+var DEFAULT_URL = (function (s, k) {
+  try {
+    var b = atob(s), out = '';
+    for (var i = 0; i < b.length; i++) out += String.fromCharCode(b.charCodeAt(i) ^ k.charCodeAt(i % k.length));
+    return out.split('').reverse().join('');
+  } catch (e) { return ''; }
+})('BRJbI1oZLREOICcQAhtfQTYrVB4bAhosQFEYUTNifj8JRlMfCkNnCjxWFQ5NJR4QCzEFPSc9CCB8NgUsRDYLVgJxPhI4BRI0HhVAPxMlNk4KSQRMNBYPGk4UCRQNIxkJGA4eSANTLwcNBE5WXARTMgEG', 'fw#Funway');
+function isBuiltinUrl(u) { return !!DEFAULT_URL && u === DEFAULT_URL; }
 
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
@@ -158,7 +166,8 @@ function showView(name) {
   $('sync').classList.toggle('hide', name !== 'app');
   $('menuBtn').classList.toggle('hide', name !== 'app');
   if (name === 'setup') {
-    $('cfg-url').value = ST.cfg ? ST.cfg.url : '';
+    $('cfg-url').value = ST.cfg && !isBuiltinUrl(ST.cfg.url) ? ST.cfg.url : '';
+    $('cfg-url').placeholder = DEFAULT_URL ? '空白＝用內建網址（建議）' : 'https://script.google.com/macros/s/…/exec';
     $('title').textContent = '裝置設定';
   }
   if (name === 'login') { $('title').textContent = '登入'; if (!$('login-acc').value) $('login-acc').value = LS.get('fw_lastAcc', ''); }
@@ -252,8 +261,9 @@ function boot() {
   // 同步網址：內建好了就不用輸入；也可以用「網址?api=…」的連結一次設定好
   var qApi = (location.search.match(/[?&]api=([^&]+)/) || [])[1];
   var preset = qApi ? decodeURIComponent(qApi) : DEFAULT_URL;
-  if (preset && /^https:\/\/script\.google(usercontent)?\.com\//.test(preset) && (!ST.cfg || qApi)) {
-    ST.cfg = { url: preset, device: ST.cfg ? ST.cfg.device : '' }; LS.set('fw_cfg', ST.cfg);
+  // 沒有自己改過網址的裝置（包括以前存了舊網址的）一律用內建網址
+  if (preset && /^https:\/\/script\.google(usercontent)?\.com\//.test(preset) && (!ST.cfg || qApi || (!ST.cfg.custom && !qApi && ST.cfg.url !== preset))) {
+    ST.cfg = { url: preset, device: ST.cfg ? ST.cfg.device : '', custom: !!qApi && !isBuiltinUrl(preset) }; LS.set('fw_cfg', ST.cfg);
     if (qApi && history.replaceState) history.replaceState(null, '', location.pathname);
   }
   if (!ST.cfg) return showView('setup');
@@ -263,10 +273,10 @@ function boot() {
 
 /* ---------- 第一次設定 ---------- */
 function saveSetup() {
-  var url = $('cfg-url').value.trim();
+  var url = $('cfg-url').value.trim() || DEFAULT_URL;
   if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) return toast('同步網址格式不對，應該是 https://script.google.com/… 開頭');
   var old = ST.cfg;
-  ST.cfg = { url: url, device: old ? old.device : '' };
+  ST.cfg = { url: url, device: old ? old.device : '', custom: !isBuiltinUrl(url) };   // 自己改的網址才記住，不然都跟著內建
   busy(true);
   api('ping').then(function () {
     busy(false);
@@ -327,7 +337,7 @@ function login() {
       return;
     }
     if (e.down) {
-      var u = (ST.cfg && ST.cfg.url) || '';
+      var u = ST.cfg && isBuiltinUrl(ST.cfg.url) ? '（內建網址）' : ((ST.cfg && ST.cfg.url) || '');
       alert(SYNC_DOWN_MSG + (e.detail ? '\n\n（試算表回應：' + e.detail + '）' : '') +
         '\n\n這台裝置用的同步網址：\n' + u + '\n\n檢查方法：把這個網址貼到瀏覽器打開，看到「風味記帳同步服務」就是網址正確；看到錯誤頁或要登入，就是網址錯了，請按「修改同步網址」換成手機上在用的那個。');
       return;

@@ -15,8 +15,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
     const ctx = await b.newContext({ viewport: { width: 1100, height: 1300 } });
     await ctx.route(URL_, async (route) => { const body = JSON.parse(route.request().postData()); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(g.post(body)) }); });
     const pg = await ctx.newPage(); pg.on('pageerror', e => console.log(name, 'PAGEERROR', e.message)); pg.on('dialog', d => d.accept());
-    await pg.goto('http://localhost:8765/');
-    await pg.fill('#cfg-url', URL_); await pg.click('text=測試連線並儲存');
+    await pg.goto('http://localhost:8765/?api=' + encodeURIComponent(URL_));   // 測試用的同步網址（正式的是內建網址）
     await pg.waitForSelector('#login-acc');
     return { ctx, pg };
   }
