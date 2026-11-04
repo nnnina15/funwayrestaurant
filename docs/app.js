@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.6.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.6.1';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1030,6 +1030,26 @@ function openEmp(name, stay) {
     var e = (ST.snap.config.employees || []).filter(function (x) { return x.name === name; })[0];
     ST.items = (e ? payrollDefaults(e) : (rows.length ? [] : [{ item: '薪資', amount: '', kind: '薪資' }])).concat(rows.map(asItem));
   }
+  // 正職：月薪、扣健保(自付)、扣勞保(自付) 固定在最上面，不能刪除也不用再加
+  var emp = (ST.snap.config.employees || []).filter(function (x) { return x.name === name; })[0];
+  if (emp && emp.type !== '計時') {
+    var fixed = FIXED_PAY.map(function (f) {
+      var i = -1;
+      ST.items.forEach(function (it, j) { if (i < 0 && String(it.item || '').trim() === f[0]) i = j; });
+      var it = i >= 0 ? ST.items.splice(i, 1)[0] : { item: f[0], amount: '', kind: '薪資' };
+      if (it) { it.fixed = true; it.neg = f[1] < 0; }
+      return it;
+    });
+    ST.items = fixed.concat(ST.items);
+  } else if (emp) {
+    // 計時：固定一行「時數 × 時薪」，時薪照設定（存過就照存過的），只要填上班時數
+    var k = -1;
+    ST.items.forEach(function (it, j) { if (k < 0 && hasRate(it) && !/（日結 \d+\/\d+）$/.test(String(it.item || ''))) k = j; });
+    var hr = k >= 0 ? ST.items.splice(k, 1)[0] : { item: '時薪', hours: '', rate: emp.hourly || '', kind: '薪資' };
+    if (hr.rate === '' || hr.rate === undefined || hr.rate === null) hr.rate = emp.hourly || '';
+    hr.fixed = true;
+    ST.items = [hr].concat(ST.items);
+  }
   ST.empSaved = saved;
   ST.empGroup = inRoster(name) ? undefined : savedGroup(name);
   renderPayrollTab(false);
@@ -1046,6 +1066,7 @@ function empTitle() {
     '<span class="emp-t">' + esc(name) + '<small>' + month.slice(0, 4) + '/' + Number(month.slice(5, 7)) + '月' + (saved ? '・已儲存過' : '・帶入預設') + (idx >= 0 ? '・' + (idx + 1) + '/' + list.length : '') + '</small></span>' +
     '<button class="step" onclick="stepEmp(1)" aria-label="下一位"' + (idx < 0 || idx >= list.length - 1 ? ' disabled' : '') + '>›</button>';
 }
+var FIXED_PAY = [['月薪', 1], ['扣健保(自付)', -1], ['扣勞保(自付)', -1]];
 function hasRate(it) { return it.rate !== '' && it.rate !== undefined && it.rate !== null; }
 
 /* 人事常用項目：[名稱, 類別, 1=加項 / -1=扣項]，照設定的清單 */
@@ -1073,11 +1094,12 @@ function renderItems() {
   var kinds = ST.snap.config.kinds || ['薪資', '公司負擔', '預支'];
   $('s-items').innerHTML = ST.items.map(function (it, i) {
     var amt = hasRate(it)
-      ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="時數" inputmode="text" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal" oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
+      ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="上班時數" inputmode="text" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal"' + (it.fixed && String(it.rate) !== '' ? ' readonly tabindex="-1" class="ro-in"' : '') + ' oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
       : '<input' + (it.neg ? ' class="neg-in"' : '') + ' value="' + esc(it.amount) + '" inputmode="text" placeholder="' + (it.neg ? '扣多少（打正數就好）' : '金額（扣款打負數）') + '" oninput="setItem(' + i + ',\'amount\',this.value)">';
-    return '<div class="item-row' + (hasRate(it) ? ' rate' : '') + '"><input value="' + esc(it.item) + '" placeholder="項目名稱" oninput="setItem(' + i + ',\'item\',this.value)">' + amt +
-      '<select onchange="setItem(' + i + ',\'kind\',this.value)">' + kinds.map(function (k) { return '<option value="' + esc(k) + '"' + (k === it.kind ? ' selected' : '') + '>' + esc(window.matchMedia && window.matchMedia('(max-width: 560px)').matches && k === '公司負擔' ? '公司付' : k) + '</option>'; }).join('') + '</select>' +
-      '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delItem(' + i + ')">✕</button></div>';
+    var fx = it.fixed;
+    return '<div class="item-row' + (hasRate(it) ? ' rate' : '') + (fx ? ' fixed' : '') + '"><input value="' + esc(it.item) + '" placeholder="項目名稱"' + (fx ? ' readonly tabindex="-1"' : '') + ' oninput="setItem(' + i + ',\'item\',this.value)">' + amt +
+      '<select' + (fx ? ' disabled' : '') + ' onchange="setItem(' + i + ',\'kind\',this.value)">' + kinds.map(function (k) { return '<option value="' + esc(k) + '"' + (k === it.kind ? ' selected' : '') + '>' + esc(window.matchMedia && window.matchMedia('(max-width: 560px)').matches && k === '公司負擔' ? '公司付' : k) + '</option>'; }).join('') + '</select>' +
+      (fx ? '<span class="del-x fixed-x" title="固定項目，不能刪除"></span>' : '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delItem(' + i + ')">✕</button>') + '</div>';
   }).join('');
   renderPresetChips();
   payCalc();
@@ -1088,7 +1110,9 @@ function itemAmount(it) {
   return it.neg && a > 0 ? -a : a;     // 扣款項目打正數也會變成扣
 }
 function setItem(i, k, val) { ST.items[i][k] = val; ST.itemsDirty = true; payCalc(); }
-function delItem(i) { ST.items.splice(i, 1); ST.itemsDirty = true; renderItems(); }
+function delItem(i) { if (ST.items[i] && ST.items[i].fixed) return;
+  delItemAt(i); }
+function delItemAt(i) { ST.items.splice(i, 1); ST.itemsDirty = true; renderItems(); }
 function addItem(hourly) { ST.itemsDirty = true; ST.items.push(hourly ? { item: '時薪', hours: '', rate: '', kind: '薪資' } : { item: '', amount: '', kind: '薪資' }); renderItems(); }
 function payCalc() {
   var pay = 0, cost = 0, bad = false;
@@ -1102,7 +1126,8 @@ function payCalc() {
 }
 function savePayroll() {
   var bad = false;
-  var items = ST.items.filter(function (it) { return String(it.item || '').trim(); }).map(function (it) {
+  // 固定項目沒填金額（0）就不存，免得試算表多一堆 0
+  var items = ST.items.filter(function (it) { return String(it.item || '').trim() && !(it.fixed && !itemAmount(it)); }).map(function (it) {
     var r = hasRate(it);
     var o = { item: String(it.item).trim(), kind: it.kind || '薪資', hours: r ? expr(it.hours) : '', rate: r ? expr(it.rate) : '' };
     o.amount = itemAmount(it);

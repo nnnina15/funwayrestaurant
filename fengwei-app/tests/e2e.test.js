@@ -113,21 +113,27 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok((await B.pg.textContent('#s-emps')).includes('範例正職'), '點了才加入名單');
   assert.ok((await B.pg.textContent('#s-name')).includes('1/2'), '範例正職，加上日結自動記的 PT');
   assert.ok(await B.pg.isHidden('#s-temp'), '名單上的人不能改名／改分組');
+  // 正職：月薪、扣健保(自付)、扣勞保(自付) 固定在最上面，沒有刪除鈕，常用項目也不再出現
+  assert.deepStrictEqual(await B.pg.$$eval('.item-row.fixed', rs => rs.map(r => r.querySelector('input').value + (r.querySelector('.danger') ? 'X' : ''))), ['月薪', '扣健保(自付)', '扣勞保(自付)'], '正職固定三項');
+  assert.ok(!(await B.pg.textContent('#s-presets')).includes('扣健保'), '固定項目不能再加一次');
   await B.pg.click('#s-roster button:has-text("範例計時")');
   assert.ok((await B.pg.textContent('#s-name')).includes('範例計時(請改名)') && (await B.pg.textContent('#s-name')).includes('1/2'), '換成範例計時（剛剛沒存的範例正職不留在名單）');
-  await B.pg.fill('.hours input >> nth=0', '106'); await B.pg.fill('.hours input >> nth=1', '240'); await B.pg.dispatchEvent('.hours input >> nth=0', 'input');
+  // 計時：固定一行「上班時數 × 時薪」，時薪照設定（250）不能改、不能刪
+  assert.strictEqual(await B.pg.inputValue('.hours input >> nth=1'), '250'); assert.ok(await B.pg.$eval('.hours input >> nth=1', e => e.readOnly), '時薪固定');
+  assert.strictEqual(await B.pg.$$eval('.item-row >> nth=0', r => r[0].querySelector('.danger') === null), true, '時薪那行不能刪');
+  await B.pg.fill('.hours input >> nth=0', '106'); await B.pg.dispatchEvent('.hours input >> nth=0', 'input');
   await B.pg.click('text=＋ 新增項目'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=0', '加班費'); await B.pg.fill('.item-row >> nth=1 >> input >> nth=1', '700'); await B.pg.dispatchEvent('.item-row >> nth=1 >> input >> nth=1', 'input');
-  assert.ok((await B.pg.textContent('#s-calc')).includes('26,140'));
+  assert.ok((await B.pg.textContent('#s-calc')).includes('27,200'));
   // 常用項目：點「早退（扣）」打正數 → 自動變成扣款；已加入的項目不再出現在按鈕列
   await B.pg.click('#s-presets button:has-text("早退")');
   await B.pg.fill('.item-row >> nth=2 >> input >> nth=1', '300'); await B.pg.dispatchEvent('.item-row >> nth=2 >> input >> nth=1', 'input');
-  assert.ok((await B.pg.textContent('#s-calc')).includes('25,840'), await B.pg.textContent('#s-calc'));
+  assert.ok((await B.pg.textContent('#s-calc')).includes('26,900'), await B.pg.textContent('#s-calc'));
   assert.ok(!(await B.pg.textContent('#s-presets')).includes('早退'));
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-payroll.png'), fullPage: true });
   await B.pg.click('.item-row >> nth=2 >> button.danger');
   await B.pg.click('text=儲存這位員工');
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
-  assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 26140 + 800, '人事頁存的 26,140 ＋ 日結自動記的 PT 800');
+  assert.strictEqual(g.rows(S.PAYROLL).reduce((a, r) => a + r['金額'], 0), 27200 + 800, '人事頁存的 27,200 ＋ 日結自動記的 PT 800');
   // 其他人：可以改名、分到計時
   B.pg.__ans = '臨時工';
   await B.pg.click('text=＋ 其他人（不在員工名單）');
