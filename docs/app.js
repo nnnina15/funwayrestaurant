@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.8.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.8.6';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1714,7 +1714,7 @@ function renderYearTab() {
       people.map(function (p) { return neg(sum(list, function (m) { return payBy[m.month + '|' + p] || 0; })); }).join('') +
       neg(sum(list, function (m) { return m.bonus; })) + neg(sum(list, function (m) { return m.reserve; })) + neg(sum(list, function (m) { return otherBy[m.month] || 0; })) +
       (hasLoan ? neg(sum(list, function (m) { return (m.loan || 0) - (m.repay || 0); })) : '') +
-      td(list.length ? bal[list[list.length - 1].month] : carry, 'em bal') + '</tr>';
+      td(sum(list, function (m) { return m.profit; }) - tot - sum(list, function (m) { return otherBy[m.month] || 0; }), 'em bal') + '</tr>';   // 結餘＝這個月（這一年）盈餘−分紅合計−其他扣除
   };
   var carryRow = '<tr class="carry"><th>上一年結餘</th>' + cols.map(function (c, i) { return i === cols.length - 1 ? td(carry, 'em bal') : '<td></td>'; }).join('') + '</tr>';
   var yDays = sum(months, function (m) { return m.days; }), yAct = sum(months, function (m) { return m.actual; });
@@ -1725,14 +1725,14 @@ function renderYearTab() {
     kpi('可分配給股東', sum(months, function (m) { return m.dist; })) +
     kpi('年底結餘', months.length ? bal[months[months.length - 1].month] : carry, '上一年結餘 ' + money(carry) + '｜已發分紅 ' + money(sum(months, function (m) { return m.paid || 0; }))) +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
-    cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' + carryRow;
+    cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
     if (!qm.length) return;
     qm.forEach(function (m) { h += rowOf([m], label(m), ''); });   // 盈餘與分紅：像舊表一樣不放季合計
   });
   h += rowOf(months, cur + ' 全年', 'yrow') + '</tbody></table></div>';
-  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝上一年結餘＋盈餘−分紅−員工分紅−存年終−其他扣除，也就是還沒分掉的錢（借給員工的錢另外看「借還款」）。每月「應該分多少」請看「月」總覽。</p>';
+  h += '<p class="muted">分紅＝實際發出去的錢：在「分紅扣除」記「股東分紅（已發）」（備註寫名字，例如 浩勤），佳茹／Nina 這類固定分紅記「其他扣除」、備註寫「佳茹分紅」。結餘＝當月盈餘−分紅合計−其他扣除，也就是那個月分完還留下的錢；全年那列是今年加總。上面「年底結餘」卡片才有加上一年留下來的（借給員工的錢另外看「借還款」）。每月「應該分多少」請看「月」總覽。</p>';
 
   // 表二：平均細項
   var catSet = {}; R.cats.forEach(function (c) { if (c.month.slice(0, 4) === cur) catSet[c.cat] = (catSet[c.cat] || 0) + c.amount; });
