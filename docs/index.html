@@ -518,6 +518,12 @@
   .hours input { padding: 10px; }
   .emp-list button { display: flex; justify-content: space-between; width: 100%; background: var(--soft); color: var(--ink); margin-bottom: 8px; text-align: left; border: 1.5px solid transparent; }
   .emp-list button.on { border-color: var(--brand); }
+  /* 員工一排 4 位（手機 2 位）：名字在上、成本在下 */
+  .emp-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 700px) { .emp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .emp-grid button { flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 4px; margin: 0; padding: 10px 12px; min-width: 0; }
+  .emp-grid button > span:first-child { font-weight: 700; font-size: 16px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .emp-grid button > span:last-child { font-size: 14px; }
   .big { font-size: 26px; font-weight: 800; }
   .grp { margin-bottom: 10px; }
   .grp-h { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
