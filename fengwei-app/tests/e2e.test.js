@@ -356,6 +356,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-loan-year.png'), fullPage: true });
   await B.pg.click('#tb-loan');
   assert.ok((await B.pg.textContent('#xl-list')).includes('建燁（9月借）'), '借還款分頁有每一筆紀錄');
+  assert.ok((await B.pg.textContent('#xl-years')).includes('30,000'), '每年年底還沒收回：建燁 30,000');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-loan.png'), fullPage: true });
   console.log('員工借還款 ✓');
   // 記錄股東分紅：選股東自動照比例算金額

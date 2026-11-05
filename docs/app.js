@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.4';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1609,9 +1609,26 @@ function renderLoans() {
     : '<p class="muted">還沒有借還款紀錄</p>';
 }
 // 借還款分頁：記錄、欠款總表、每一筆紀錄（新的在上面）
+// 每年：借出、還款、年底還沒收回（累計借出 − 累計還款），不分人
+function renderLoanYears() {
+  var recs = view().deduct.filter(function (d) { return d.type === '員工借款' || d.type === '員工還款'; });
+  if (!recs.length) { $('xl-years').innerHTML = '<p class="muted">還沒有借還款紀錄</p>'; return; }
+  var years = [];
+  recs.forEach(function (d) { var y = String(d.month).slice(0, 4); if (years.indexOf(y) < 0) years.push(y); });
+  years.sort();
+  var yr = function (y, type) { return recs.reduce(function (a, d) { return a + (d.type === type && String(d.month).slice(0, 4) === y ? Number(d.amount || 0) : 0); }, 0); };
+  var owe = function (y) { return recs.reduce(function (a, d) { return String(d.month).slice(0, 4) > y ? a : a + (d.type === '員工借款' ? 1 : -1) * Number(d.amount || 0); }, 0); };
+  var cell = function (v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + '">' + (v ? money(v) : '<span class="muted">—</span>') + '</td>'; };
+  $('xl-years').innerHTML = '<div class="xscroll"><table class="ytable eq" style="min-width:' + (110 + years.length * 100) + 'px"><thead><tr><th></th>' +
+    years.map(function (y) { return '<th class="n">' + y + (y === todayStr().slice(0, 4) ? '<span class="tag">至今</span>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    '<tr><th>借出</th>' + years.map(function (y) { return cell(yr(y, '員工借款')); }).join('') + '</tr>' +
+    '<tr><th>還款</th>' + years.map(function (y) { return cell(yr(y, '員工還款')); }).join('') + '</tr>' +
+    '<tr class="yrow"><th>年底還沒收回</th>' + years.map(function (y) { return cell(owe(y), owe(y) > 0 ? 'neg' : ''); }).join('') + '</tr></tbody></table></div>';
+}
 function renderLoanTab() {
   if (!$('xl-month').value) $('xl-month').value = todayStr().slice(0, 7);
   renderLoans();
+  renderLoanYears();
   var list = view().deduct.filter(function (d) { return d.type === '員工借款' || d.type === '員工還款'; })
     .sort(function (a, b) { return a.month < b.month ? 1 : a.month > b.month ? -1 : 0; });
   var h = '', last = '';
