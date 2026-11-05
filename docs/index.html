@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.14.0">
+<meta name="app-version" content="4.14.1">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -268,6 +268,9 @@
   .costpie .lg i { width: 12px; height: 12px; border-radius: 3px; }
   .costpie .lg b { font-weight: 700; text-align: right; } .costpie .lg em { font-style: normal; text-align: right; color: var(--muted); font-weight: 700; }
   .costpie .lg b.neg, .costpie .lg em.neg { color: var(--bad); } .costpie .lg b.pos { color: var(--ok); }
+  /* 長表單的儲存鈕：滑到哪都固定在視窗下方（手機在下方分頁列上面） */
+  .sticky-save { position: sticky; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 4; box-shadow: 0 8px 22px rgba(0,0,0,.18); }
+  @media (max-width: 899px) { body.has-bar .sticky-save { bottom: calc(74px + env(safe-area-inset-bottom)); } }
   .seg.xtabs { display: flex; width: 100%; margin: 0 0 10px; } .seg.xtabs button { flex: 1; font-size: 17px; padding: 10px 12px; white-space: nowrap; }
   .xp-done { font-size: 14px; color: var(--ok); margin: 6px 0 2px; }
   .xp-done:empty { display: none; }
@@ -728,7 +731,7 @@
       <p class="muted d-body formula">現金盈餘 = 現場 − 全支付 − LINE Pay − 總支出　｜　現金差額 = 現場現金 − 現金盈餘</p>
 
       <label>備註</label><input id="d-note" placeholder="例：冷氣維修、提早打烊">
-      <button class="primary" onclick="saveDaily()">儲存今日結帳</button>
+      <button class="primary sticky-save" onclick="saveDaily()">儲存今日結帳</button>
     </div>
   </section>
 
@@ -771,7 +774,7 @@
       <button class="ghost" onclick="addItem(false)">＋ 新增項目</button>
       <button class="ghost" onclick="addItem(true)">＋ 時數 × 時薪</button>
       <div class="calc" id="s-calc"></div>
-      <button class="primary" onclick="savePayroll()">儲存這位員工</button>
+      <button class="primary sticky-save" onclick="savePayroll()">儲存這位員工</button>
     </div>
   </section>
 
@@ -782,7 +785,7 @@
       <label>月份</label><input id="v-month" type="month" onchange="renderDeliveryTab()">
       <p class="muted">外送：照平台對帳單填，佣金、月費、拒單費用打正數會自動扣掉，總收就是實際入帳。全支付／LINE Pay：填月底實際收到的錢，手續費自動算。</p>
       <div id="v-body"></div>
-      <button class="primary" onclick="saveDelivery()">儲存對帳</button>
+      <button class="primary sticky-save" onclick="saveDelivery()">儲存對帳</button>
     </div>
   </section>
 

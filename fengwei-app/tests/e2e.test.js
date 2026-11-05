@@ -412,6 +412,11 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="month"]');
   assert.ok((await B.pg.textContent('#m-body .costpie')).includes('食材成本'), '月總覽要有成本比例圓餅圖');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-costbox.png') });
+  // 外送對帳：儲存鈕固定在視窗下方
+  await B.pg.setViewportSize({ width: 1100, height: 600 }); await B.pg.click('#tb-delivery'); await B.pg.evaluate(() => window.scrollTo(0, 0));
+  const sv = await B.pg.evaluate(() => { const b = document.querySelector('#tab-delivery .sticky-save').getBoundingClientRect(); return [Math.round(b.bottom), innerHeight]; });
+  assert.ok(sv[0] <= sv[1] && sv[0] > sv[1] - 80, '儲存對帳要在視窗下方看得到：' + sv);
+  await B.pg.setViewportSize({ width: 1100, height: 1300 });
   console.log('股東分紅自動算 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
