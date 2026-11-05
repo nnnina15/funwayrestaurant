@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.12.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1453,8 +1453,22 @@ function renderDeductTab() {
   // 每個人一張卡（可以一次勾很多人）：比例／上次、這次應分；這個月已發的顯示綠色 ✓
   var L = computeLocal();
   var key = ST.sess.store + '|' + month;
-  if (!ST.xp || ST.xp.key !== key) ST.xp = { key: key, sel: null, amt: {}, extra: [] };
+  if (!ST.xp || ST.xp.key !== key) ST.xp = { key: key, sel: null, amt: {}, extra: [], from: '', keep: LS.get('fw_keep_' + ST.sess.store, '') };
   ST.xp.extra.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
+  // 這次分哪幾個月的盈餘：預設從上次發股東分紅的下個月，到上面選的月份；可以改
+  if (!ST.xp.from) {
+    var lastPay = L.V.deduct.filter(function (d) { return d.type === '股東分紅（已發）' && d.month < month; }).map(function (d) { return d.month; }).sort().pop();
+    var firstM = (L.R.months[0] || {}).month || month;
+    ST.xp.from = lastPay ? nextMonth(lastPay) : firstM;
+    if (ST.xp.from > month) ST.xp.from = month;
+  }
+  var pool = L.R.months.filter(function (m) { return m.month >= ST.xp.from && m.month <= month && m.status !== '未來'; });
+  ST.xp.pool = pool.reduce(function (a, m) { return a + m.dist; }, 0);
+  ST.xp.profit = pool.reduce(function (a, m) { return a + m.profit; }, 0);
+  var keep = expr(ST.xp.keep) || 0;
+  $('xp-range').innerHTML = '<div class="xp-range-row"><label>分這幾個月的盈餘</label><div class="xp-mrange"><input type="month" value="' + esc(ST.xp.from) + '" max="' + month + '" onchange="xpFrom(this.value)"><span>到</span><b>' + month.replace('-', '/') + '</b></div></div>' +
+    '<div class="xp-range-row"><label>店裡留作備用基金</label><div class="xp-amt"><span>$</span><input inputmode="numeric" value="' + esc(ST.xp.keep) + '" placeholder="0" oninput="digitsOnly(this);xpKeep(this.value)" onchange="renderDeductTab()"></div></div>' +
+    '<p class="xp-pool">月盈餘 ' + money(ST.xp.profit) + '　扣員工分紅、存年終後可分配 ' + money(ST.xp.pool) + '　－ 備用基金 ' + money(keep) + '　＝ <b>這次可以分 ' + money(ST.xp.pool - keep) + '</b></p>';
   var calc = {}; names.forEach(function (n) { calc[n] = xpCalc(n, month, L); });
   var partners = (L.C.partners || []).map(function (p) { return p.name; });
   if (!ST.xp.sel) {   // 預設勾：股東＋上次跟股東一起發的人（例：店長分紅）
@@ -1499,6 +1513,9 @@ function renderDeductTab() {
   $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
 }
 // 記錄實際發出的股東分紅：設定裡的股東（浩勤、豐吉…）記「股東分紅（已發）」；其他人（佳茹、Nina…）記「其他扣除・某某分紅」
+function nextMonth(m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7) + 1; if (mo > 12) { y++; mo = 1; } return y + '-' + (mo < 10 ? '0' : '') + mo; }
+function xpFrom(v) { if (!v) return; ST.xp.from = v; ST.xp.amt = {}; renderDeductTab(); }
+function xpKeep(v) { ST.xp.keep = v; ST.xp.amt = {}; LS.set('fw_keep_' + ST.sess.store, v); clearTimeout(ST.xpKeepT); ST.xpKeepT = setTimeout(function () { var a = document.activeElement; renderDeductTab(); var i = $('xp-range').querySelector('.xp-amt input'); if (i && a && a.closest && a.closest('#xp-range')) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 400); }
 function xpToggle(n) { ST.xp.sel[n] = !ST.xp.sel[n]; renderDeductTab(); }
 function xpOther() { var n = prompt('要記誰的分紅？（例：建燁、佳茹）'); if (!n || !(n = n.trim())) return; if (ST.xp.extra.indexOf(n) < 0) ST.xp.extra.push(n); ST.xp.sel[n] = true; renderDeductTab(); }
 function xpSum() {
@@ -1523,14 +1540,14 @@ function xpCalc(who, month, L) {
     else { out.tag = '自己填金額'; out.info = '請填金額' + warn; }
     return out;
   }
-  var last = paid.length ? paid[0].month : '';
-  if (last === month) last = paid.filter(function (d) { return d.month < month; }).map(function (d) { return d.month; })[0] || '';
-  var list = L.R.shares.filter(function (s) { return s.name === who && s.month > last && s.month <= month && s.status !== '未來'; });
-  var amt = list.reduce(function (a, s) { return a + s.amount; }, 0);
+  // 股東：（選的月份範圍可分配 − 店裡備用基金）× 比例
+  var from = ST.xp && ST.xp.from || month, keep = ST.xp ? (expr(ST.xp.keep) || 0) : 0;
+  var poolAmt = L.R.months.filter(function (m) { return m.month >= from && m.month <= month && m.status !== '未來'; }).reduce(function (a, m) { return a + m.dist; }, 0);
+  var amt = (poolAmt - keep) * Number(p.pct || 0) / 100;
   out.amt = Math.round(amt);
-  var range = list.length ? (list[0].month === list[list.length - 1].month ? list[0].month.replace('-', '/') : list[0].month.replace('-', '/') + '～' + list[list.length - 1].month.replace('-', '/')) : '（沒有月份）';
+  var range = from === month ? month.replace('-', '/') : from.replace('-', '/') + '～' + month.replace('-', '/');
   out.tag = p.pct + '%' + (already ? '｜已記過' : '');
-  out.info = p.pct + '%｜' + range + ' 應分 ' + money(amt) + (last ? '（上次發到 ' + last.replace('-', '/') + '）' : '') + (amt < 0 ? '｜虧損，金額先填 0' : '') + warn;
+  out.info = p.pct + '%｜' + range + (keep ? '（留備用 ' + money(keep) + '）' : '') + ' 應分 ' + money(amt) + (amt < 0 ? '｜虧損，金額先填 0' : '') + warn;
   return out;
 }
 // 一次記錄勾選的人：股東記「股東分紅（已發）」，其他人（佳茹、店長…）記「其他扣除・某某分紅」
