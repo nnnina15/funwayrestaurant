@@ -302,8 +302,10 @@
 
   /* 日期／月份置頂：小小一條、置中 */
   #pickbar { position: sticky; top: calc(var(--sticky-top, 50px) / var(--fz, 1)); z-index: 4; margin: -14px auto 12px; padding: 6px 0;
-    display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap; pointer-events: none; }
+    display: flex; justify-content: center; gap: 8px; align-items: center; flex-wrap: wrap; pointer-events: none;
+    background: var(--bg); box-shadow: 0 0 0 100vmax var(--bg); clip-path: inset(0 -100vmax); }   /* 黏住時整條底色蓋住下面的字，不會透出來 */
   #pickbar > * { pointer-events: auto; }
+  header #pickbar { background: none; box-shadow: none; clip-path: none; }
   #pickbar .pin, #pickbar #ov-month-pick, #pickbar #ov-year-pick { background: var(--card); border: 1px solid var(--line); border-radius: 999px;
     padding: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.10); }
   #pickbar .pin-cap, #pickbar label { display: none; }

@@ -365,6 +365,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.waitForTimeout(200);
   const ov = await B.pg.evaluate(() => { const a = document.getElementById('pickbar').getBoundingClientRect(), b = document.getElementById('s-name').getBoundingClientRect(); return [a.bottom, b.top]; });
   assert.ok(ov[1] >= ov[0] - 1, '員工名字不能被月份列蓋住：' + ov);
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-pay-sticky.png') });
   console.log('股東分紅自動算 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
