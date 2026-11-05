@@ -203,6 +203,12 @@
   .who-cards .wc.done .tick { background: var(--ok); border-color: var(--ok); }
   .who-cards .wc.other { justify-content: center; align-items: center; color: var(--muted); border-style: dashed; border-color: var(--line); background: transparent; min-height: 72px; }
   #xp-rows { margin-top: 10px; }
+  #xp-rows:empty { display: none; }
+  .xp-chips button.who.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .xp-chips button.who.done { background: color-mix(in srgb, var(--ok) 14%, var(--card)); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+  .xp-chips button.who.add { background: transparent; color: var(--muted); border: 1.5px dashed var(--line); }
+  #xp-rows .wc { cursor: default; }
+  #xp-rows .wc .card-amt { padding-left: 8px; }
   .xp-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 28px; gap: 8px; align-items: center; padding: 8px 10px; margin-bottom: 6px; border-radius: 12px; background: color-mix(in srgb, var(--brand) 10%, var(--card)); border: 1.5px solid var(--brand); }
   .xp-row-who { display: flex; flex-direction: column; min-width: 0; }
   .xp-row-who b { font-size: 17px; } .xp-row-who small { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -736,9 +742,9 @@
     <select id="x-year" class="hide"></select><input id="xp-month" type="hidden"><input id="x-month" type="hidden">
     <div class="card edit-card">
       <h2>記錄分紅</h2>
-      <p class="muted">點卡片選這次要發的人（可以選很多個），選了會移到下面，金額照比例算好、可以改。</p>
-      <div class="who-cards" id="xp-chips"></div>
-      <div id="xp-rows"></div>
+      <p class="muted">點名字選這次要發的人（可以選很多個），金額照比例自動算好，可以改。</p>
+      <div class="chips xp-chips" id="xp-chips"></div>
+      <div class="who-cards" id="xp-rows"></div>
       <p class="xp-done" id="xp-done"></p>
       <button class="primary" id="xp-btn" onclick="addPayouts()">記錄分紅</button>
     </div>
