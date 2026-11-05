@@ -406,6 +406,8 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok(await B.pg.isVisible('#xpane-pay') && await B.pg.isHidden('#xpane-ded'));
   await B.pg.click('#x-tabs button[data-v="ded"]');
   assert.ok(await B.pg.isVisible('#xpane-ded') && await B.pg.isHidden('#xpane-pay'), '切到分配前扣除');
+  const tabW = await B.pg.evaluate(() => [document.getElementById('x-tabs').offsetWidth, document.getElementById('x-tabs').parentNode.clientWidth, document.querySelector('#x-tabs button').offsetHeight]);
+  assert.ok(tabW[0] > tabW[1] * 0.8 && tabW[2] < 60, '分頁要整排、字不換行：' + tabW);
   await B.pg.click('#x-tabs button[data-v="pay"]');
   await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="month"]');
   assert.ok((await B.pg.textContent('#m-body .costbox')).includes('食材成本'), '月總覽要有成本比例');
