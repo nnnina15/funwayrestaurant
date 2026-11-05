@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.10.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.10.3';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -515,6 +515,10 @@ function updateStickyTop() {
   var tabsOn = t && !t.classList.contains('hide') && getComputedStyle(t).display !== 'none';
   if (t) t.style.top = h + 'px';                               // 分頁列緊貼標題列，不留縫
   document.documentElement.style.setProperty('--sticky-top', (h + (tabsOn ? t.offsetHeight : 0)) + 'px');
+  // 月份／日期列在內容上方（平板、電腦）也是黏在上面：底下會黏住的東西（人事的員工名字、表格標題）要排在它下面，不然會疊在一起
+  var bar = $('pickbar'), under = h + (tabsOn ? t.offsetHeight : 0);
+  if (bar && bar.parentNode !== document.querySelector('header') && !bar.classList.contains('hide')) under += bar.offsetHeight;
+  document.documentElement.style.setProperty('--sticky-under', under + 'px');
 }
 window.addEventListener('resize', function () { if (ST.sess) updateStickyTop(); });
 

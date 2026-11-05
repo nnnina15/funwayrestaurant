@@ -359,6 +359,12 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-deduct-phone.png'), fullPage: true });
   assert.ok(await B.pg.evaluate(() => document.documentElement.scrollWidth <= 392), '手機上不能左右超出畫面');
   await B.pg.setViewportSize({ width: 1100, height: 1300 });
+  // 平板／電腦：人事員工名字黏在月份列下面，不能疊在一起
+  await B.pg.click('#tb-payroll'); await B.pg.click('#s-emps button >> nth=0');
+  await B.pg.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await B.pg.waitForTimeout(200);
+  const ov = await B.pg.evaluate(() => { const a = document.getElementById('pickbar').getBoundingClientRect(), b = document.getElementById('s-name').getBoundingClientRect(); return [a.bottom, b.top]; });
+  assert.ok(ov[1] >= ov[0] - 1, '員工名字不能被月份列蓋住：' + ov);
   console.log('股東分紅自動算 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
