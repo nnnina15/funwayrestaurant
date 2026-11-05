@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.2';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1676,6 +1676,9 @@ var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 function fixTheads(root) {
   Array.prototype.forEach.call(root.querySelectorAll('.xscroll'), function (sc) {
     var t = sc.querySelector('table.ytable'); if (!t || !t.tHead) return;
+    // 每個表格包一層：黏在上面的表頭只在自己的表格範圍內黏住，捲過這個表格就跟著離開（不會蓋到下一段）
+    if (!sc.parentNode.classList.contains('tblwrap')) { var w = document.createElement('div'); w.className = 'tblwrap'; sc.parentNode.insertBefore(w, sc); w.appendChild(sc); }
+    if (!sc.offsetWidth) return;   // 還沒顯示出來（量不到寬度），等顯示時再排
     var old = sc.previousElementSibling; if (old && old.classList.contains('xhead')) old.remove();
     sc.style.marginTop = '';
     // 先拿掉上次固定的欄寬，讓表格照內容排一次再量
@@ -1702,6 +1705,8 @@ function fixTheads(root) {
     hr.style.height = cr.style.height = hh + 'px';
     if (lift) { var cr2 = ct.tBodies[0].rows[0], th2 = Math.max(top.offsetHeight, cr2.offsetHeight); top.style.height = cr2.style.height = th2 + 'px'; }
     sc.style.marginTop = -head.offsetHeight + 'px';
+    // 字型晚一點載入、表頭高度變了：跟著重新對齊，不會兩個表頭錯開
+    if (window.ResizeObserver) new ResizeObserver(function () { if (head.offsetHeight) sc.style.marginTop = -head.offsetHeight + 'px'; }).observe(head);
     // 左右滑：只有表格本身能滑，表頭單向跟著（表頭不接手指，滑表頭的位置其實是在滑下面的表格）
     var raf = 0;
     sc.addEventListener('scroll', function () {

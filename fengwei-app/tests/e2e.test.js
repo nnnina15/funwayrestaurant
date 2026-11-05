@@ -206,6 +206,15 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.strictEqual(await B.pg.evaluate(() => document.querySelector('header').getBoundingClientRect().top), 0, '總覽上方不能有白邊');
   const yt = await B.pg.textContent('#y-body');
   assert.ok(yt.includes('2026 全年') && yt.includes('豐吉') && yt.includes('結餘') && yt.includes('上一年盈餘') && yt.includes('人事') && yt.includes('貨款'), '年：要有季合計、全年、股東欄');
+  // 年表的表頭複本只黏在自己的表格範圍：捲到下面的「平均細項」時，上面那張表的表頭不能還黏著；兩張表頭要完全重疊
+  await B.pg.setViewportSize({ width: 1100, height: 520 });
+  const algn = await B.pg.evaluate(() => { const w = document.querySelector('#y-body .tblwrap'); const h = w.querySelector('.xhead').getBoundingClientRect(), t = w.querySelector('thead').getBoundingClientRect(); return Math.abs(h.top - t.top); });
+  assert.ok(algn <= 1, '表頭複本要蓋在原本表頭上：差 ' + algn);
+  await B.pg.evaluate(() => { const ws = document.querySelectorAll('#y-body .tblwrap'); ws[ws.length - 1].scrollIntoView(); window.scrollBy(0, 120); });
+  await B.pg.waitForTimeout(150);
+  const stuck = await B.pg.evaluate(() => { const ws = document.querySelectorAll('#y-body .tblwrap'), a = ws[0].querySelector('.xhead').getBoundingClientRect(), b = ws[ws.length - 1].getBoundingClientRect(); return ws.length > 1 && a.bottom > b.top + 2 && a.top < b.bottom; });
+  assert.ok(!stuck, '上一張表的表頭不能蓋到下一張表');
+  await B.pg.setViewportSize({ width: 1100, height: 1300 });
   // 總覽：日（看 2026-11 每天的營收和進貨）
   await B.pg.click('#ov-seg button[data-v="day"]'); await B.pg.fill('#m-month', '2026-11'); await B.pg.dispatchEvent('#m-month', 'change');
   const dt = await B.pg.textContent('#dd-body');
