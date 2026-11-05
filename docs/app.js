@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.10.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.10.1';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1856,13 +1856,14 @@ function renderSummaryTab() {
   var rows = [
     ['現場營收', m.site], ['Panda', m.pandaN === null ? '未對帳' : m.pandaN, false, '', m.pandaG], ['Uber', m.uberN === null ? '未對帳' : m.uberN, false, '', m.uberG],
     ['＝ 實際營收', m.actual, true], ['進貨', -m.purchase, false, pct(m.purchasePct)], ['人事成本', -m.staff, false, pct(m.staffPct)],
-    ['固定支出', -m.fixed], ['其他支出', -m.other], [m.feeEst ? '線上支付手續費（估計）' : '線上支付手續費', -m.fee], ['＝ 盈餘', m.profit, true],
+    ['固定支出', -m.fixed], ['其他支出', -m.other], [m.feeEst ? '線上支付手續費（估計）' : '線上支付手續費', -m.fee],
+    (C.store && C.store.cashIn ? ['現金差額', m.cashDiff] : ['現金差額（不算，可到裝置 → 預設 → 店家打開）', 0]), ['＝ 月盈餘', m.profit, true],
     ['員工分紅', -m.bonus], ['年終預留', -m.reserve], ['其他扣除', -m.deductOther], ['＝ 可分配給股東', m.dist, true]
   ];
   var shares = R.shares.filter(function (x) { return x.month === month; });
   var warns = R.warns.filter(function (x) { return x.month === month || x.month === ''; });
   var cats = R.cats.filter(function (x) { return x.month === month; }).sort(function (a, b) { return b.amount - a.amount; });
-  var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('盈餘', m.profit, '扣完所有成本', true) +
+  var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('月盈餘', m.profit, '扣完所有成本' + (C.store && C.store.cashIn ? '＋現金差額' : ''), true) +
     kpi('可分配給股東', m.dist, '扣員工分紅、年終後') + kpi('人事佔比', pct(m.staffPct), '進貨佔比 ' + pct(m.purchasePct)) + '</div>' + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
     '　工作天 ' + m.days + '　日均營收 ' + money(m.avg) + '　現金差額累計 ' + money(m.cashDiff) + '</p>';
   h += '<table class="msum">' + rows.map(function (x) {
