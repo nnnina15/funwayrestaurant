@@ -338,11 +338,12 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   console.log('員工借還款 ✓');
   // 記錄股東分紅：選股東自動照比例算金額
   await B.pg.click('#tb-deduct'); await B.pg.fill('#xp-month', '2026-11'); await B.pg.dispatchEvent('#xp-month', 'change');
+  assert.ok((await B.pg.textContent('#xp-chips')).includes('50%'), '卡片上要有比例');
   await B.pg.click('#xp-chips button:has-text("豐吉")');
-  assert.ok((await B.pg.textContent('#xp-info')).includes('豐吉 50%'), '要顯示比例：' + await B.pg.textContent('#xp-info'));
+  assert.ok((await B.pg.textContent('#xp-info')).includes('50%'), '要顯示比例：' + await B.pg.textContent('#xp-info'));
   assert.ok(/^\d+$/.test(await B.pg.inputValue('#xp-amount')), '金額自動帶入：' + await B.pg.inputValue('#xp-amount'));
   await B.pg.setViewportSize({ width: 390, height: 844 });
-  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-deduct-phone.png') });
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-deduct-phone.png'), fullPage: true });
   assert.ok(await B.pg.evaluate(() => document.documentElement.scrollWidth <= 392), '手機上不能左右超出畫面');
   await B.pg.setViewportSize({ width: 1100, height: 1300 });
   console.log('股東分紅自動算 ✓');

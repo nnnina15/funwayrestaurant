@@ -184,6 +184,30 @@
   .font-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 4px; padding: 8px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .font-row > span { font-weight: 700; white-space: nowrap; }
   .font-row .seg { margin: 0; }
+  /* 分紅扣除：標題右邊放月份；人和類型用卡片點選 */
+  .xh { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .xh h2 { margin: 0; }
+  .xh .xh-month { width: auto; max-width: 170px; font-size: 16px; padding: 8px 10px; font-weight: 700; text-align: center; }
+  .who-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 10px 0 4px; }
+  .who-cards button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--soft); color: var(--ink); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 12px; text-align: left; min-height: 0; }
+  .who-cards button b { font-size: 17px; }
+  .who-cards button small { font-size: 12.5px; color: var(--muted); }
+  .who-cards button .amt { font-size: 15px; font-weight: 700; color: var(--brand); }
+  .who-cards button.on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--card)); }
+  .who-cards button.other { justify-content: center; align-items: center; color: var(--muted); border-style: dashed; border-color: var(--line); background: transparent; }
+  .xp-pay { margin-top: 10px; padding: 12px; border-radius: 14px; background: var(--soft); }
+  .xp-pay-row { display: flex; align-items: center; gap: 10px; }
+  .xp-pay-who { font-weight: 800; font-size: 18px; white-space: nowrap; }
+  .xp-amt { position: relative; flex: 1; }
+  .xp-amt span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 700; }
+  .xp-amt input { padding-left: 26px; font-size: 22px; font-weight: 800; background: var(--card); }
+  #tab-deduct .edit-card .xp-amt input { padding-left: 28px; }
+  .xp-pay p.muted { margin: 8px 0 4px; font-size: 13px; }
+  .type-cards { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .type-cards button { flex: 1; min-width: 92px; background: var(--soft); color: var(--ink); border: 1.5px solid transparent; border-radius: 12px; padding: 10px 8px; font-size: 15px; font-weight: 700; }
+  .type-cards button.on { border-color: var(--brand); color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--card)); }
+  .xd-row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; }
+  .xd-row .xp-amt input { font-size: 19px; }
   .pp-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 40px 40px auto; gap: 6px; align-items: center; margin-bottom: 6px; }
   .pp-row input { font-size: 16px; padding: 10px; min-width: 0; }
   .pp-pct { position: relative; } .pp-pct input { padding-right: 28px; } .pp-pct span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
@@ -681,27 +705,26 @@
     <p class="ro-note">🔒 店長只能看，不能修改（要改請找管理）</p>
     <div><label>年份</label><select id="x-year" onchange="onDeductYear()"></select></div>
     <div class="card edit-card">
-      <h2>記錄股東分紅（實際發出）</h2>
-      <p class="muted">每次真的發分紅時記一筆（中正：1、4、7、10 月）。年總覽的分紅、結餘就是照這裡算。</p>
-      <div class="grid3">
-        <div><label>月份</label><input id="xp-month" type="month" onchange="xpFill()"></div>
-        <div><label>股東</label><input id="xp-who" list="xp-names" placeholder="例：浩勤" autocomplete="off" onchange="xpFill()"><datalist id="xp-names"></datalist></div>
-        <div><label>金額（自動算）</label><input id="xp-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this)"></div>
+      <div class="xh"><h2>記錄分紅</h2><input id="xp-month" type="month" class="xh-month" onchange="renderDeductTab()"></div>
+      <p class="muted">點要發的人，金額照比例自動算好（從上次發之後算到這個月）。</p>
+      <input id="xp-who" type="hidden"><datalist id="xp-names"></datalist>
+      <div class="who-cards" id="xp-chips"></div>
+      <div class="xp-pay hide" id="xp-pay">
+        <div class="xp-pay-row"><span class="xp-pay-who" id="xp-pay-who"></span><div class="xp-amt"><span>$</span><input id="xp-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this);ST.xpEdited=true"></div></div>
+        <p class="muted" id="xp-info"></p>
+        <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
       </div>
-      <div class="chips" id="xp-chips"></div>
-      <p class="muted" id="xp-info"></p>
-      <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
     </div>
     <div class="card edit-card">
-      <h2>分配前扣除</h2>
-      <p class="muted">股東分紅前要先扣掉的錢：員工分紅（每月不一定）、年終預留…</p>
-      <div class="grid3">
-        <div><label>月份</label><input id="x-month" type="month"></div>
-        <div><label>類型</label><select id="x-type"></select></div>
-        <div><label>金額</label><input id="x-amount" inputmode="decimal"></div>
+      <div class="xh"><h2>分配前扣除</h2><input id="x-month" type="month" class="xh-month"></div>
+      <p class="muted">分給股東之前先扣掉的錢。</p>
+      <select id="x-type" class="hide"></select>
+      <div class="type-cards" id="x-type-seg"></div>
+      <div class="xd-row">
+        <div class="xp-amt"><span>$</span><input id="x-amount" inputmode="decimal" placeholder="金額"></div>
+        <input id="x-note" placeholder="備註（可不填）">
       </div>
-      <label>備註（例：Q4 員工季分紅）</label><input id="x-note">
-      <button class="primary" onclick="addDeduct()">新增</button>
+      <button class="primary" onclick="addDeduct()">新增扣除</button>
     </div>
     <div class="card"><h2 id="x-list-h">這一年的分紅和扣除</h2><table class="xlist"><tbody id="x-list"></tbody></table></div>
   </section>
