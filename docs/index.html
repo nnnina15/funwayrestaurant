@@ -673,11 +673,12 @@
       <h2>記錄股東分紅（實際發出）</h2>
       <p class="muted">每次真的發分紅時記一筆（中正：1、4、7、10 月）。年總覽的分紅、結餘就是照這裡算。</p>
       <div class="grid3">
-        <div><label>月份</label><input id="xp-month" type="month"></div>
-        <div><label>股東</label><input id="xp-who" list="xp-names" placeholder="例：浩勤" autocomplete="off"><datalist id="xp-names"></datalist></div>
-        <div><label>金額</label><input id="xp-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this)"></div>
+        <div><label>月份</label><input id="xp-month" type="month" onchange="xpFill()"></div>
+        <div><label>股東</label><input id="xp-who" list="xp-names" placeholder="例：浩勤" autocomplete="off" onchange="xpFill()"><datalist id="xp-names"></datalist></div>
+        <div><label>金額（選股東自動算）</label><input id="xp-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this)"></div>
       </div>
       <div class="chips" id="xp-chips"></div>
+      <p class="muted" id="xp-info"></p>
       <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
     </div>
     <div class="card edit-card">

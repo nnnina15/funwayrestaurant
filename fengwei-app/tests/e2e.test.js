@@ -336,6 +336,12 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok((await B.pg.textContent('#xl-list')).includes('建燁（9月借）'), '借還款分頁有每一筆紀錄');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-loan.png'), fullPage: true });
   console.log('員工借還款 ✓');
+  // 記錄股東分紅：選股東自動照比例算金額
+  await B.pg.click('#tb-deduct'); await B.pg.fill('#xp-month', '2026-11'); await B.pg.dispatchEvent('#xp-month', 'change');
+  await B.pg.click('#xp-chips button:has-text("豐吉")');
+  assert.ok((await B.pg.textContent('#xp-info')).includes('豐吉 50%'), '要顯示比例：' + await B.pg.textContent('#xp-info'));
+  assert.ok(/^\d+$/.test(await B.pg.inputValue('#xp-amount')), '金額自動帶入：' + await B.pg.inputValue('#xp-amount'));
+  console.log('股東分紅自動算 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換
   await B.pg.setViewportSize({ width: 390, height: 844 });
