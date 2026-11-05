@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.14.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.14.6';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1873,15 +1873,15 @@ function renderAllYears() {
   var run = 0; rows.forEach(function (o) { run += o.left; o.cum = run; });
   people = people.filter(function (p) { return rows.some(function (o) { return o.pay[p]; }); });
   var td = function (v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + sgn(v) + '">' + money(v) + '</td>'; };
-  var tot = { days: 0, actual: 0, profit: 0, paid: 0, bonus: 0, reserve: 0, other: 0, loan: 0, pay: {}, cum: run };
-  rows.forEach(function (o) { ['days', 'actual', 'profit', 'paid', 'bonus', 'reserve', 'other', 'loan'].forEach(function (k) { tot[k] += o[k]; }); people.forEach(function (p) { tot.pay[p] = (tot.pay[p] || 0) + o.pay[p]; }); });
+  var tot = { days: 0, actual: 0, profit: 0, paid: 0, bonus: 0, reserve: 0, other: 0, loan: 0, left: 0, pay: {}, cum: run };
+  rows.forEach(function (o) { ['days', 'actual', 'profit', 'paid', 'bonus', 'reserve', 'other', 'loan', 'left'].forEach(function (k) { tot[k] += o[k]; }); people.forEach(function (p) { tot.pay[p] = (tot.pay[p] || 0) + o.pay[p]; }); });
   var all = rows.concat([Object.assign(tot, { y: '全部' })]);
   // 年份放欄、項目放列（扣的項目顯示負數）
   var items = [['工作天', function (o) { return o.days; }, 'plain'], ['實際營收', function (o) { return o.actual; }], ['月盈餘', function (o) { return o.profit; }, 'em'],
     ['分紅合計', function (o) { return -(o.paid + o.bonus); }, 'em']]
     .concat(people.map(function (p) { return ['　' + p, function (o) { return -(o.pay[p] || 0); }]; }))
     .concat([['員工分紅', function (o) { return -o.bonus; }], ['存年終', function (o) { return -o.reserve; }], ['其他扣除', function (o) { return -o.other; }],
-      ['借出−還款', function (o) { return -o.loan; }], ['當年盈餘', function (o) { return o.cum; }, 'em bal']]);
+      ['借出−還款', function (o) { return -o.loan; }], ['當年結餘', function (o) { return o.left; }, 'em'], ['當年盈餘', function (o) { return o.cum; }, 'em bal']]);
   var sumAll = function (k) { return months.reduce(function (a, m) { return a + (m[k] || 0); }, 0); };
   var actAll = sumAll('actual'), staffAll = sumAll('staff'), purAll = sumAll('purchase'), daysAll = sumAll('days');
   var cards = '<div class="kpis">' + kpi('累積盈餘', run, years[0] + '～' + years[years.length - 1] + ' 留下來的錢', true) +
@@ -1899,7 +1899,7 @@ function renderAllYears() {
         return td(v, (it[2] || '') + (i === all.length - 1 ? ' tot' : ''));
       }).join('') + '</tr>';
     }).join('') + '</tbody></table></div>' +
-    '<p class="muted">當年盈餘＝月盈餘−分紅合計（含員工分紅）−存年終−其他扣除−借出＋還款＋上一年盈餘，跟「年」總覽上面的卡片一樣；「全部」那欄的當年盈餘就是到今天累積留下的錢。點「年」可以看每一年的每個月。</p>';
+    '<p class="muted">當年結餘＝月盈餘−分紅合計（含員工分紅）−存年終−其他扣除−借出＋還款，是這一年自己留下的錢；當年盈餘＝當年結餘＋上一年盈餘，跟「年」總覽上面的卡片一樣；「全部」那欄的當年盈餘就是到今天累積留下的錢。點「年」可以看每一年的每個月。</p>';
   $('y-body').innerHTML = h; fixTheads($('y-body'));
 }
 function renderYearTab() {
