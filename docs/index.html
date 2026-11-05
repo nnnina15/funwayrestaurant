@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.13.9">
+<meta name="app-version" content="4.14.0">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -246,15 +246,25 @@
   .xp-pool { margin: 0; font-size: 13.5px; color: var(--muted); } .xp-pool b { color: var(--brand); font-size: 15px; }
   @media (max-width: 560px) { .xp-range-row { grid-template-columns: 1fr; gap: 4px; } }
   .edit-card .grid3 + .chips, .edit-card .grid3 + .chips + .chips { margin-top: 10px; }   /* 輸入格和名字按鈕之間留白 */
+  /* 總覽上方：左邊圓餅、右邊數字卡（手機上下排） */
+  .ovgrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; margin-bottom: 16px; align-items: stretch; }
+  .ovgrid .costpie { margin: 0; flex-wrap: nowrap; gap: 16px; padding: 14px 16px; }
+  .ovgrid .costpie .pie { width: 132px; height: 132px; } .ovgrid .costpie .hole { inset: 24px; }
+  .ovgrid .costpie .legend { min-width: 0; }
+  @media (max-width: 420px) { .ovgrid .costpie { flex-wrap: wrap; justify-content: center; } }
+  .ovgrid .kpis.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; align-content: stretch; }
+  .ovgrid .kpis.two .kpi { display: flex; flex-direction: column; justify-content: center; }
+  @media (max-width: 760px) { .ovgrid { grid-template-columns: 1fr; } }
   /* 成本比例圓餅圖 */
   :root { --pie1: #d9822b; --pie2: #4f7cac; --pie3: #a9a39a; --pie4: #3f9b6b; }
-  .costpie { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin: 0 0 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
-  .costpie .pie { width: 150px; height: 150px; border-radius: 50%; position: relative; flex: none; }
-  .costpie .hole { position: absolute; inset: 28px; border-radius: 50%; background: var(--card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .costpie { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin: 0 0 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }
+  .costpie .pie { width: 160px; height: 160px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.04); border-radius: 50%; position: relative; flex: none; }
+  .costpie .hole { position: absolute; inset: 30px; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-radius: 50%; background: var(--card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .costpie .hole small { font-size: 12px; color: var(--muted); } .costpie .hole b { font-size: 16px; }
   .costpie .legend { flex: 1; min-width: 220px; }
-  .costpie .lg-h { font-weight: 800; margin-bottom: 6px; }
-  .costpie .lg { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 52px; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .costpie .lg-h { font-weight: 800; font-size: 17px; margin-bottom: 8px; }
+  .costpie .lg { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto 56px; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 15px; }
+  .costpie .lg em { background: var(--soft); border-radius: 999px; padding: 2px 8px; font-size: 13px; text-align: center !important; }
   .costpie .lg i { width: 12px; height: 12px; border-radius: 3px; }
   .costpie .lg b { font-weight: 700; text-align: right; } .costpie .lg em { font-style: normal; text-align: right; color: var(--muted); font-weight: 700; }
   .costpie .lg b.neg, .costpie .lg em.neg { color: var(--bad); } .costpie .lg b.pos { color: var(--ok); }

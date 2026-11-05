@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.9';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.14.0';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1945,11 +1945,11 @@ function renderYearTab() {
   var yDed = sum(months, function (m) { return otherBy[m.month] || 0; });
   // 當年盈餘＝月盈餘合計−當年分紅合計（含員工分紅）−存年終−其他扣除＋上一年盈餘
   var yLoan = sum(months, function (m) { return (m.loan || 0) - (m.repay || 0); });   // 今年借出 − 還款
-  var h = '<div class="kpis">' + kpi(cur + ' 當年盈餘', yProfit - yPaid - yRes - yDed - yLoan + carry, '月盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－存年終 ' + money(yRes) + (yDed ? '－其他扣除 ' + money(yDed) : '') + (yLoan ? (yLoan > 0 ? '－借出 ' + money(yLoan) : '＋還款 ' + money(-yLoan)) : '') + '＋上一年盈餘 ' + money(carry), true) +
+  var h = '<div class="ovgrid">' + costBox(cur + ' 全年', sum(months, function (m) { return m.purchase; }), sum(months, function (m) { return m.staff; }), yProfit, yAct) + '<div class="kpis two">' + kpi(cur + ' 當年盈餘', yProfit - yPaid - yRes - yDed - yLoan + carry, '月盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－存年終 ' + money(yRes) + (yDed ? '－其他扣除 ' + money(yDed) : '') + (yLoan ? (yLoan > 0 ? '－借出 ' + money(yLoan) : '＋還款 ' + money(-yLoan)) : '') + '＋上一年盈餘 ' + money(carry), true) +
     kpi(cur + ' 當年結餘', yProfit - yPaid - yRes - yDed - yLoan, '今年留下的錢（不含上一年）') +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) +
     kpi('人事', sum(months, function (m) { return m.staff; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.staff; }) / yAct : 0)) +
-    kpi('貨款', sum(months, function (m) { return m.purchase; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.purchase; }) / yAct : 0)) + '</div>' + costBox(cur + ' 全年', sum(months, function (m) { return m.purchase; }), sum(months, function (m) { return m.staff; }), yProfit, yAct) + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
+    kpi('貨款', sum(months, function (m) { return m.purchase; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.purchase; }) / yAct : 0)) + '</div></div><h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
     cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
@@ -2011,8 +2011,9 @@ function renderSummaryTab() {
   var shares = R.shares.filter(function (x) { return x.month === month; });
   var warns = R.warns.filter(function (x) { return x.month === month || x.month === ''; });
   var cats = R.cats.filter(function (x) { return x.month === month; }).sort(function (a, b) { return b.amount - a.amount; });
-  var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('月盈餘', m.profit, '扣完所有成本＋現金差額', true) +
-    kpi('可分配給股東', m.dist, '扣員工分紅、年終後') + kpi('人事佔比', pct(m.staffPct), '進貨佔比 ' + pct(m.purchasePct)) + '</div>' + costBox(Number(month.slice(5, 7)) + '月', m.purchase, m.staff, m.profit, m.actual) + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
+  var h = '<div class="ovgrid">' + costBox(Number(month.slice(5, 7)) + '月', m.purchase, m.staff, m.profit, m.actual) + '<div class="kpis two">' +
+    kpi('月盈餘', m.profit, '扣完所有成本＋現金差額', true) + kpi('可分配給股東', m.dist, '扣員工分紅、年終後') +
+    kpi('實際營收', m.actual, '工作 ' + m.days + ' 天') + kpi('日均營收', m.avg, '每個工作天') + '</div></div>' + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
     '　工作天 ' + m.days + '　日均營收 ' + money(m.avg) + '　現金差額累計 ' + money(m.cashDiff) + '</p>';
   h += '<table class="msum">' + rows.map(function (x) {
     if (x[4] !== undefined) {                       // 外送：日結 − 實際收到 ＝ 付給平台
