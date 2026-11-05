@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.9.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.9.2';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1460,21 +1460,16 @@ function renderDeductTab() {
       if (partners.indexOf(n) >= 0 || (lastBatch && c.last === lastBatch)) ST.xp.sel[n] = true;
     });
   }
-  var doneList = [], selN = 0, selSum = 0, rows = '';
-  // 名字用小按鈕（可以多選，選了變橘色）；這個月已發的變綠色 ✓；選了的人在下面一行一行填金額
+  var doneList = [], selN = 0, selSum = 0;
   $('xp-chips').innerHTML = names.map(function (n) {
     var c = calc[n], on = !!ST.xp.sel[n];
-    if (c.done) { doneList.push(n + ' ' + money(c.done)); return '<button type="button" class="who done" onclick="toast(\'' + jsq(n) + ' 這個月已經記過了；要改請到下面列表刪掉再記\')">✓ ' + esc(n) + '</button>'; }
-    if (on) {
-      var a = ST.xp.amt[n] !== undefined ? ST.xp.amt[n] : (c.amt !== null ? String(Math.max(c.amt, 0)) : '');
-      selN++; selSum += expr(a) || 0;
-      rows += '<div class="xp-row" data-name="' + esc(n) + '"><div class="xp-row-who"><b>' + esc(n) + '</b><small>' + esc(c.tag) + '</small></div>' +
-        '<div class="xp-amt"><span>$</span><input class="card-amt" inputmode="numeric" value="' + esc(a) + '" placeholder="金額" oninput="digitsOnly(this);ST.xp.amt[\'' + jsq(n) + '\']=this.value;xpSum()"></div>' +
-        '<button class="danger del-x" aria-label="不發" title="不發" onclick="xpToggle(\'' + jsq(n) + '\')">✕</button></div>';
-    }
-    return '<button type="button" class="who' + (on ? ' on' : '') + '" onclick="xpToggle(\'' + jsq(n) + '\')">' + esc(n) + '</button>';
-  }).join('') + '<button type="button" class="who add" onclick="xpOther()">＋ 其他</button>';
-  $('xp-rows').innerHTML = rows;
+    if (c.done) { doneList.push(n + ' ' + money(c.done)); return '<div class="wc done" onclick="toast(\'' + jsq(n) + ' 這個月已經記過了；要改請到下面列表刪掉再記\')"><span class="tick">✓</span><b>' + esc(n) + '</b><small>已發</small><span class="amt">' + money(c.done) + '</span></div>'; }
+    var a = ST.xp.amt[n] !== undefined ? ST.xp.amt[n] : (c.amt !== null ? String(Math.max(c.amt, 0)) : '');
+    if (on) { selN++; selSum += expr(a) || 0; }
+    return '<div class="wc' + (on ? ' on' : '') + '" onclick="xpToggle(\'' + jsq(n) + '\')"><span class="tick">' + (on ? '✓' : '') + '</span><b>' + esc(n) + '</b><small>' + esc(c.tag) + '</small>' +
+      (on ? '<input class="card-amt" inputmode="numeric" value="' + esc(a) + '" placeholder="金額" onclick="event.stopPropagation()" oninput="digitsOnly(this);ST.xp.amt[\'' + jsq(n) + '\']=this.value;xpSum()">'
+          : '<span class="amt">' + (a ? money(expr(a)) : '—') + '</span>') + '</div>';
+  }).join('') + '<div class="wc other" onclick="xpOther()">＋ 其他人</div>';
   $('xp-done').textContent = doneList.length ? '✓ ' + Number(month.slice(5)) + ' 月已發：' + doneList.join('、') : '';
   $('xp-btn').disabled = !selN;
   $('xp-btn').textContent = selN ? '記錄 ' + selN + ' 筆分紅｜合計 ' + money(selSum) : '勾選要發的人';
@@ -1498,7 +1493,7 @@ function xpToggle(n) { ST.xp.sel[n] = !ST.xp.sel[n]; renderDeductTab(); }
 function xpOther() { var n = prompt('要記誰的分紅？（例：建燁、佳茹）'); if (!n || !(n = n.trim())) return; if (ST.xp.extra.indexOf(n) < 0) ST.xp.extra.push(n); ST.xp.sel[n] = true; renderDeductTab(); }
 function xpSum() {
   var n = 0, t = 0; Object.keys(ST.xp.sel).forEach(function (k) { if (ST.xp.sel[k]) { n++; } });
-  $('xp-rows').querySelectorAll('.card-amt').forEach(function (i) { t += expr(i.value) || 0; });
+  $('xp-chips').querySelectorAll('.wc.on .card-amt').forEach(function (i) { t += expr(i.value) || 0; });
   $('xp-btn').textContent = n ? '記錄 ' + n + ' 筆分紅｜合計 ' + money(t) : '勾選要發的人';
 }
 // 選股東 → 照比例自動算金額：上次發分紅之後（到選的月份）每個月「應分」加起來
@@ -1532,8 +1527,8 @@ function xpCalc(who, month, L) {
 function addPayouts() {
   var month = $('xs-month').value, partners = (ST.snap.config.partners || []).map(function (p) { return p.name; });
   var rows = [], bad = '';
-  $('xp-rows').querySelectorAll('.xp-row').forEach(function (row) {
-    var n = row.dataset.name, a = expr(row.querySelector('.card-amt').value);
+  $('xp-chips').querySelectorAll('.wc.on').forEach(function (card) {
+    var n = card.querySelector('b').textContent, a = expr(card.querySelector('.card-amt').value);
     if (isNaN(a) || !a) bad = n; else rows.push([n, a]);
   });
   if (bad) return toast(bad + ' 的金額沒填或看不懂');
