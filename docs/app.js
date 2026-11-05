@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.11.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.11.2';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1918,14 +1918,17 @@ function peCatOptions(use) {
 function renderPresetEditor() {
   if (!isAdmin()) { $('set-presets-card').classList.add('hide'); return; }
   $('set-presets-card').classList.remove('hide');
-  if (!ST.pe) ST.pe = { use: '每日結帳', items: null, dirty: false };
+  // 換店別：清單要換成那家店的（不然會看到、甚至存成上一家店的常用項目）
+  if (!ST.pe || ST.pe.store !== ST.sess.store) ST.pe = { store: ST.sess.store, use: ST.pe ? ST.pe.use : '每日結帳', items: null, dirty: false };
   if (!ST.pe.items) ST.pe.items = presetsFor(ST.pe.use);
   $('pe-uses').innerHTML = PE_USES.map(function (u) {
     return '<button class="' + (u[0] === ST.pe.use ? 'on' : '') + '" onclick="peUse(\'' + u[0] + '\')">' + u[1] + '</button>';
   }).join('');
   var groups = peCatOptions(ST.pe.use), isPay = ST.pe.use === '人事';
   $('pe-list').innerHTML = ST.pe.items.map(function (it, i) {
-    var sel = '<select onchange="peSet(' + i + ',\'cat\',this.value)">' + groups.map(function (g) {
+    // 分類不在這家店的清單裡（例：舊的「菜」、別家店的分類）：照原本的顯示，不要偷偷變成第一個選項
+    var known = groups.some(function (g) { return g[1].indexOf(it.cat) >= 0; });
+    var sel = '<select onchange="peSet(' + i + ',\'cat\',this.value)">' + (known || !it.cat ? '' : '<option selected>' + esc(it.cat) + '</option>') + groups.map(function (g) {
       var opts = g[1].map(function (c) { return '<option' + (c === it.cat ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
       return g[0] ? '<optgroup label="' + g[0] + '">' + opts + '</optgroup>' : opts;
     }).join('') + '</select>';
@@ -1981,7 +1984,7 @@ function defGo(t) {
 }
 function peUse(u) {
   if (ST.pe.dirty && !confirm('這一類還沒儲存，確定要切換？（改的內容會不見）')) return;
-  ST.pe = { use: u, items: null, dirty: false }; renderPresetEditor();
+  ST.pe = { store: ST.sess.store, use: u, items: null, dirty: false }; renderPresetEditor();
 }
 function peSet(i, k, v) { ST.pe.items[i][k] = v; ST.pe.dirty = true; $('pe-save').disabled = false; $('pe-save').textContent = '儲存變更'; }
 function peMove(i, d) { var j = i + d; if (j < 0 || j >= ST.pe.items.length) return; var t = ST.pe.items[i]; ST.pe.items[i] = ST.pe.items[j]; ST.pe.items[j] = t; ST.pe.dirty = true; renderPresetEditor(); }
@@ -2002,7 +2005,7 @@ function peSave() {
   var names = items.map(function (it) { return it.name; });
   if (names.some(function (n, i) { return names.indexOf(n) !== i; })) return toast('有重複的名稱，請改掉');
   enqueue('presets.set', { use: ST.pe.use, items: items });
-  ST.pe = { use: ST.pe.use, items: null, dirty: false };
+  ST.pe = { store: ST.sess.store, use: ST.pe.use, items: null, dirty: false };
   renderPresetEditor();
   toast('常用項目已儲存 ✓（所有裝置同步後都會更新）');
 }

@@ -282,6 +282,14 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   // 更改 PIN（規則要符合）
   await B.pg.click('#tb-settings'); await B.pg.fill('#cp-old', 'Nina#2026x'); await B.pg.fill('#cp-new', 'Nina#2027y'); await B.pg.fill('#cp-new2', 'Nina#2027y');
   await B.pg.click('#set-pin-card .primary'); await B.pg.waitForFunction(() => /PIN 已更改/.test(document.getElementById('toast').textContent));
+  // 常用項目設定：換店別後要顯示那家店的清單，分類不認得時照原本顯示
+  await B.pg.click('#tb-settings');
+  const peA = await B.pg.$$eval('#pe-list .pe-row > input', i => i.map(x => x.value));
+  await B.pg.selectOption('#storeSel', '中正店'); await B.pg.waitForFunction(() => ST.sess.store === '中正店' && ST.snap);
+  await B.pg.click('#tb-settings');
+  const peB = await B.pg.evaluate(() => presetsFor('每日結帳').map(p => p.name));
+  assert.deepStrictEqual(await B.pg.$$eval('#pe-list .pe-row > input', i => i.map(x => x.value)), peB, '換店後常用項目要是中正店的：' + peA);
+  await B.pg.selectOption('#storeSel', '大埔店'); await B.pg.waitForFunction(() => ST.sess.store === '大埔店');
   console.log('帳號登入、切店、改 PIN ✓');
   // 裝置：管理可以改員工名單、進貨分類；字體大小併進「這台裝置」，卡片順序：常用項目 → 員工 → 分類
   await B.pg.click('#tb-settings');
