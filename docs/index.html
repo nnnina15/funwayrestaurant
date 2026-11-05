@@ -181,6 +181,7 @@
   .ee-del { color: var(--bad); padding: 8px 14px; font-size: 15px; margin: 0; }
   .ce-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 40px 40px auto; gap: 6px; align-items: center; margin-bottom: 6px; }
   .ce-row input { font-size: 16px; padding: 10px; min-width: 0; }
+  .ce-row input[type=month] { -webkit-appearance: none; appearance: none; width: 100%; max-width: 100%; text-align: center; font-size: 14px; padding: 10px 4px; }
   .font-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 4px; padding: 8px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .font-row > span { font-weight: 700; white-space: nowrap; }
   .font-row .seg { margin: 0; }
@@ -229,10 +230,18 @@
   @media (max-width: 560px) { .pp-row { grid-template-columns: minmax(0, 1fr) 90px 32px 32px 24px; gap: 4px; } }
   .ce-stop { margin: 0; padding: 10px 6px; font-size: 14px; color: var(--muted); }
   .ce-row.off input:first-child { color: var(--muted); text-decoration: line-through; }
-  @media (max-width: 560px) { .ce-row { grid-template-columns: minmax(0, 1fr) 120px 32px 32px 24px; gap: 4px; } }
+  @media (max-width: 560px) { .ce-row { grid-template-columns: minmax(0, 1fr) 112px 30px 30px 22px; gap: 4px; } .ce-row .pe-mv { height: 38px; } .ce-row .ce-stop { font-size: 13px; } }
   .pe-mv { padding: 0; height: 40px; background: var(--soft); font-size: 16px; }
   .primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
-  @media (max-width: 560px) { .pe-row, .pe-row.pay { grid-template-columns: 1fr 1fr 36px 36px auto; } .pe-row .pe-sign { grid-column: 1 / 3; } .pe-row.pay select:not(.pe-sign) { grid-column: 2; } }
+  /* 手機：常用項目每一項都排一行（名稱｜分類｜加扣｜↑↓✕），字小一點 */
+  @media (max-width: 560px) {
+    .pe-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px 30px 22px; gap: 4px; }
+    .pe-row.pay { grid-template-columns: minmax(0, 1fr) 76px 52px 30px 30px 22px; gap: 4px; }
+    .pe-row input, .pe-row select { font-size: 15px; padding: 9px 6px; min-width: 0; }
+    .pe-row select { -webkit-appearance: none; appearance: none; background-image: none; text-align: center; text-align-last: center; }
+    .pe-row .pe-mv { height: 38px; font-size: 14px; }
+    .pe-row .del-x { padding: 0; width: 22px; }
+  }
 
   .ov-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
   .ov-top h2 { margin: 0; }

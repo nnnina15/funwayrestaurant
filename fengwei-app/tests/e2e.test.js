@@ -372,6 +372,18 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#bb-more'); await B.pg.click('#moregrid button:has-text("裝置")');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-phone-settings.png'), fullPage: true });
   await B.pg.click('#bb-daily');
+  // 手機：裝置頁的常用項目（人事）、進貨分類不能跑版
+  await B.pg.click('#bb-more'); await B.pg.click('#moregrid button:has-text("裝置")');
+  await B.pg.click('#pe-uses button:has-text("人事")');
+  const peTops = await B.pg.$$eval('#pe-list .pe-row.pay', rs => rs.slice(0, 3).map(r => { const k = [...r.children].map(c => Math.round(c.getBoundingClientRect().top)); return Math.max(...k) - Math.min(...k); }));
+  assert.ok(peTops.every(d => d < 12), '人事常用項目每項要在同一行：' + peTops);
+  await B.pg.click('#def-tabs button:has-text("進貨分類")');
+  await B.pg.evaluate(() => { ST.ce.items[0].to = '2026-11'; renderCatEditor(); });
+  const ceOver = await B.pg.$$eval('#ce-list .ce-row', rs => rs.some(r => [...r.children].some((c, i, a) => i && c.getBoundingClientRect().left < a[i - 1].getBoundingClientRect().right - 1)));
+  assert.ok(!ceOver, '進貨分類有停用月份時不能重疊');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-phone-settings2.png'), fullPage: true });
+  await B.pg.evaluate(() => { ST.ce = null; ST.pe = null; });
+  await B.pg.click('#bb-daily');
   console.log('手機分頁列 + 亮暗切換 ✓');
   // 登出時沒上傳的資料要保留：離線記一筆 → 登出 → 登入畫面提醒 → 同帳號再登入自動上傳
   const n0 = g.rows(S.PURCHASE).length;
