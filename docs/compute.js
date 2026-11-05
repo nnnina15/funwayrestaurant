@@ -168,9 +168,15 @@ function applyOp_(state, op, store) {
   const d = op.data || {};
   function keep(arr, pred) { return arr.filter(function (r) { return !pred(r); }); }
   switch (op.type) {
-    case 'daily.upsert':
+    case 'daily.upsert': {
       state.daily = keep(state.daily, function (r) { return r.date === d.date; });
-      state.daily.push(Object.assign({ store: store }, d));
+      // 還沒上傳的那幾天也要有現金差額（跟試算表一樣：點收現金 −（現場 − 全支付 − LINE Pay − 現場支出））
+      const nn = function (x) { x = Number(x); return isFinite(x) ? x : 0; };
+      const cd = d.closed ? 0 : nn(d.cash) - (nn(d.site) - nn(d.allpay) - nn(d.line) - nn(d.spend));
+      state.daily.push(Object.assign({ store: store, cashDiff: cd }, d));
+      break;
+    }
+    case 'store.set':
       break;
     case 'purchase.add':
       state.purchase = keep(state.purchase, function (r) { return r.id === d.id; });

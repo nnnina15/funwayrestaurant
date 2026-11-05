@@ -287,7 +287,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#tb-settings');
   assert.deepStrictEqual(await B.pg.$$eval('#tab-settings > .card:not(.hide) h2', h => h.map(x => x.textContent)).then(x => x.slice(0, 4)), ['這台裝置', '常用項目設定', '預設', '更改 PIN']);
   assert.deepStrictEqual(await B.pg.$$eval('#pe-uses button', b => b.map(x => x.textContent)), ['每日結帳・支出明細', '固定／其他支出', '人事']);
-  assert.deepStrictEqual(await B.pg.$$eval('#def-tabs button', b => b.map(x => x.textContent)), ['員工名單', '股東', '進貨分類']);
+  assert.deepStrictEqual(await B.pg.$$eval('#def-tabs button', b => b.map(x => x.textContent)), ['店家', '員工名單', '股東', '進貨分類']);
   await B.pg.click('#def-tabs button:has-text("員工名單")');
   await B.pg.click('text=＋ 新增員工');
   await B.pg.fill('.ee-item.open .ee-body > label input', '阿寶');
@@ -317,6 +317,12 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   assert.deepStrictEqual(g.rows(S.PARTNER).filter(r => r['店別'] === '大埔店').map(r => r['股東'] + r['比例(%)']), ['豐吉50', '浩勤30', '呀肥20']);
   assert.ok(g.rows(S.PARTNER).some(r => r['店別'] === '中正店'), '中正店股東不受影響');
+  // 店家：現金差額算進盈餘（存回設定_店家）
+  await B.pg.click('#def-tabs button:has-text("店家")');
+  await B.pg.check('#sp-cashin'); await B.pg.click('text=儲存店家設定');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  assert.strictEqual(g.rows(S.STORE).find(r => r['店別'] === '大埔店')['現金差額計入盈餘(是/否)'], '是', '店家設定存到試算表');
+  assert.ok(await B.pg.evaluate(() => ST.snap.config.store.cashIn === true), '同步後設定還是開著');
   console.log('裝置：員工名單、進貨分類 ✓');
   // 員工借還款：借出 5 萬、還 2 萬 → 欠 3 萬；年總覽多「借還款」欄，結餘扣 3 萬
   await B.pg.click('#tb-loan');

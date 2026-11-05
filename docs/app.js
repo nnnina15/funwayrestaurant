@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.9.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.10.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -705,7 +705,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.5.1';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.6.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';
@@ -1932,7 +1932,7 @@ function renderPresetEditor() {
   $('pe-save').textContent = ST.pe.dirty ? '儲存「' + PE_USES.filter(function (u) { return u[0] === ST.pe.use; })[0][1] + '」常用項目' : '沒有變更';
 }
 // 「預設」卡片：員工名單／進貨分類（這家店的，管理才看得到）
-var DEF_TABS = [['員工', '員工名單'], ['股東', '股東'], ['分類', '進貨分類']];
+var DEF_TABS = [['店家', '店家'], ['員工', '員工名單'], ['股東', '股東'], ['分類', '進貨分類']];
 function renderDefaults() {
   if (!isAdmin()) { $('set-def-card').classList.add('hide'); return; }
   $('set-def-card').classList.remove('hide');
@@ -1942,19 +1942,35 @@ function renderDefaults() {
   }).join('');
   $('def-note').textContent = tab === '員工'
     ? ST.sess.store + '的員工。人事頁的「＋名字」、月薪／時薪和勞健保照這裡帶入。點名字展開修改；不做了的取消勾選「在職」就好，以前的薪資紀錄會留著。'
+    : tab === '店家' ? ST.sess.store + '的設定。改了以後，以前月份的盈餘也會照新設定重算。'
     : tab === '股東' ? ST.sess.store + '的股東和分紅比例，總覽的「應分多少」照這裡算，比例加起來要 100%。改了比例，以前月份的應分金額也會照新比例重算。'
     : ST.sess.store + '的進貨分類，進貨頁的分類按鈕照這裡的順序顯示。點「一直用」可以選從哪個月開始停用。';
   $('ee-pane').classList.toggle('hide', tab !== '員工');
+  $('sp-pane').classList.toggle('hide', tab !== '店家');
   $('pp-pane').classList.toggle('hide', tab !== '股東');
   $('ce-pane').classList.toggle('hide', tab !== '分類');
-  if (tab === '員工') renderEmpEditor(); else if (tab === '股東') renderPartnerEditor(); else renderCatEditor();
+  if (tab === '店家') renderStoreEditor(); else if (tab === '員工') renderEmpEditor(); else if (tab === '股東') renderPartnerEditor(); else renderCatEditor();
+}
+// 店家設定：現金差額算不算進盈餘、警示門檻、手續費率（存回「設定_店家」）
+function renderStoreEditor() {
+  var st = ST.snap.config.store || {};
+  $('sp-cashin').checked = !!st.cashIn; $('sp-warn').value = st.cashWarn || ''; $('sp-fee').value = st.fee === undefined ? '' : st.fee;
+}
+function spSave() {
+  var fee = expr($('sp-fee').value), warn = expr($('sp-warn').value);
+  if (isNaN(fee) || isNaN(warn)) return toast('數字看不懂');
+  var d = { cashIn: $('sp-cashin').checked, cashWarn: warn || 500, fee: fee };
+  enqueue('store.set', d);
+  ST.snap.config.store = Object.assign({}, ST.snap.config.store, d);
+  LS.set(k_('snap'), ST.snap);
+  toast('店家設定已儲存 ✓' + (d.cashIn ? '（現金差額會算進盈餘）' : ''));
 }
 function defGo(t) {
   var cur = ST.defTab || '員工';
   if (t === cur) return;
-  var dirty = cur === '員工' ? ST.ee && ST.ee.dirty : cur === '股東' ? ST.pp && ST.pp.dirty : ST.ce && ST.ce.dirty;
+  var dirty = cur === '員工' ? ST.ee && ST.ee.dirty : cur === '股東' ? ST.pp && ST.pp.dirty : cur === '分類' ? ST.ce && ST.ce.dirty : false;
   if (dirty && !confirm('這一頁還沒儲存，確定要切換？（改的內容會不見）')) return;
-  if (cur === '員工') ST.ee = null; else if (cur === '股東') ST.pp = null; else ST.ce = null;
+  if (cur === '員工') ST.ee = null; else if (cur === '股東') ST.pp = null; else if (cur === '分類') ST.ce = null;
   ST.defTab = t; renderDefaults();
 }
 function peUse(u) {

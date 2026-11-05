@@ -235,6 +235,9 @@
   .type-cards button.on { border-color: var(--brand); color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--card)); }
   .xd-row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; }
   .xd-row .xp-amt input { font-size: 19px; }
+  .sp-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--soft); margin: 0 0 10px; cursor: pointer; }
+  .sp-row span { display: flex; flex-direction: column; } .sp-row b { font-size: 17px; color: var(--ink); } .sp-row small { font-size: 13px; color: var(--muted); }
+  .sp-row input { width: 26px; height: 26px; flex: none; margin: 0; }
   .pp-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 40px 40px auto; gap: 6px; align-items: center; margin-bottom: 6px; }
   .pp-row input { font-size: 16px; padding: 10px; min-width: 0; }
   .pp-pct { position: relative; } .pp-pct input { padding-right: 28px; } .pp-pct span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
@@ -829,6 +832,14 @@
         <div id="ee-list"></div>
         <button class="ghost addline" onclick="eeAdd()">＋ 新增員工</button>
         <button class="primary" id="ee-save" onclick="eeSave()">沒有變更</button>
+      </div>
+      <div id="sp-pane" class="hide" style="margin-top:12px">
+        <label class="sp-row"><span><b>現金差額算進盈餘</b><small>每天點收現金和應有現金的差，多收加、短少扣</small></span><input type="checkbox" id="sp-cashin"></label>
+        <div class="grid2">
+          <div><label>現金差額警示門檻（元）</label><input id="sp-warn" inputmode="numeric" oninput="digitsOnly(this)"></div>
+          <div><label>全支付／LINE Pay 手續費率（%）</label><input id="sp-fee" inputmode="decimal"></div>
+        </div>
+        <button class="primary" onclick="spSave()">儲存店家設定</button>
       </div>
       <div id="pp-pane" class="hide" style="margin-top:12px">
         <div id="pp-list"></div>

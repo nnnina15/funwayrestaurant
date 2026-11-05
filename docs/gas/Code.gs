@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.5.1';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '員工借還款；管理可以在 App「裝置 → 預設」改股東和比例';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.6.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '管理可以在 App「裝置 → 預設 → 店家」改手續費率、現金差額要不要算進盈餘';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -570,7 +570,8 @@ function sync_(req) {
       });
     });
   }
-  return Object.assign({ ok: true, account: acc.name, role: role, stores: list, results: results }, pull_(s, role));
+  const s2 = changed ? (stores_().filter(function (x) { return x.name === s.name; })[0] || s) : s;   // 店家設定可能剛改過
+  return Object.assign({ ok: true, account: acc.name, role: role, stores: list, results: results }, pull_(s2, role));
 }
 
 /* ---------- 登入權杖：改 PIN、停用帳號，舊權杖就自動失效 ---------- */
@@ -655,6 +656,17 @@ function applyServerOp_(store, op) {
       });
       deleteWhere_(S.EMP, function (x) { return str_(x['店別']) === store; });
       append_(S.EMP, rows);
+      return 'ok';
+    }
+    // 管理在 App「裝置 → 預設 → 店家」改這家店的設定（手續費率、現金差額要不要算進盈餘、警示門檻）
+    case 'store.set': {
+      const sh = sheet_(S.STORE), h = cols_(sh, S.STORE);
+      const r = rows_(S.STORE).filter(function (x) { return str_(x['店別']) === store; })[0];
+      if (!r) throw new Error('找不到店家：' + store);
+      const set = function (k, v) { const i = h.indexOf(k); if (i >= 0) sh.getRange(r._row, i + 1).setValue(v); };
+      if (d.fee !== undefined) set('手續費率(%)', num_(d.fee));
+      if (d.cashIn !== undefined) set('現金差額計入盈餘(是/否)', d.cashIn ? '是' : '否');
+      if (d.cashWarn !== undefined) set('現金差額警示門檻', num_(d.cashWarn));
       return 'ok';
     }
     // 管理在 App「裝置」改這家店的股東和比例：整份換掉
