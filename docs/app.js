@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.11.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.11.3';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1837,7 +1837,7 @@ function renderYearTab() {
     return '<tr class="' + cls + '"><th>' + name + '</th><td class="n">' + sum(list, function (m) { return m.days; }) + '</td>' +
       dcols.map(function (c, i) { var v = dv(list, c[1]) * (i === 0 ? 1 : -1); return '<td class="n' + (i === 0 ? ' em' : '') + sgn(v) + '">' + money(v) + '</td>'; }).join('') + '</tr>';
   };
-  h += '<div class="h2row"><h2>平均細項</h2><select onchange="setYMode(this.value)"><option value="day"' + (perDay ? ' selected' : '') + '>每個工作天平均</option><option value="total"' + (perDay ? '' : ' selected') + '>每月合計</option></select></div><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + (dcols.length + 1) * 84) + 'px"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
+  h += '<div class="h2row"><h2>平均細項</h2><div class="seg ymode"><button class="' + (perDay ? 'on' : '') + '" onclick="setYMode(\'day\')">平均</button><button class="' + (perDay ? '' : 'on') + '" onclick="setYMode(\'total\')">合計</button></div></div><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + (dcols.length + 1) * 84) + 'px"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
     dcols.map(function (c, i) { return '<th class="n' + (i >= 5 ? ' cat' : '') + '">' + esc(c[0]) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
