@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.11.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.11.4';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1831,6 +1831,8 @@ function renderYearTab() {
   });
   var dcols = [['實際營收', function (m) { return m.actual; }], ['人事', function (m) { return m.staff; }],
     ['電費', function (m) { return util[m.month + '|電費'] || 0; }], ['水費', function (m) { return util[m.month + '|水費'] || 0; }],
+    ['固定支出', function (m) { return m.fixed; }], ['其他支出', function (m) { return m.other; }],
+    ['現金差額', function (m) { return -m.cashDiff; }],   // 正數＝多收（顯示時會再乘 −1 變回正的）
     ['貨款', function (m) { return m.purchase; }]].concat(cats.map(function (c) { return [c, function (m) { return catAmt[m.month + '|' + c] || 0; }]; }));
   var dv = function (list, f) { var days = sum(list, function (m) { return m.days; }); var t = sum(list, f); return perDay ? (days ? t / days : 0) : t; };
   var drow = function (list, name, cls) {
@@ -1838,14 +1840,14 @@ function renderYearTab() {
       dcols.map(function (c, i) { var v = dv(list, c[1]) * (i === 0 ? 1 : -1); return '<td class="n' + (i === 0 ? ' em' : '') + sgn(v) + '">' + money(v) + '</td>'; }).join('') + '</tr>';
   };
   h += '<div class="h2row"><h2>平均細項</h2><div class="seg ymode"><button class="' + (perDay ? 'on' : '') + '" onclick="setYMode(\'day\')">平均</button><button class="' + (perDay ? '' : 'on') + '" onclick="setYMode(\'total\')">合計</button></div></div><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + (dcols.length + 1) * 84) + 'px"><thead><tr><th>' + cur + '</th><th class="n">工作天</th>' +
-    dcols.map(function (c, i) { return '<th class="n' + (i >= 5 ? ' cat' : '') + '">' + esc(c[0]) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    dcols.map(function (c, i) { return '<th class="n' + (i >= 8 ? ' cat' : '') + '">' + esc(c[0]) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
     if (!qm.length) return;
     qm.forEach(function (m) { h += drow([m], label(m), ''); });
   });
   h += drow(months, cur + (perDay ? ' 全年平均' : ' 全年'), 'yrow') + '</tbody></table></div>';
-  h += '<p class="muted">電費、水費是從「固定／其他支出」裡項目名稱有「電費」「水費」的金額抓的。季、全年的每天平均＝合計 ÷ 總工作天。</p>';
+  h += '<p class="muted">電費、水費是從「固定／其他支出」裡項目名稱有「電費」「水費」的金額抓的（也包含在固定／其他支出裡）。現金差額正數＝多收、負數＝短少。季、全年的每天平均＝合計 ÷ 總工作天。</p>';
   $('y-body').innerHTML = h; fixTheads($('y-body'));
 }
 
