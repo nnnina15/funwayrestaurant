@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.11.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.12.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1649,10 +1649,10 @@ function setYMode(v) { ST.ymode = v; LS.set('fw_ymode', v); renderOverview(); }
 function setOverview(v) { ST.ov = v; LS.set('fw_ov', v); document.body.classList.toggle('page-wide', v !== 'month'); renderOverview(); }
 function renderOverview() {
   Array.prototype.forEach.call(document.querySelectorAll('#ov-seg button'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === ST.ov); });
-  $('ov-month-pick').classList.toggle('hide', ST.ov === 'year');
+  $('ov-month-pick').classList.toggle('hide', ST.ov === 'year' || ST.ov === 'all');
   $('ov-year-pick').classList.toggle('hide', ST.ov !== 'year');
-  ['dd-body', 'm-body', 'y-body'].forEach(function (id) { $(id).classList.toggle('hide', id !== { day: 'dd-body', month: 'm-body', year: 'y-body' }[ST.ov]); });
-  if (ST.ov === 'day') renderDayView(); else if (ST.ov === 'month') renderSummaryTab(); else renderYearTab();
+  ['dd-body', 'm-body', 'y-body'].forEach(function (id) { $(id).classList.toggle('hide', id !== { day: 'dd-body', month: 'm-body', year: 'y-body', all: 'y-body' }[ST.ov]); });
+  if (ST.ov === 'day') renderDayView(); else if (ST.ov === 'month') renderSummaryTab(); else if (ST.ov === 'all') renderAllYears(); else renderYearTab();
 }
 var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 // 表格標題列的高度：讓「總計」列固定在標題下面
@@ -1752,6 +1752,48 @@ function renderDayView() {
   $('dd-body').innerHTML = h; fixTheads($('dd-body'));
 }
 
+// 歷年：一年一列（月盈餘、分紅、員工分紅、存年終、其他扣除、借出−還款、當年盈餘＝含上一年留下的）
+function renderAllYears() {
+  var L = computeLocal(), R = L.R, V = L.V;
+  var months = R.months.filter(function (m) { return m.status !== '未來'; });
+  if (!months.length) { $('y-body').innerHTML = '<p class="muted">還沒有任何資料</p>'; return; }
+  var who = function (note) { return String(note || '').replace(/（.*?）|\(.*?\)/g, '').replace(/分紅.*$/, '').trim(); };
+  var partners = (L.C.partners || []).map(function (p) { return p.name; }), people = partners.slice(), payBy = {}, otherBy = {};
+  (V.deduct || []).forEach(function (d) {
+    var y = String(d.month || '').slice(0, 4), amt = Number(d.amount || 0), p = '';
+    if (d.type === '股東分紅（已發）') p = who(d.note) || '股東（未寫名字）';
+    else if (d.type === '其他扣除' && /分紅|秘笈/.test(String(d.note || ''))) p = who(d.note);
+    if (p) { payBy[y + '|' + p] = (payBy[y + '|' + p] || 0) + amt; if (people.indexOf(p) < 0) people.push(p); }
+    else if (d.type === '其他扣除') otherBy[y] = (otherBy[y] || 0) + amt;
+  });
+  var years = []; months.forEach(function (m) { var y = m.month.slice(0, 4); if (years.indexOf(y) < 0) years.push(y); });
+  years.sort();
+  var f = function (y, k) { return months.filter(function (m) { return m.month.slice(0, 4) === y; }).reduce(function (a, m) { return a + (typeof k === 'function' ? k(m) : (m[k] || 0)); }, 0); };
+  var rows = years.map(function (y) {
+    var o = { y: y, days: f(y, 'days'), actual: f(y, 'actual'), profit: f(y, 'profit'), bonus: f(y, 'bonus'), reserve: f(y, 'reserve'), other: otherBy[y] || 0,
+      loan: f(y, function (m) { return (m.loan || 0) - (m.repay || 0); }), pay: {} };
+    o.paid = people.reduce(function (a, p) { o.pay[p] = payBy[y + '|' + p] || 0; return a + o.pay[p]; }, 0);
+    o.left = o.profit - o.paid - o.bonus - o.reserve - o.other - o.loan;   // 這一年留下來的
+    return o;
+  });
+  var run = 0; rows.forEach(function (o) { run += o.left; o.cum = run; });
+  people = people.filter(function (p) { return rows.some(function (o) { return o.pay[p]; }); });
+  var td = function (v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + sgn(v) + '">' + money(v) + '</td>'; };
+  var neg = function (v) { return v ? td(-v) : '<td class="n"></td>'; };
+  var cols = ['工作天', '實際營收', '月盈餘', '分紅合計'].concat(people, ['員工分紅', '存年終', '其他扣除', '借出−還款', '當年盈餘']);
+  var line = function (o, name, cls, last) {
+    return '<tr class="' + cls + '"><th>' + name + '</th><td class="n">' + o.days + '</td>' + td(o.actual) + td(o.profit) + td(-(o.paid + o.bonus), 'em') +
+      people.map(function (p) { return neg(o.pay[p]); }).join('') + neg(o.bonus) + neg(o.reserve) + neg(o.other) + neg(o.loan) + td(last, 'em bal') + '</tr>';
+  };
+  var tot = { days: 0, actual: 0, profit: 0, paid: 0, bonus: 0, reserve: 0, other: 0, loan: 0, pay: {} };
+  rows.forEach(function (o) { ['days', 'actual', 'profit', 'paid', 'bonus', 'reserve', 'other', 'loan'].forEach(function (k) { tot[k] += o[k]; }); people.forEach(function (p) { tot.pay[p] = (tot.pay[p] || 0) + o.pay[p]; }); });
+  var h = '<h2>歷年</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (110 + cols.length * 96) + 'px"><thead><tr><th>年份</th>' +
+    cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    rows.map(function (o) { return line(o, o.y + (o.y === todayStr().slice(0, 4) ? '<span class="tag">進行中</span>' : ''), '', o.cum); }).join('') +
+    line(tot, '全部', 'yrow', run) + '</tbody></table></div>' +
+    '<p class="muted">當年盈餘＝月盈餘−分紅合計（含員工分紅）−存年終−其他扣除−借出＋還款＋上一年盈餘，跟「年」總覽上面的卡片一樣。點「年」可以看每一年的每個月。</p>';
+  $('y-body').innerHTML = h; fixTheads($('y-body'));
+}
 function renderYearTab() {
   var L = computeLocal(), R = L.R, V = L.V;
   var years = {}; R.months.forEach(function (m) { years[m.month.slice(0, 4)] = true; });
