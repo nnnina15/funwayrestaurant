@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.11.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.11.5';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1782,7 +1782,7 @@ function renderYearTab() {
   people = people.filter(function (p) { return months.some(function (m) { return payBy[m.month + '|' + p]; }) || partners.indexOf(p) >= 0; });
   var paidOf = function (m) { return people.reduce(function (a, p) { return a + (payBy[m.month + '|' + p] || 0); }, 0); };
   // 結餘：上一年留下來的錢 ＋ 盈餘 − 員工分紅 − 存年終 − 其他扣除 − 發出去的分紅（＝還沒分掉的錢）
-  var net = function (m) { return m.dist - (m.paid || 0); };   // 借還款另外在「借還款」分頁看，不放總覽
+  var net = function (m) { return m.dist - (m.paid || 0) - (m.loan || 0) + (m.repay || 0); };   // 借給員工的錢先扣掉，還了再加回（明細在「借還款」分頁）
   var carry = R.months.filter(function (m) { return m.month.slice(0, 4) < cur; }).reduce(function (a, m) { return a + net(m); }, 0);
   var bal = {}, run = carry;
   months.forEach(function (m) { run += net(m); bal[m.month] = run; });
@@ -1805,7 +1805,8 @@ function renderYearTab() {
   var yRes = sum(months, function (m) { return m.reserve; });
   var yDed = sum(months, function (m) { return otherBy[m.month] || 0; });
   // 當年盈餘＝月盈餘合計−當年分紅合計（含員工分紅）−存年終−其他扣除＋上一年盈餘
-  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', yProfit - yPaid - yRes - yDed + carry, '月盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－存年終 ' + money(yRes) + (yDed ? '－其他扣除 ' + money(yDed) : '') + '＋上一年盈餘 ' + money(carry), true) +
+  var yLoan = sum(months, function (m) { return (m.loan || 0) - (m.repay || 0); });   // 今年借出 − 還款
+  var h = '<div class="kpis">' + kpi(cur + ' 盈餘', yProfit - yPaid - yRes - yDed - yLoan + carry, '月盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－存年終 ' + money(yRes) + (yDed ? '－其他扣除 ' + money(yDed) : '') + (yLoan ? (yLoan > 0 ? '－借出 ' + money(yLoan) : '＋還款 ' + money(-yLoan)) : '') + '＋上一年盈餘 ' + money(carry), true) +
     kpi('可分配給股東', sum(months, function (m) { return m.dist; })) +
     kpi('年底結餘', months.length ? bal[months[months.length - 1].month] : carry, '上一年結餘 ' + money(carry) + '｜已發分紅 ' + money(sum(months, function (m) { return m.paid || 0; }))) +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
