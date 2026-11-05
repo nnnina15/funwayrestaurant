@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.13.5">
+<meta name="app-version" content="4.13.6">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -246,6 +246,7 @@
   .xp-pool { margin: 0; font-size: 13.5px; color: var(--muted); } .xp-pool b { color: var(--brand); font-size: 15px; }
   @media (max-width: 560px) { .xp-range-row { grid-template-columns: 1fr; gap: 4px; } }
   .edit-card .grid3 + .chips, .edit-card .grid3 + .chips + .chips { margin-top: 10px; }   /* 輸入格和名字按鈕之間留白 */
+  .xtabs { display: flex; margin: 0 0 10px; } .xtabs button { flex: 1; font-size: 17px; padding: 10px 12px; }
   .xp-done { font-size: 14px; color: var(--ok); margin: 6px 0 2px; }
   .xp-done:empty { display: none; }
   .who-cards button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--soft); color: var(--ink); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 12px; text-align: left; min-height: 0; }
@@ -786,25 +787,25 @@
     <div><label>月份</label><input id="xs-month" type="month" onchange="renderDeductTab()"></div>
     <select id="x-year" class="hide"></select><input id="xp-month" type="hidden"><input id="x-month" type="hidden">
     <div class="card edit-card">
-      <h2>記錄分紅</h2>
-      <p class="muted">點名字選這次要發的人（可以選很多個），金額照比例自動算好，可以改。</p>
-      <div class="xp-range" id="xp-range"></div>
-      <div class="chips xp-chips" id="xp-chips"></div>
-      <div class="who-cards" id="xp-rows"></div>
-      <p class="xp-done" id="xp-done"></p>
-      <button class="primary" id="xp-btn" onclick="addPayouts()">記錄分紅</button>
-    </div>
-    </div>
-    <div class="card edit-card">
-      <h2>分配前扣除</h2>
-      <p class="muted">分給股東之前先扣掉的錢。</p>
-      <select id="x-type" class="hide"></select>
-      <div class="type-cards" id="x-type-seg"></div>
-      <div class="xd-row">
-        <div class="xp-amt"><span>$</span><input id="x-amount" inputmode="decimal" placeholder="金額"></div>
-        <input id="x-note" placeholder="備註（可不填）">
+      <div class="seg xtabs" id="x-tabs"><button data-v="pay" onclick="xTab('pay')">記錄分紅</button><button data-v="ded" onclick="xTab('ded')">分配前扣除</button></div>
+      <div id="xpane-pay">
+        <p class="muted">點名字選這次要發的人（可以選很多個），金額照比例自動算好，可以改。</p>
+        <div class="xp-range" id="xp-range"></div>
+        <div class="chips xp-chips" id="xp-chips"></div>
+        <div class="who-cards" id="xp-rows"></div>
+        <p class="xp-done" id="xp-done"></p>
+        <button class="primary" id="xp-btn" onclick="addPayouts()">記錄分紅</button>
       </div>
-      <button class="primary" onclick="addDeduct()">新增扣除</button>
+      <div id="xpane-ded" class="hide">
+        <p class="muted">分給股東之前先扣掉的錢。</p>
+        <select id="x-type" class="hide"></select>
+        <div class="type-cards" id="x-type-seg"></div>
+        <div class="xd-row">
+          <div class="xp-amt"><span>$</span><input id="x-amount" inputmode="decimal" placeholder="金額"></div>
+          <input id="x-note" placeholder="備註（可不填）">
+        </div>
+        <button class="primary" onclick="addDeduct()">新增扣除</button>
+      </div>
     </div>
     <div class="card"><h2 id="x-list-h">這一年的分紅和扣除</h2><table class="xlist"><tbody id="x-list"></tbody></table></div>
   </section>

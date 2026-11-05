@@ -401,6 +401,12 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok((await B.pg.textContent('#y-body .kpis')).includes('累積盈餘'), '歷年要有卡片');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-allyears.png') });
   await B.pg.click('#ov-seg button[data-v="month"]');
+  // 記錄分紅／分配前扣除在同一張卡片，用分頁切換
+  await B.pg.click('#tb-deduct');
+  assert.ok(await B.pg.isVisible('#xpane-pay') && await B.pg.isHidden('#xpane-ded'));
+  await B.pg.click('#x-tabs button[data-v="ded"]');
+  assert.ok(await B.pg.isVisible('#xpane-ded') && await B.pg.isHidden('#xpane-pay'), '切到分配前扣除');
+  await B.pg.click('#x-tabs button[data-v="pay"]');
   console.log('股東分紅自動算 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換

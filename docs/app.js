@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.6';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1468,6 +1468,7 @@ function payoutNames() {
   return names;
 }
 function renderDeductTab() {
+  xTab(ST.xTab || 'pay');
   // 上面一個月份（‹ › 切換）：記錄分紅、分配前扣除都用這個月份；下面列表看這一年
   if (!$('xs-month').value) $('xs-month').value = todayStr().slice(0, 7);
   var month = $('xs-month').value, y = month.slice(0, 4);
@@ -1540,6 +1541,12 @@ function renderDeductTab() {
 function nextMonth(m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7) + 1; if (mo > 12) { y++; mo = 1; } return y + '-' + (mo < 10 ? '0' : '') + mo; }
 function xpFrom(v) { if (!v) return; ST.xp.from = v; ST.xp.amt = {}; renderDeductTab(); }
 function xpKeep(v) { ST.xp.keep = v; ST.xp.amt = {}; LS.set('fw_keep_' + ST.sess.store, v); clearTimeout(ST.xpKeepT); ST.xpKeepT = setTimeout(function () { var a = document.activeElement; renderDeductTab(); var i = $('xp-range').querySelector('.xp-amt input'); if (i && a && a.closest && a.closest('#xp-range')) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 400); }
+// 記錄分紅／分配前扣除：同一張卡片用上面的分頁切換
+function xTab(t) {
+  ST.xTab = t;
+  Array.prototype.forEach.call($('x-tabs').children, function (b) { b.classList.toggle('on', b.dataset.v === t); });
+  $('xpane-pay').classList.toggle('hide', t !== 'pay'); $('xpane-ded').classList.toggle('hide', t !== 'ded');
+}
 function xpToggle(n) { ST.xp.sel[n] = !ST.xp.sel[n]; renderDeductTab(); }
 function xpOther() { var n = prompt('要記誰的分紅？（例：建燁、佳茹）'); if (!n || !(n = n.trim())) return; if (ST.xp.extra.indexOf(n) < 0) ST.xp.extra.push(n); ST.xp.sel[n] = true; renderDeductTab(); }
 function xpSum() {
