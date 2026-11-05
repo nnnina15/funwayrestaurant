@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.14.1">
+<meta name="app-version" content="4.14.2">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -269,6 +269,9 @@
   .costpie .lg b { font-weight: 700; text-align: right; } .costpie .lg em { font-style: normal; text-align: right; color: var(--muted); font-weight: 700; }
   .costpie .lg b.neg, .costpie .lg em.neg { color: var(--bad); } .costpie .lg b.pos { color: var(--ok); }
   /* 長表單的儲存鈕：滑到哪都固定在視窗下方（手機在下方分頁列上面） */
+  th.split-th { text-align: left; font-weight: 500; }
+  th.split-th label.split { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 0; font-size: 13px; color: var(--muted); white-space: nowrap; cursor: pointer; }
+  th.split-th label.split input { width: 18px; height: 18px; margin: 0; }
   .sticky-save { position: sticky; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 4; box-shadow: 0 8px 22px rgba(0,0,0,.18); }
   @media (max-width: 899px) { body.has-bar .sticky-save { bottom: calc(74px + env(safe-area-inset-bottom)); } }
   .seg.xtabs { display: flex; width: 100%; margin: 0 0 10px; } .seg.xtabs button { flex: 1; font-size: 17px; padding: 10px 12px; white-space: nowrap; }

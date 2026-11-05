@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.14.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.14.2';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1326,7 +1326,8 @@ function dvNet(o) {
 function renderDv(p, gross) {
   var st = ST.dv[p];
   if (gross === undefined) gross = st.gross; else st.gross = gross;
-  var head = '<tr><th></th>' + st.periods.map(function (o) { return '<th>' + esc(o.label) + '</th>'; }).join('') + '</tr>';
+  // 左上角那格：分上半月／下半月兩期（勾選框）
+  var head = '<tr><th class="split-th"><label class="split"><input type="checkbox" ' + (st.split ? 'checked' : '') + ' onchange="dvSplit(\'' + p + '\',this.checked)"> 分上半月／下半月兩期</label></th>' + st.periods.map(function (o) { return '<th>' + esc(o.label) + '</th>'; }).join('') + '</tr>';
   var rows = DV_ROWS.map(function (r) {
     return '<tr><th>' + r[1] + '</th>' + st.periods.map(function (o, i) {
       return '<td><input' + (r[2] ? ' class="neg-in"' : '') + ' inputmode="text" value="' + esc(o[r[0]]) + '" placeholder="' + (r[2] ? '扣' : '0') + '" oninput="dvSet(\'' + p + '\',' + i + ',\'' + r[0] + '\',this.value)"></td>';
@@ -1337,7 +1338,6 @@ function renderDv(p, gross) {
   var tot = '<tr class="tot"><th>總收（實際入帳）</th><td class="n' + sgn(total) + '" colspan="' + st.periods.length + '" id="dv-' + p + '-tot">' + money(total) + '</td></tr>';
   $('dv-' + p).innerHTML = '<div class="dv-h"><span>' + p + ' 實際營收' + pendTag('delivery', $('v-month').value + '|' + p) + '</span><span class="muted" id="dv-' + p + '-ratio">' + dvRatio(total, gross) + '</span></div>' +
     '<table><thead>' + head + '</thead><tbody>' + rows + sub + tot + '</tbody></table>' +
-    '<label class="split"><input type="checkbox" ' + (st.split ? 'checked' : '') + ' onchange="dvSplit(\'' + p + '\',this.checked)"> 分上半月／下半月兩期</label>' +
     (st.old !== null ? '<p class="muted" style="padding:0 14px 10px">舊資料：實際入帳 ' + money(st.old) + '（沒有明細）。填了明細儲存後會取代。</p>' : '');
 }
 function dvRatio(total, gross) { return '每日結帳營業額 ' + money(gross) + (gross && total ? '｜入帳 ' + pct(total / gross) : (gross ? '｜<span class="warn">尚未對帳</span>' : '')); }
