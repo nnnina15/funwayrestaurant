@@ -377,7 +377,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   // 歷年：一年一列，最後一欄當年盈餘＝年總覽卡片
   await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="all"]'); await B.pg.waitForSelector('#y-body table.ytable');
   const allHead = await B.pg.$$eval('#y-body table.ytable thead th', t => t.map(x => x.textContent));
-  assert.ok(allHead[0] === '年份' && allHead.includes('當年盈餘') && allHead.includes('借出−還款'), '歷年表頭：' + allHead);
+  assert.ok(allHead[0] === '項目' && allHead.some(x => x.startsWith('2026')) && allHead.includes('全部'), '歷年：年份放欄：' + allHead);
+  const allRows = await B.pg.$$eval('#y-body table.ytable tbody th', t => t.map(x => x.textContent));
+  assert.ok(allRows.includes('當年盈餘') && allRows.includes('借出−還款'), '歷年列：' + allRows);
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-allyears.png') });
   await B.pg.click('#ov-seg button[data-v="month"]');
   console.log('股東分紅自動算 ✓');
