@@ -1,6 +1,15 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.5';   // 和 sw.js 的 VERSION 一起改
+// 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
+(function () {
+  var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
+  if (!hv || hv === APP_VERSION) return;
+  var key = 'fw_vfix_' + APP_VERSION;
+  try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) { return; }
+  if (navigator.onLine === false) return;
+  location.replace(location.pathname + '?_r=' + Date.now());
+})();
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -450,11 +459,11 @@ function enterApp() {
   if (!ST.snap) loadLocal();
   if (!ST.snap) { showView('login'); return; }
   showView('app');
-  renderTitle();
+  safe('標題', renderTitle);
   var t = todayStr(), m = t.slice(0, 7);
-  ['d-date', 'p-date'].forEach(function (id) { if (!$(id).value) $(id).value = t; });
-  ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { if (!$(id).value) $(id).value = m; });
-  $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).filter(function (x) { return ['股東分紅（已發）', '員工借款', '員工還款'].indexOf(x) < 0; }).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
+  ['d-date', 'p-date'].forEach(function (id) { var el = $(id); if (el && !el.value) el.value = t; });
+  ['s-month', 'v-month', 'e-month', 'x-month', 'm-month'].forEach(function (id) { var el = $(id); if (el && !el.value) el.value = m; });
+  if ($('x-type')) $('x-type').innerHTML = (ST.snap.config.deductTypes || ['員工分紅', '年終預留', '其他扣除']).filter(function (x) { return ['股東分紅（已發）', '員工借款', '員工還款'].indexOf(x) < 0; }).map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
   var mine = TABS.filter(function (x) { return canSee(x[0]); });
   $('tabs').innerHTML = mine.map(function (x) {
     return '<button id="tb-' + x[0] + '" onclick="showTab(\'' + x[0] + '\')">' + ICONS[x[0]] + x[1] + '</button>';
@@ -468,9 +477,21 @@ function enterApp() {
   }).join('');
   ST.moreTabs = rest.map(function (x) { return x[0]; });
   if (!canSee(ST.tab)) ST.tab = 'daily';
-  showTab(ST.tab);
-  renderStatus();
+  safe('分頁', function () { showTab(ST.tab); });
+  safe('同步狀態', renderStatus);
 }
+// 某一塊畫面出錯時，不要整個 App 都空白：其他部分照常顯示，並把錯誤記下來
+function safe(where, fn) {
+  try { fn(); } catch (e) { reportErr(where, e); }
+}
+function reportErr(where, e) {
+  var msg = (where ? where + '：' : '') + (e && e.message || e);
+  try { console.error(e); } catch (x) { /* ignore */ }
+  if (ST.lastErr === msg) return; ST.lastErr = msg;
+  try { (ST.failed = ST.failed || []).push({ at: nowStr(), op: { type: '畫面錯誤' }, msg: msg }); saveOutbox(); } catch (x) { /* ignore */ }
+  toast('⚠ 畫面出錯：' + msg + '（請截圖給管理者，重新整理通常就好）');
+}
+window.addEventListener('error', function (ev) { reportErr('', ev.error || ev.message); });
 function openSettings() { showTab('settings'); }
 function openMore() { $('moresheet').classList.remove('hide'); }
 function closeMore() { $('moresheet').classList.add('hide'); }
@@ -524,6 +545,9 @@ function updateStickyTop() {
 window.addEventListener('resize', function () { if (ST.sess) updateStickyTop(); });
 
 function showTab(name) {
+  try { showTab_(name); } catch (e) { reportErr('分頁「' + name + '」', e); }
+}
+function showTab_(name) {
   ST.tab = name;
   (ST.hiddenLbls || []).forEach(function (l) { l.classList.remove('hide'); });
   pinPickers(name);
