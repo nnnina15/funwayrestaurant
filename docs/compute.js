@@ -135,7 +135,7 @@ function computeAll_(D, today) {
     const fee = Math.round(feeAll + feeLine);
     const feeEst = (m.allpay > 0 && m.allpayN === null) || (m.line > 0 && m.lineN === null);
     if (status === '已結束' && feeEst) m.warns.push(['線上支付未對帳', '全支付／LINE Pay 月底實際入帳還沒填，手續費先用 ' + n(st.fee) + '% 估計']);
-    const profit = actual - m.purchase - m.staff - m.fixed - m.other - fee + (st.cashIn ? m.cashDiff : 0);
+    const profit = actual - m.purchase - m.staff - m.fixed - m.other - fee + m.cashDiff;   // 現金差額一律算進盈餘（多收加、短少扣）
     const dist = profit - m.bonus - m.reserve - m.deductOther;
     if (status === '已結束' && dist < 0) m.warns.push(['虧損', '可分配金額為負數 ' + fmt(dist) + '，股東分紅會是負的']);
 

@@ -33,8 +33,8 @@ assert.strictEqual(sep.site, 20000 * workDays);
 assert.strictEqual(sep.actual, 20000 * workDays + 60000);          // Panda 用實際入帳；Uber 未對帳 = 0
 assert.strictEqual(sep.staff, 45000 + 5566 + 25000);               // 預支不算成本
 assert.strictEqual(sep.fee, Math.round(1500 * workDays * 0.02));
-const profit = sep.actual - 3000 - sep.staff - 32000 - 5000 - sep.fee;
-assert.strictEqual(sep.profit, profit);                            // 現金差額不計入
+const profit = sep.actual - 3000 - sep.staff - 32000 - 5000 - sep.fee - 800;
+assert.strictEqual(sep.profit, profit);                            // 現金差額一律計入（10 號短少 800）
 assert.strictEqual(sep.dist, profit - 12500 - 3000);
 const shares = R.shares.filter(s => s.month === '2026-09');
 assert.deepStrictEqual(shares.map(s => s.amount), [Math.round(sep.dist * 0.6), Math.round(sep.dist * 0.2), Math.round(sep.dist * 0.2)]);

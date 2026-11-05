@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.10.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.10.2';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1857,13 +1857,13 @@ function renderSummaryTab() {
     ['現場營收', m.site], ['Panda', m.pandaN === null ? '未對帳' : m.pandaN, false, '', m.pandaG], ['Uber', m.uberN === null ? '未對帳' : m.uberN, false, '', m.uberG],
     ['＝ 實際營收', m.actual, true], ['進貨', -m.purchase, false, pct(m.purchasePct)], ['人事成本', -m.staff, false, pct(m.staffPct)],
     ['固定支出', -m.fixed], ['其他支出', -m.other], [m.feeEst ? '線上支付手續費（估計）' : '線上支付手續費', -m.fee],
-    (C.store && C.store.cashIn ? ['現金差額', m.cashDiff] : ['現金差額（不算，可到裝置 → 預設 → 店家打開）', 0]), ['＝ 月盈餘', m.profit, true],
+    ['現金差額', m.cashDiff], ['＝ 月盈餘', m.profit, true],
     ['員工分紅', -m.bonus], ['年終預留', -m.reserve], ['其他扣除', -m.deductOther], ['＝ 可分配給股東', m.dist, true]
   ];
   var shares = R.shares.filter(function (x) { return x.month === month; });
   var warns = R.warns.filter(function (x) { return x.month === month || x.month === ''; });
   var cats = R.cats.filter(function (x) { return x.month === month; }).sort(function (a, b) { return b.amount - a.amount; });
-  var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('月盈餘', m.profit, '扣完所有成本' + (C.store && C.store.cashIn ? '＋現金差額' : ''), true) +
+  var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('月盈餘', m.profit, '扣完所有成本＋現金差額', true) +
     kpi('可分配給股東', m.dist, '扣員工分紅、年終後') + kpi('人事佔比', pct(m.staffPct), '進貨佔比 ' + pct(m.purchasePct)) + '</div>' + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
     '　工作天 ' + m.days + '　日均營收 ' + money(m.avg) + '　現金差額累計 ' + money(m.cashDiff) + '</p>';
   h += '<table class="msum">' + rows.map(function (x) {
@@ -1943,7 +1943,7 @@ function renderDefaults() {
   }).join('');
   $('def-note').textContent = tab === '員工'
     ? ST.sess.store + '的員工。人事頁的「＋名字」、月薪／時薪和勞健保照這裡帶入。點名字展開修改；不做了的取消勾選「在職」就好，以前的薪資紀錄會留著。'
-    : tab === '店家' ? ST.sess.store + '的設定。改了以後，以前月份的盈餘也會照新設定重算。'
+    : tab === '店家' ? ST.sess.store + '的設定。現金差額一律算進月盈餘（多收加、短少扣），超過門檻會在「需要注意」提醒。'
     : tab === '股東' ? ST.sess.store + '的股東和分紅比例，總覽的「應分多少」照這裡算，比例加起來要 100%。改了比例，以前月份的應分金額也會照新比例重算。'
     : ST.sess.store + '的進貨分類，進貨頁的分類按鈕照這裡的順序顯示。點「一直用」可以選從哪個月開始停用。';
   $('ee-pane').classList.toggle('hide', tab !== '員工');
@@ -1955,16 +1955,16 @@ function renderDefaults() {
 // 店家設定：現金差額算不算進盈餘、警示門檻、手續費率（存回「設定_店家」）
 function renderStoreEditor() {
   var st = ST.snap.config.store || {};
-  $('sp-cashin').checked = !!st.cashIn; $('sp-warn').value = st.cashWarn || ''; $('sp-fee').value = st.fee === undefined ? '' : st.fee;
+  $('sp-warn').value = st.cashWarn || ''; $('sp-fee').value = st.fee === undefined ? '' : st.fee;
 }
 function spSave() {
   var fee = expr($('sp-fee').value), warn = expr($('sp-warn').value);
   if (isNaN(fee) || isNaN(warn)) return toast('數字看不懂');
-  var d = { cashIn: $('sp-cashin').checked, cashWarn: warn || 500, fee: fee };
+  var d = { cashWarn: warn || 500, fee: fee };
   enqueue('store.set', d);
   ST.snap.config.store = Object.assign({}, ST.snap.config.store, d);
   LS.set(k_('snap'), ST.snap);
-  toast('店家設定已儲存 ✓' + (d.cashIn ? '（現金差額會算進盈餘）' : ''));
+  toast('店家設定已儲存 ✓');
 }
 function defGo(t) {
   var cur = ST.defTab || '員工';
