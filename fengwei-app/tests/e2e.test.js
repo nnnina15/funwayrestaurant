@@ -407,6 +407,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#x-tabs button[data-v="ded"]');
   assert.ok(await B.pg.isVisible('#xpane-ded') && await B.pg.isHidden('#xpane-pay'), '切到分配前扣除');
   await B.pg.click('#x-tabs button[data-v="pay"]');
+  await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="month"]');
+  assert.ok((await B.pg.textContent('#m-body .costbox')).includes('食材成本'), '月總覽要有成本比例');
+  await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-costbox.png') });
   console.log('股東分紅自動算 ✓');
 
   // 手機：下方分頁列、「更多」、右下角亮／暗切換

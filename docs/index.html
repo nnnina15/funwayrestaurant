@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.13.6">
+<meta name="app-version" content="4.13.7">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -246,6 +246,11 @@
   .xp-pool { margin: 0; font-size: 13.5px; color: var(--muted); } .xp-pool b { color: var(--brand); font-size: 15px; }
   @media (max-width: 560px) { .xp-range-row { grid-template-columns: 1fr; gap: 4px; } }
   .edit-card .grid3 + .chips, .edit-card .grid3 + .chips + .chips { margin-top: 10px; }   /* 輸入格和名字按鈕之間留白 */
+  .costbox { border-collapse: separate; border-spacing: 0; margin: 0 0 14px; width: auto !important; min-width: 280px; max-width: 360px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
+  .costbox thead th { background: var(--soft); text-align: left; padding: 6px 12px; font-size: 15px; }
+  .costbox th, .costbox td { padding: 6px 12px; border-top: 1px solid var(--line); font-size: 15px; }
+  .costbox tbody th { text-align: left; font-weight: 700; }
+  .costbox td.pct { color: var(--ok); } .costbox td.pct.neg { color: var(--bad); }
   .xtabs { display: flex; margin: 0 0 10px; } .xtabs button { flex: 1; font-size: 17px; padding: 10px 12px; }
   .xp-done { font-size: 14px; color: var(--ok); margin: 6px 0 2px; }
   .xp-done:empty { display: none; }

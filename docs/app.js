@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.6';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.7';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1823,6 +1823,12 @@ function renderDayView() {
 }
 
 // 歷年：一年一列（月盈餘、分紅、員工分紅、存年終、其他扣除、借出−還款、當年盈餘＝含上一年留下的）
+// 成本比例小表（像舊表）：食材成本、人事成本、盈餘，各佔實際營收幾 %
+function costBox(title, pur, staff, profit, actual) {
+  var r = function (name, v, cls) { return '<tr><th>' + name + '</th><td class="n ' + cls + '">' + money(v) + '</td><td class="n pct' + (v < 0 && name === '盈餘' ? ' neg' : '') + '">' + (actual ? (v < 0 && name === '盈餘' ? '-' : '') + Math.round(Math.abs(v) / actual * 100) : 0) + '%</td></tr>'; };
+  return '<table class="costbox"><thead><tr><th colspan="3">' + esc(title) + ' 成本比例</th></tr></thead><tbody>' +
+    r('食材成本', -pur, 'neg') + r('人事成本', -staff, 'neg') + r('盈餘', profit, profit < 0 ? 'neg' : 'pos') + '</tbody></table>';
+}
 function renderAllYears() {
   var L = computeLocal(), R = L.R, V = L.V;
   var months = R.months.filter(function (m) { return m.status !== '未來'; });
@@ -1936,7 +1942,7 @@ function renderYearTab() {
     kpi(cur + ' 當年結餘', yProfit - yPaid - yRes - yDed - yLoan, '今年留下的錢（不含上一年）') +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) +
     kpi('人事', sum(months, function (m) { return m.staff; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.staff; }) / yAct : 0)) +
-    kpi('貨款', sum(months, function (m) { return m.purchase; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.purchase; }) / yAct : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
+    kpi('貨款', sum(months, function (m) { return m.purchase; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.purchase; }) / yAct : 0)) + '</div>' + costBox(cur + ' 全年', sum(months, function (m) { return m.purchase; }), sum(months, function (m) { return m.staff; }), yProfit, yAct) + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
     cols.map(function (c) { return '<th class="n">' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
   [1, 2, 3, 4].forEach(function (q) {
     var qm = months.filter(function (m) { return Math.ceil(Number(m.month.slice(5, 7)) / 3) === q; });
@@ -1999,7 +2005,7 @@ function renderSummaryTab() {
   var warns = R.warns.filter(function (x) { return x.month === month || x.month === ''; });
   var cats = R.cats.filter(function (x) { return x.month === month; }).sort(function (a, b) { return b.amount - a.amount; });
   var h = '<div class="kpis">' + kpi('實際營收', m.actual, '工作 ' + m.days + ' 天｜日均 ' + money(m.avg)) + kpi('月盈餘', m.profit, '扣完所有成本＋現金差額', true) +
-    kpi('可分配給股東', m.dist, '扣員工分紅、年終後') + kpi('人事佔比', pct(m.staffPct), '進貨佔比 ' + pct(m.purchasePct)) + '</div>' + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
+    kpi('可分配給股東', m.dist, '扣員工分紅、年終後') + kpi('人事佔比', pct(m.staffPct), '進貨佔比 ' + pct(m.purchasePct)) + '</div>' + costBox(Number(month.slice(5, 7)) + '月', m.purchase, m.staff, m.profit, m.actual) + note + '<p>' + (m.status === '進行中' ? '<span class="warn">● 本月進行中</span>' : '<span class="ok">● 已結束</span>') +
     '　工作天 ' + m.days + '　日均營收 ' + money(m.avg) + '　現金差額累計 ' + money(m.cashDiff) + '</p>';
   h += '<table class="msum">' + rows.map(function (x) {
     if (x[4] !== undefined) {                       // 外送：日結 − 實際收到 ＝ 付給平台
