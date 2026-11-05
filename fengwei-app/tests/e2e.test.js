@@ -410,7 +410,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.ok(tabW[0] > tabW[1] * 0.8 && tabW[2] < 60, '分頁要整排、字不換行：' + tabW);
   await B.pg.click('#x-tabs button[data-v="pay"]');
   await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="month"]');
-  assert.ok((await B.pg.textContent('#m-body .costbox')).includes('食材成本'), '月總覽要有成本比例');
+  assert.ok((await B.pg.textContent('#m-body .costpie')).includes('食材成本'), '月總覽要有成本比例圓餅圖');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-costbox.png') });
   console.log('股東分紅自動算 ✓');
 

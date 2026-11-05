@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.8';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.9';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1823,11 +1823,18 @@ function renderDayView() {
 }
 
 // 歷年：一年一列（月盈餘、分紅、員工分紅、存年終、其他扣除、借出−還款、當年盈餘＝含上一年留下的）
-// 成本比例小表（像舊表）：食材成本、人事成本、盈餘，各佔實際營收幾 %
+// 成本比例圓餅圖：實際營收拆成 食材成本／人事成本／其他支出（固定、其他、手續費、現金差額）／盈餘
 function costBox(title, pur, staff, profit, actual) {
-  var r = function (name, v, cls) { return '<tr><th>' + name + '</th><td class="n ' + cls + '">' + money(v) + '</td><td class="n pct' + (v < 0 && name === '盈餘' ? ' neg' : '') + '">' + (actual ? (v < 0 && name === '盈餘' ? '-' : '') + Math.round(Math.abs(v) / actual * 100) : 0) + '%</td></tr>'; };
-  return '<table class="costbox"><thead><tr><th colspan="3">' + esc(title) + ' 成本比例</th></tr></thead><tbody>' +
-    r('食材成本', -pur, 'neg') + r('人事成本', -staff, 'neg') + r('盈餘', profit, profit < 0 ? 'neg' : 'pos') + '</tbody></table>';
+  var other = actual - pur - staff - profit;
+  var parts = [['食材成本', pur, 'var(--pie1)'], ['人事成本', staff, 'var(--pie2)'], ['其他支出', other, 'var(--pie3)'], ['盈餘', profit, 'var(--pie4)']];
+  var shown = parts.filter(function (p) { return p[1] > 0; });
+  var base = shown.reduce(function (a, p) { return a + p[1]; }, 0) || 1, acc = 0;
+  var grad = shown.map(function (p) { var a0 = acc; acc += p[1] / base * 100; return p[2] + ' ' + a0.toFixed(2) + '% ' + acc.toFixed(2) + '%'; }).join(', ');
+  var pc = function (v) { return actual ? Math.round(v / actual * 100) : 0; };
+  return '<div class="costpie"><div class="pie" style="background: conic-gradient(' + (grad || 'var(--line) 0 100%') + ')"><div class="hole"><small>實際營收</small><b>' + money(actual) + '</b></div></div>' +
+    '<div class="legend"><div class="lg-h">' + esc(title) + ' 成本比例</div>' + parts.map(function (p) {
+      return '<div class="lg"><i style="background:' + p[2] + '"></i><span>' + p[0] + '</span><b class="' + (p[0] === '盈餘' ? (p[1] < 0 ? 'neg' : 'pos') : '') + '">' + money(p[0] === '盈餘' ? p[1] : -p[1]) + '</b><em class="' + (p[1] < 0 && p[0] === '盈餘' ? 'neg' : '') + '">' + pc(p[1]) + '%</em></div>';
+    }).join('') + (profit < 0 ? '<p class="muted" style="margin:4px 0 0">這段期間虧損，圓餅只畫出成本的比例</p>' : '') + '</div></div>';
 }
 function renderAllYears() {
   var L = computeLocal(), R = L.R, V = L.V;
