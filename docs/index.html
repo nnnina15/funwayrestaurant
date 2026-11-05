@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.14.2">
+<meta name="app-version" content="4.14.3">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -251,10 +251,24 @@
   .ovgrid .costpie { margin: 0; flex-wrap: nowrap; gap: 16px; padding: 14px 16px; }
   .ovgrid .costpie .pie { width: 132px; height: 132px; } .ovgrid .costpie .hole { inset: 24px; }
   .ovgrid .costpie .legend { min-width: 0; }
-  @media (max-width: 420px) { .ovgrid .costpie { flex-wrap: wrap; justify-content: center; } }
   .ovgrid .kpis.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; align-content: stretch; }
   .ovgrid .kpis.two .kpi { display: flex; flex-direction: column; justify-content: center; }
-  @media (max-width: 760px) { .ovgrid { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) {
+    .ovgrid { grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+    .ovgrid .costpie { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; width: 200px; }
+    .ovgrid .costpie .pie { width: 120px; height: 120px; align-self: center; } .ovgrid .costpie .hole { inset: 22px; }
+    .ovgrid .costpie .hole b { font-size: 14px; }
+    .ovgrid .costpie .lg-h { font-size: 15px; text-align: center; }
+    .ovgrid .costpie .lg { grid-template-columns: 10px minmax(0, 1fr) auto; gap: 6px; font-size: 13px; padding: 5px 0; }
+    .ovgrid .costpie .lg b { display: none; }
+    .ovgrid .costpie .lg em { font-size: 12px; padding: 1px 6px; }
+  }
+  @media (max-width: 520px) {
+    .ovgrid .costpie { width: 150px; padding: 10px; }
+    .ovgrid .costpie .pie { width: 104px; height: 104px; } .ovgrid .costpie .hole { inset: 18px; }
+    .ovgrid .costpie .hole b { font-size: 12px; } .ovgrid .costpie .hole small { font-size: 10px; }
+    .ovgrid .kpis.two { grid-template-columns: 1fr; }
+  }
   /* 成本比例圓餅圖 */
   :root { --pie1: #d9822b; --pie2: #4f7cac; --pie3: #a9a39a; --pie4: #3f9b6b; }
   .costpie { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin: 0 0 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }
