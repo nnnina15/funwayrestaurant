@@ -337,11 +337,18 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-loan.png'), fullPage: true });
   console.log('員工借還款 ✓');
   // 記錄股東分紅：選股東自動照比例算金額
-  await B.pg.click('#tb-deduct'); await B.pg.fill('#xp-month', '2026-11'); await B.pg.dispatchEvent('#xp-month', 'change');
+  await B.pg.click('#tb-deduct'); await B.pg.fill('#xs-month', '2026-11'); await B.pg.dispatchEvent('#xs-month', 'change');
+  assert.strictEqual(await B.pg.$$eval('#xp-chips .wc.on', c => c.length), 3, '預設勾三位股東');
   assert.ok((await B.pg.textContent('#xp-chips')).includes('50%'), '卡片上要有比例');
-  await B.pg.click('#xp-chips button:has-text("豐吉")');
-  assert.ok((await B.pg.textContent('#xp-info')).includes('50%'), '要顯示比例：' + await B.pg.textContent('#xp-info'));
-  assert.ok(/^\d+$/.test(await B.pg.inputValue('#xp-amount')), '金額自動帶入：' + await B.pg.inputValue('#xp-amount'));
+  await B.pg.click('#xp-chips .wc:has-text("呀肥")');   // 取消呀肥
+  assert.strictEqual(await B.pg.$$eval('#xp-chips .wc.on', c => c.length), 2);
+  assert.ok(/記錄 2 筆分紅/.test(await B.pg.textContent('#xp-btn')));
+  const before = g.rows(S.DEDUCT).filter(r => r['類型'] === '股東分紅（已發）').length;
+  await B.pg.click('#xp-btn');
+  await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
+  assert.strictEqual(g.rows(S.DEDUCT).filter(r => r['類型'] === '股東分紅（已發）').length, before + 2, '一次記兩筆');
+  assert.ok((await B.pg.textContent('#xp-done')).includes('豐吉'), '看得到這個月發給誰');
+  assert.strictEqual(await B.pg.$$eval('#xp-chips .wc.done', c => c.length), 2, '已發的卡變綠色');
   await B.pg.setViewportSize({ width: 390, height: 844 });
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-deduct-phone.png'), fullPage: true });
   assert.ok(await B.pg.evaluate(() => document.documentElement.scrollWidth <= 392), '手機上不能左右超出畫面');

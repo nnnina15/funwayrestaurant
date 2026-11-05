@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.8.11';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.9.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -177,7 +177,7 @@ function showView(name) {
 }
 
 /* ---------- 日期／月份／年份左右的 ‹ › ---------- */
-var STEP_IDS = ['d-date', 'p-date', 's-month', 'v-month', 'e-month', 'x-year', 'm-month', 'y-year'];
+var STEP_IDS = ['d-date', 'p-date', 's-month', 'v-month', 'e-month', 'xs-month', 'm-month', 'y-year'];
 function addSteppers() {
   STEP_IDS.forEach(function (id) {
     var el = $(id); if (!el || el.parentNode.classList.contains('stepper')) return;
@@ -476,7 +476,7 @@ function closeMore() { $('moresheet').classList.add('hide'); }
 
 /* ---------- 日期／月份置頂：切換分頁時，把那頁的日期／月份搬到上方固定列 ---------- */
 var PIN_MAP = { daily: [['d-date', '日期']], purchase: [['p-date', '日期']], expense: [['e-month', '月份']],
-  overview: [['ov-seg'], ['ov-month-pick'], ['ov-year-pick']], payroll: [['s-month', '月份']], delivery: [['v-month', '月份']], deduct: [['x-year', '年份']] };
+  overview: [['ov-seg'], ['ov-month-pick'], ['ov-year-pick']], payroll: [['s-month', '月份']], delivery: [['v-month', '月份']], deduct: [['xs-month', '月份']] };
 function pinPickers(name) {
   (ST.pinned || []).forEach(function (p) { p.ph.parentNode.insertBefore(p.node, p.ph); p.ph.remove(); if (p.cap) p.cap.remove(); });
   ST.pinned = [];
@@ -1439,21 +1439,40 @@ function payoutNames() {
   return names;
 }
 function renderDeductTab() {
-  var sel = $('x-year'), ys = deductYears(), y = sel.value || todayStr().slice(0, 4);
-  if (ys.indexOf(y) < 0) y = ys[ys.length - 1];
-  sel.innerHTML = ys.map(function (x) { return '<option' + (x === y ? ' selected' : '') + '>' + x + '</option>'; }).join('');
-  ['x-month', 'xp-month'].forEach(function (id) { if (!$(id).value || $(id).value.slice(0, 4) !== y) $(id).value = todayStr().slice(0, 4) === y ? todayStr().slice(0, 7) : y + '-12'; });
+  // 上面一個月份（‹ › 切換）：記錄分紅、分配前扣除都用這個月份；下面列表看這一年
+  if (!$('xs-month').value) $('xs-month').value = todayStr().slice(0, 7);
+  var month = $('xs-month').value, y = month.slice(0, 4);
+  $('xp-month').value = month; $('x-month').value = month;
+  $('x-year').innerHTML = '<option selected>' + y + '</option>';
   var names = payoutNames();
-  $('xp-names').innerHTML = names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
-  // 每個人一張卡：名字、比例、這次應分多少（點了帶入下面）
-  var L = computeLocal(), month = $('xp-month').value, cur = $('xp-who').value;
-  if (cur && names.indexOf(cur) < 0) names.push(cur);
+  // 每個人一張卡（可以一次勾很多人）：比例／上次、這次應分；這個月已發的顯示綠色 ✓
+  var L = computeLocal();
+  var key = ST.sess.store + '|' + month;
+  if (!ST.xp || ST.xp.key !== key) ST.xp = { key: key, sel: null, amt: {}, extra: [] };
+  ST.xp.extra.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
+  var calc = {}; names.forEach(function (n) { calc[n] = xpCalc(n, month, L); });
+  var partners = (L.C.partners || []).map(function (p) { return p.name; });
+  if (!ST.xp.sel) {   // 預設勾：股東＋上次跟股東一起發的人（例：店長分紅）
+    ST.xp.sel = {};
+    var lastBatch = names.filter(function (n) { return partners.indexOf(n) >= 0; }).map(function (n) { return calc[n].last; }).sort().pop() || '';
+    names.forEach(function (n) {
+      var c = calc[n]; if (c.done || c.amt === null || c.amt <= 0) return;
+      if (partners.indexOf(n) >= 0 || (lastBatch && c.last === lastBatch)) ST.xp.sel[n] = true;
+    });
+  }
+  var doneList = [], selN = 0, selSum = 0;
   $('xp-chips').innerHTML = names.map(function (n) {
-    var c = xpCalc(n, month, L);
-    return '<button type="button" class="' + (cur === n ? 'on' : '') + '" onclick="xpPick(\'' + jsq(n) + '\')"><b>' + esc(n) + '</b><small>' + esc(c.tag) + '</small>' + (c.amt !== null ? '<span class="amt">' + money(c.amt) + '</span>' : '') + '</button>';
-  }).join('') + '<button type="button" class="other" onclick="xpOther()">＋ 其他人</button>';
-  $('xp-pay').classList.toggle('hide', !cur);
-  if (cur) { var c0 = xpCalc(cur, month, L); $('xp-pay-who').textContent = cur; $('xp-info').textContent = c0.info; if (!ST.xpEdited && c0.amt !== null) $('xp-amount').value = Math.max(Math.round(c0.amt), 0); }
+    var c = calc[n], on = !!ST.xp.sel[n];
+    if (c.done) { doneList.push(n + ' ' + money(c.done)); return '<div class="wc done" onclick="toast(\'' + jsq(n) + ' 這個月已經記過了；要改請到下面列表刪掉再記\')"><span class="tick">✓</span><b>' + esc(n) + '</b><small>已發</small><span class="amt">' + money(c.done) + '</span></div>'; }
+    var a = ST.xp.amt[n] !== undefined ? ST.xp.amt[n] : (c.amt !== null ? String(Math.max(c.amt, 0)) : '');
+    if (on) { selN++; selSum += expr(a) || 0; }
+    return '<div class="wc' + (on ? ' on' : '') + '" onclick="xpToggle(\'' + jsq(n) + '\')"><span class="tick">' + (on ? '✓' : '') + '</span><b>' + esc(n) + '</b><small>' + esc(c.tag) + '</small>' +
+      (on ? '<input class="card-amt" inputmode="numeric" value="' + esc(a) + '" placeholder="金額" onclick="event.stopPropagation()" oninput="digitsOnly(this);ST.xp.amt[\'' + jsq(n) + '\']=this.value;xpSum()">'
+          : '<span class="amt">' + (a ? money(expr(a)) : '—') + '</span>') + '</div>';
+  }).join('') + '<div class="wc other" onclick="xpOther()">＋ 其他人</div>';
+  $('xp-done').textContent = doneList.length ? '✓ ' + Number(month.slice(5)) + ' 月已發：' + doneList.join('、') : '';
+  $('xp-btn').disabled = !selN;
+  $('xp-btn').textContent = selN ? '記錄 ' + selN + ' 筆分紅｜合計 ' + money(selSum) : '勾選要發的人';
   // 分配前扣除：類型用卡片點選
   var types = Array.prototype.map.call($('x-type').options, function (o) { return o.value; });
   $('x-type-seg').innerHTML = types.map(function (t) { return '<button type="button" class="' + ($('x-type').value === t ? 'on' : '') + '" onclick="$(\'x-type\').value=\'' + jsq(t) + '\';renderDeductTab()">' + esc(t) + '</button>'; }).join('');
@@ -1470,9 +1489,13 @@ function renderDeductTab() {
   $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
 }
 // 記錄實際發出的股東分紅：設定裡的股東（浩勤、豐吉…）記「股東分紅（已發）」；其他人（佳茹、Nina…）記「其他扣除・某某分紅」
-function xpPick(n) { $('xp-who').value = n; ST.xpEdited = false; renderDeductTab(); var a = $('xp-amount'); if (a) a.focus(); }
-function xpOther() { var n = prompt('要記誰的分紅？（例：建燁、佳茹）'); if (n && n.trim()) xpPick(n.trim()); }
-function xpFill() { ST.xpEdited = false; renderDeductTab(); }
+function xpToggle(n) { ST.xp.sel[n] = !ST.xp.sel[n]; renderDeductTab(); }
+function xpOther() { var n = prompt('要記誰的分紅？（例：建燁、佳茹）'); if (!n || !(n = n.trim())) return; if (ST.xp.extra.indexOf(n) < 0) ST.xp.extra.push(n); ST.xp.sel[n] = true; renderDeductTab(); }
+function xpSum() {
+  var n = 0, t = 0; Object.keys(ST.xp.sel).forEach(function (k) { if (ST.xp.sel[k]) { n++; } });
+  $('xp-chips').querySelectorAll('.wc.on .card-amt').forEach(function (i) { t += expr(i.value) || 0; });
+  $('xp-btn').textContent = n ? '記錄 ' + n + ' 筆分紅｜合計 ' + money(t) : '勾選要發的人';
+}
 // 選股東 → 照比例自動算金額：上次發分紅之後（到選的月份）每個月「應分」加起來
 // 不是股東的人（佳茹、Nina…固定分紅）→ 帶上次發的金額
 function xpCalc(who, month, L) {
@@ -1484,6 +1507,7 @@ function xpCalc(who, month, L) {
     .sort(function (a, b) { return a.month < b.month ? 1 : -1; });
   var already = paid.filter(function (d) { return d.month === month; }).reduce(function (a, d) { return a + Number(d.amount || 0); }, 0);
   var warn = already ? '｜⚠ 這個月已經記過 ' + money(already) : '';
+  out.done = already; out.last = (paid.filter(function (d) { return d.month < month; })[0] || {}).month || '';
   if (!p) {
     if (paid.length) { out.amt = Math.round(paid[0].amount); out.tag = '上次 ' + paid[0].month.slice(5).replace(/^0/, '') + ' 月'; out.info = '固定分紅，帶上次（' + paid[0].month.replace('-', '/') + '）發的金額，可以改' + warn; }
     else { out.tag = '自己填金額'; out.info = '請填金額' + warn; }
@@ -1499,16 +1523,24 @@ function xpCalc(who, month, L) {
   out.info = p.pct + '%｜' + range + ' 應分 ' + money(amt) + (last ? '（上次發到 ' + last.replace('-', '/') + '）' : '') + (amt < 0 ? '｜虧損，金額先填 0' : '') + warn;
   return out;
 }
-function addPayout() {
-  var who = $('xp-who').value.trim(), amt = v('xp-amount'), month = $('xp-month').value;
-  if (!who) return toast('請選股東');
-  if (isNaN(amt) || !amt) return toast('請填金額');
-  if (!month) return toast('請選月份');
-  var isPartner = (ST.snap.config.partners || []).some(function (p) { return p.name === who; });
-  enqueue('deduct.add', { id: uid(), month: month, type: isPartner ? '股東分紅（已發）' : '其他扣除', amount: amt, note: isPartner ? who : who + '分紅' });
-  $('xp-amount').value = ''; $('xp-who').value = ''; ST.xpEdited = false;
+// 一次記錄勾選的人：股東記「股東分紅（已發）」，其他人（佳茹、店長…）記「其他扣除・某某分紅」
+function addPayouts() {
+  var month = $('xs-month').value, partners = (ST.snap.config.partners || []).map(function (p) { return p.name; });
+  var rows = [], bad = '';
+  $('xp-chips').querySelectorAll('.wc.on').forEach(function (card) {
+    var n = card.querySelector('b').textContent, a = expr(card.querySelector('.card-amt').value);
+    if (isNaN(a) || !a) bad = n; else rows.push([n, a]);
+  });
+  if (bad) return toast(bad + ' 的金額沒填或看不懂');
+  if (!rows.length) return toast('請勾選要發的人');
+  if (!confirm(Number(month.slice(5)) + ' 月分紅：\n' + rows.map(function (r) { return r[0] + '　' + money(r[1]); }).join('\n') + '\n\n合計 ' + money(rows.reduce(function (a, r) { return a + r[1]; }, 0)) + '，確定記錄？')) return;
+  rows.forEach(function (r) {
+    var isPartner = partners.indexOf(r[0]) >= 0;
+    enqueue('deduct.add', { id: uid(), month: month, type: isPartner ? '股東分紅（已發）' : '其他扣除', amount: r[1], note: isPartner ? r[0] : r[0] + '分紅' });
+  });
+  ST.xp = null;
   renderDeductTab();
-  toast('已記錄 ' + who + ' ' + money(amt) + ' ✓');
+  toast('已記錄 ' + rows.length + ' 筆分紅 ✓');
 }
 // ---- 員工借還款：記在「分配前扣除」表，類型「員工借款／員工還款」，備註＝借款人（摘要） ----
 function loanWho(note) { return String(note || '').replace(/（.*?）|\(.*?\)/g, '').trim() || '（沒寫名字）'; }

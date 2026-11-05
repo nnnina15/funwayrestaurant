@@ -189,6 +189,20 @@
   .xh h2 { margin: 0; }
   .xh .xh-month { width: auto; max-width: 170px; font-size: 16px; padding: 8px 10px; font-weight: 700; text-align: center; }
   .who-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 10px 0 4px; }
+  .who-cards .wc { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--soft); color: var(--ink); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 12px; cursor: pointer; user-select: none; }
+  .who-cards .wc b { font-size: 17px; }
+  .who-cards .wc small { font-size: 12.5px; color: var(--muted); }
+  .who-cards .wc .amt { font-size: 15px; font-weight: 700; color: var(--muted); }
+  .who-cards .wc .tick { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; }
+  .who-cards .wc.on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--card)); }
+  .who-cards .wc.on .tick { background: var(--brand); border-color: var(--brand); }
+  .who-cards .wc .card-amt { margin-top: 4px; width: 100%; font-size: 17px; font-weight: 800; padding: 6px 8px; color: var(--brand); background: var(--card); border-radius: 8px; }
+  .who-cards .wc.done { background: color-mix(in srgb, var(--ok) 10%, var(--card)); border-color: color-mix(in srgb, var(--ok) 45%, transparent); cursor: default; }
+  .who-cards .wc.done .amt { color: var(--ok); }
+  .who-cards .wc.done .tick { background: var(--ok); border-color: var(--ok); }
+  .who-cards .wc.other { justify-content: center; align-items: center; color: var(--muted); border-style: dashed; border-color: var(--line); background: transparent; min-height: 72px; }
+  .xp-done { font-size: 14px; color: var(--ok); margin: 6px 0 2px; }
+  .xp-done:empty { display: none; }
   .who-cards button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--soft); color: var(--ink); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 12px; text-align: left; min-height: 0; }
   .who-cards button b { font-size: 17px; }
   .who-cards button small { font-size: 12.5px; color: var(--muted); }
@@ -703,20 +717,18 @@
 
   <section id="tab-deduct" class="hide">
     <p class="ro-note">🔒 店長只能看，不能修改（要改請找管理）</p>
-    <div><label>年份</label><select id="x-year" onchange="onDeductYear()"></select></div>
+    <div><label>月份</label><input id="xs-month" type="month" onchange="renderDeductTab()"></div>
+    <select id="x-year" class="hide"></select><input id="xp-month" type="hidden"><input id="x-month" type="hidden">
     <div class="card edit-card">
-      <div class="xh"><h2>記錄分紅</h2><input id="xp-month" type="month" class="xh-month" onchange="renderDeductTab()"></div>
-      <p class="muted">點要發的人，金額照比例自動算好（從上次發之後算到這個月）。</p>
-      <input id="xp-who" type="hidden"><datalist id="xp-names"></datalist>
+      <h2>記錄分紅</h2>
+      <p class="muted">勾選這次要發的人（可以一次全部），金額照比例自動算好，點金額可以改。</p>
       <div class="who-cards" id="xp-chips"></div>
-      <div class="xp-pay hide" id="xp-pay">
-        <div class="xp-pay-row"><span class="xp-pay-who" id="xp-pay-who"></span><div class="xp-amt"><span>$</span><input id="xp-amount" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="digitsOnly(this);ST.xpEdited=true"></div></div>
-        <p class="muted" id="xp-info"></p>
-        <button class="primary" onclick="addPayout()">記錄這筆分紅</button>
-      </div>
+      <p class="xp-done" id="xp-done"></p>
+      <button class="primary" id="xp-btn" onclick="addPayouts()">記錄分紅</button>
+    </div>
     </div>
     <div class="card edit-card">
-      <div class="xh"><h2>分配前扣除</h2><input id="x-month" type="month" class="xh-month"></div>
+      <h2>分配前扣除</h2>
       <p class="muted">分給股東之前先扣掉的錢。</p>
       <select id="x-type" class="hide"></select>
       <div class="type-cards" id="x-type-seg"></div>
