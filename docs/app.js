@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.14.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.14.5';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1491,11 +1491,12 @@ function renderDeductTab() {
   ST.xp.pool = pool.reduce(function (a, m) { return a + m.dist; }, 0);
   ST.xp.profit = pool.reduce(function (a, m) { return a + m.profit; }, 0);
   var keep = expr(ST.xp.keep) || 0;
-  ST.xp.year = yearSurplus(L, y);
+  ST.xp.year = yearSurplus(L, ST.xp.from);
+  var befM = prevMonth(ST.xp.from);
   ST.xp.tenth = ST.xp.year > 0 ? Math.round(ST.xp.year / 10) : 0;
   $('xp-range').innerHTML = '<div class="xp-range-row"><label>分這幾個月的盈餘</label><div class="xp-mrange"><input type="month" value="' + esc(ST.xp.from) + '" max="' + month + '" onchange="xpFrom(this.value)"><span>到</span><b>' + month.replace('-', '/') + '</b></div></div>' +
     '<div class="xp-range-row"><label>店裡留作備用基金</label><div class="xp-amt"><span>$</span><input inputmode="numeric" value="' + esc(ST.xp.keep) + '" placeholder="0" oninput="digitsOnly(this);xpKeep(this.value)" onchange="renderDeductTab()"></div></div>' +
-    '<p class="xp-pool">月盈餘 ' + money(ST.xp.profit) + '　扣員工分紅、存年終後可分配 ' + money(ST.xp.pool) + '　－ 備用基金 ' + money(keep) + '　＋ ' + y + ' 當年盈餘 ' + money(ST.xp.year) + ' 的 1/10 ' + money(ST.xp.tenth) + '　＝ <b>這次可以分 ' + money(ST.xp.pool - keep + ST.xp.tenth) + '</b></p>';
+    '<p class="xp-pool">月盈餘 ' + money(ST.xp.profit) + '　扣員工分紅、存年終後可分配 ' + money(ST.xp.pool) + '　－ 備用基金 ' + money(keep) + '　＋ 到 ' + befM.replace('-', '/') + ' 累積的當年盈餘 ' + money(ST.xp.year) + ' 的 1/10 ' + money(ST.xp.tenth) + '　＝ <b>這次可以分 ' + money(ST.xp.pool - keep + ST.xp.tenth) + '</b></p>';
   var calc = {}; names.forEach(function (n) { calc[n] = xpCalc(n, month, L); });
   var partners = (L.C.partners || []).map(function (p) { return p.name; });
   if (!ST.xp.sel) {   // 預設勾：股東＋上次跟股東一起發的人（例：店長分紅）
@@ -1558,9 +1559,11 @@ function xpSum() {
 }
 // 選股東 → 照比例自動算金額：上次發分紅之後（到選的月份）每個月「應分」加起來
 // 不是股東的人（佳茹、Nina…固定分紅）→ 帶上次發的金額
-// 當年盈餘（和「年」總覽卡片一樣）：到這一年為止，每個月 可分配−已發股東分紅−借出＋還款 累加（含上一年留下的）
-function yearSurplus(L, y) {
-  return L.R.months.filter(function (m) { return m.month.slice(0, 4) <= y && m.status !== '未來'; })
+// 店裡累積的盈餘（和「年」總覽的當年盈餘同一個算法，含上一年留下的）：到 before 之前每個月 可分配−已發分紅−借出＋還款 累加
+// 只算這次要分的月份「之前」的，避免同一個月的盈餘被算兩次
+function prevMonth(m) { var y = +m.slice(0, 4), n = +m.slice(5, 7) - 1; if (!n) { y--; n = 12; } return y + '-' + (n < 10 ? '0' : '') + n; }
+function yearSurplus(L, before) {
+  return L.R.months.filter(function (m) { return m.month < before && m.status !== '未來'; })
     .reduce(function (a, m) { return a + m.dist - (m.paid || 0) - (m.loan || 0) + (m.repay || 0); }, 0);
 }
 function xpCalc(who, month, L) {
