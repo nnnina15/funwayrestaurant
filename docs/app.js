@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.13.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.13.1';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1805,7 +1805,14 @@ function renderAllYears() {
     .concat(people.map(function (p) { return ['　' + p, function (o) { return -(o.pay[p] || 0); }]; }))
     .concat([['員工分紅', function (o) { return -o.bonus; }], ['存年終', function (o) { return -o.reserve; }], ['其他扣除', function (o) { return -o.other; }],
       ['借出−還款', function (o) { return -o.loan; }], ['當年盈餘', function (o) { return o.cum; }, 'em bal']]);
-  var h = '<h2>歷年</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (120 + all.length * 110) + 'px"><thead><tr><th>項目</th>' +
+  var sumAll = function (k) { return months.reduce(function (a, m) { return a + (m[k] || 0); }, 0); };
+  var actAll = sumAll('actual'), staffAll = sumAll('staff'), purAll = sumAll('purchase'), daysAll = sumAll('days');
+  var cards = '<div class="kpis">' + kpi('累積盈餘', run, years[0] + '～' + years[years.length - 1] + ' 留下來的錢', true) +
+    kpi('已發分紅', tot.paid + tot.bonus, '股東＋固定分紅＋員工分紅') +
+    kpi('實際營收', actAll, '工作 ' + daysAll + ' 天｜日均 ' + money(daysAll ? Math.round(actAll / daysAll) : 0)) +
+    kpi('人事', staffAll, '佔實際營收 ' + pct(actAll ? staffAll / actAll : 0)) +
+    kpi('貨款', purAll, '佔實際營收 ' + pct(actAll ? purAll / actAll : 0)) + '</div>';
+  var h = cards + '<h2>歷年</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (120 + all.length * 110) + 'px"><thead><tr><th>項目</th>' +
     all.map(function (o) { return '<th class="n">' + esc(o.y) + (o.y === todayStr().slice(0, 4) ? '<span class="tag">進行中</span>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' +
     items.map(function (it) {
       return '<tr class="' + (it[2] === 'em bal' ? 'yrow' : '') + '"><th>' + esc(it[0]) + '</th>' + all.map(function (o, i) {
