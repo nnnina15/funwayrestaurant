@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.12.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.12.4';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -1856,6 +1856,7 @@ function renderYearTab() {
   // 當年盈餘＝月盈餘合計−當年分紅合計（含員工分紅）−存年終−其他扣除＋上一年盈餘
   var yLoan = sum(months, function (m) { return (m.loan || 0) - (m.repay || 0); });   // 今年借出 − 還款
   var h = '<div class="kpis">' + kpi(cur + ' 當年盈餘', yProfit - yPaid - yRes - yDed - yLoan + carry, '月盈餘 ' + money(yProfit) + '－分紅 ' + money(yPaid) + '－存年終 ' + money(yRes) + (yDed ? '－其他扣除 ' + money(yDed) : '') + (yLoan ? (yLoan > 0 ? '－借出 ' + money(yLoan) : '＋還款 ' + money(-yLoan)) : '') + '＋上一年盈餘 ' + money(carry), true) +
+    kpi(cur + ' 當年結餘', yProfit - yPaid - yRes - yDed - yLoan, '今年留下的錢（不含上一年）') +
     kpi('實際營收', yAct, '工作 ' + yDays + ' 天｜日均 ' + money(yDays ? Math.round(yAct / yDays) : 0)) +
     kpi('人事', sum(months, function (m) { return m.staff; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.staff; }) / yAct : 0)) +
     kpi('貨款', sum(months, function (m) { return m.purchase; }), '佔實際營收 ' + pct(yAct ? sum(months, function (m) { return m.purchase; }) / yAct : 0)) + '</div>' + '<h2>盈餘與分紅</h2><p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="ytable eq" style="min-width:' + (128 + cols.length * 96) + 'px"><thead><tr><th>' + cur + '</th>' +
