@@ -74,6 +74,27 @@
   nav#tabs button svg { width: 18px; height: 18px; }
   nav#tabs button:hover { background: var(--soft); color: var(--ink); }
   nav#tabs button.on { background: var(--ink); color: var(--card); }
+  /* 電腦／平板：分頁放在最上面的黑色標題列裡；同步按鈕改成右下角的圓形按鈕（在「需要注意」上面） */
+  @media (min-width: 900px) { header h1 { flex: 0 0 auto; overflow: visible; } }   /* 分頁在標題列裡：店別和帳號不要被擠掉 */
+  header nav#tabs { position: static; flex: 1 1 auto; min-width: 0; background: transparent; border: 0; padding: 0 8px; z-index: auto; }
+  header nav#tabs button { color: rgba(255,255,255,.72); font-size: 15px; padding: 8px 12px; }
+  @media (max-width: 1360px) { header nav#tabs button { font-size: 14px; padding: 7px 9px; gap: 4px; } header nav#tabs button svg { display: none; } header nav#tabs { gap: 2px; } }
+  @media (max-width: 1100px) { header h1 .acc { display: none; } }
+  header nav#tabs button:hover { background: rgba(255,255,255,.12); color: #fff; }
+  header nav#tabs button.on { background: #fff; color: #1d1a17; }
+  @media (min-width: 900px) {
+    body.has-bar #sync, body.app-on #sync { position: fixed; z-index: 7; right: 16px; bottom: calc(134px + env(safe-area-inset-bottom)); height: 48px; min-width: 48px;
+      display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; margin: 0; box-sizing: border-box;
+      background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15); font-size: 14px; padding: 0; }
+    body.app-on #sync .sync-txt { display: none; }
+    body.app-on #sync:not(.open) { width: 48px; padding: 0; }
+    body.app-on #sync.open { padding: 0 0 0 16px; }
+    body.app-on #sync.open .sync-txt { display: inline; }
+    body.app-on #sync .sync-ic { width: 46px; height: 46px; flex: 0 0 46px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: var(--ok); margin: 0; }
+    body.app-on #sync.pending .sync-ic, body.app-on #sync.err .sync-ic { color: inherit; font-size: 15px; }
+    body.app-on #sync.pending { background: var(--amber); color: #3d2600; }
+    body.app-on #sync.err { background: #ff8a75; color: #3d0b04; }
+  }
   #bottombar { display: none; }
   @media (max-width: 899px) {
     nav#tabs { display: none !important; }
@@ -580,6 +601,7 @@
 <header>
   <img class="logo" src="logo-white.png" alt="風味食堂">
   <h1 id="title">記帳</h1>
+  <nav id="tabs" class="hide"></nav>
   <button id="sync" class="hide" onclick="onSyncClick()">—</button>
   <button id="menuBtn" class="hide" onclick="openSettings()">⋯</button>
 </header>
@@ -621,7 +643,6 @@
   </div>
 </main>
 
-<nav id="tabs" class="hide"></nav>
 
 <main id="v-app" class="hide">
   <div id="pickbar" class="hide"></div>

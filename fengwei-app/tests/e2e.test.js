@@ -105,9 +105,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   assert.deepStrictEqual(await B.pg.$$eval('#storeSel option', o => o.map(x => x.textContent)), ['大埔店', '中正店'], '管理可以切兩家店');
   // 試算表新增店家：同步後店別選單馬上多出來（不用重新登入）
   g.sheets[S.STORE].cells.push(['師大店', 2, '否', 500]);
-  await B.pg.click('#sync'); await B.pg.waitForFunction(() => document.querySelectorAll('#storeSel option').length === 3, null, { timeout: 8000 });
+  await B.pg.evaluate(() => trySync(true)); await B.pg.waitForFunction(() => document.querySelectorAll('#storeSel option').length === 3, null, { timeout: 8000 });
   g.sheets[S.STORE].cells.pop();
-  await B.pg.click('#sync'); await B.pg.waitForFunction(() => document.querySelectorAll('#storeSel option').length === 2, null, { timeout: 8000 });
+  await B.pg.evaluate(() => trySync(true)); await B.pg.waitForFunction(() => document.querySelectorAll('#storeSel option').length === 2, null, { timeout: 8000 });
   await B.pg.click('#tb-purchase'); await B.pg.fill('#p-date', '2026-11-01'); await B.pg.dispatchEvent('#p-date', 'change');
   assert.strictEqual(await B.pg.$$eval('#p-list tr', t => t.length), 3, '手機要看到平板的進貨（手動 2 + 結帳單 1）');
   await B.pg.click('#tb-payroll');
@@ -219,9 +219,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.fill('#op-1', '3640'); await B.pg.dispatchEvent('#op-1', 'input');
   await B.pg.click('#tab-delivery .primary');
   await B.pg.click('#tb-overview');
-  // 日期／月份置頂：捲到下面時，月份列仍貼在分頁列下方
+  // 日期／月份置頂：捲到下面時，月份列仍貼在標題列（分頁在標題列裡）下方
   await B.pg.evaluate(() => window.scrollTo(0, 2000)); await B.pg.waitForTimeout(200);
-  const pin = await B.pg.evaluate(() => { const b = document.getElementById('pickbar').getBoundingClientRect(), t = document.getElementById('tabs').getBoundingClientRect(); return [Math.round(b.top), Math.round(t.bottom), !!document.querySelector('#pickbar #m-month')]; });
+  const pin = await B.pg.evaluate(() => { const b = document.getElementById('pickbar').getBoundingClientRect(), t = document.querySelector('header').getBoundingClientRect(); return [Math.round(b.top), Math.round(t.bottom), !!document.querySelector('#pickbar #m-month')]; });
   assert.ok(pin[2] && Math.abs(pin[0] - pin[1]) <= 1, '月份要置頂：' + pin);
   await B.pg.evaluate(() => window.scrollTo(0, 0));
   // 總覽：月

@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.10.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.11.0';   // 和 sw.js 的 VERSION 一起改
 // 內建同步網址（編碼過，程式碼和畫面上看不到原文；真正保護資料的是帳號＋PIN）
 var DEFAULT_URL = (function (s, k) {
   try {
@@ -164,6 +164,7 @@ function showView(name) {
   $('tabs').classList.toggle('hide', name !== 'app');
   $('bottombar').classList.toggle('hide', name !== 'app');
   document.body.classList.toggle('has-bar', name === 'app');
+  document.body.classList.toggle('app-on', name === 'app');
   $('sync').classList.toggle('hide', name !== 'app');
   $('menuBtn').classList.toggle('hide', name !== 'app');
   if (name === 'setup') {
@@ -512,8 +513,8 @@ function placePickbar() {
 if (PHONE.addEventListener) PHONE.addEventListener('change', placePickbar);
 function updateStickyTop() {
   var h = document.querySelector('header').offsetHeight, t = $('tabs');
-  var tabsOn = t && !t.classList.contains('hide') && getComputedStyle(t).display !== 'none';
-  if (t) t.style.top = h + 'px';                               // 分頁列緊貼標題列，不留縫
+  var tabsOn = t && !t.classList.contains('hide') && getComputedStyle(t).display !== 'none' && t.parentNode !== document.querySelector('header');   // 分頁在標題列裡就不另外算高度
+  if (t && tabsOn) t.style.top = h + 'px';                               // 分頁列緊貼標題列，不留縫
   document.documentElement.style.setProperty('--sticky-top', (h + (tabsOn ? t.offsetHeight : 0)) + 'px');
   // 月份／日期列在內容上方（平板、電腦）也是黏在上面：底下會黏住的東西（人事的員工名字、表格標題）要排在它下面，不然會疊在一起
   var bar = $('pickbar'), under = h + (tabsOn ? t.offsetHeight : 0);
@@ -659,7 +660,7 @@ function relogin() {
 function onSyncClick() {
   if (ST.authLost) return relogin();
   var b = $('sync');
-  if (PHONE.matches && !b.classList.contains('open')) { b.classList.add('open'); syncAutoClose(); return; }
+  if (!b.classList.contains('open')) { b.classList.add('open'); syncAutoClose(); return; }
   trySync(true);
 }
 function syncAutoClose() {
