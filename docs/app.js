@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.16.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.16.3';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1918,7 +1918,7 @@ function renderAllYears() {
   rows.forEach(function (o) { ['days', 'actual', 'profit', 'paid', 'bonus', 'reserve', 'other', 'loan', 'left'].forEach(function (k) { tot[k] += o[k]; }); people.forEach(function (p) { tot.pay[p] = (tot.pay[p] || 0) + o.pay[p]; }); });
   var all = rows.concat([Object.assign(tot, { y: '全部' })]);
   // 年份放欄、項目放列（扣的項目顯示負數）
-  var items = [['工作天', function (o) { return o.days; }, 'plain'], ['實際營收', function (o) { return o.actual; }], ['月盈餘', function (o) { return o.profit; }, 'em'],
+  var items = [['工作天', function (o) { return o.days; }, 'plain'], ['月盈餘', function (o) { return o.profit; }, 'em'], ['實際營收', function (o) { return o.actual; }],
     ['分紅合計', function (o) { return -(o.paid + o.bonus); }, 'em']]
     .concat(people.map(function (p) { return ['　' + p, function (o) { return -(o.pay[p] || 0); }]; }))
     .concat([['員工分紅', function (o) { return -o.bonus; }], ['存年終', function (o) { return -o.reserve; }], ['其他扣除', function (o) { return -o.other; }],
