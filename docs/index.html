@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.16.1">
+<meta name="app-version" content="4.16.2">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -656,15 +656,18 @@
     body.has-bar #sync.pending { background: var(--amber); color: #3d2600; }
     body.has-bar #sync.err { background: #ff8a75; color: #3d0b04; }
   }
-  /* 電腦：同步／提醒／亮暗三顆按鈕排成一排，貼在右下角（不要蓋住表格右邊） */
+  /* 電腦：同步／提醒／亮暗三顆按鈕直的排，貼在左下角（不要蓋住表格右邊的數字） */
   @media (min-width: 900px) {
-    #themeBtn { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 42px; height: 42px; }
-    #warnBtn { right: 64px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 42px; height: 42px; }
-    body.has-bar #sync, body.app-on #sync { right: 114px; bottom: calc(14px + env(safe-area-inset-bottom)); height: 42px; min-width: 42px; }
+    #themeBtn { right: auto; left: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 42px; height: 42px; }
+    #warnBtn { right: auto; left: 14px; bottom: calc(64px + env(safe-area-inset-bottom)); width: 42px; height: 42px; }
+    body.has-bar #sync, body.app-on #sync { right: auto; left: 14px; bottom: calc(114px + env(safe-area-inset-bottom)); height: 42px; min-width: 42px; }
     body.has-bar #sync:not(.open), body.app-on #sync:not(.open) { width: 42px; }
     body.has-bar #sync .sync-ic, body.app-on #sync .sync-ic { width: 40px; height: 40px; flex: 0 0 40px; }
     main { padding-bottom: 72px; }
   }
+  /* 左下角的按鈕不要蓋到內容：畫面不夠寬（內容貼到左邊）時，左邊多留一點空 */
+  @media (min-width: 900px) and (max-width: 1540px) { body.page-wide main { padding-left: 66px; } }
+  @media (min-width: 900px) and (max-width: 1040px) { main { padding-left: 66px; } }
 </style>
 </head>
 <body>
