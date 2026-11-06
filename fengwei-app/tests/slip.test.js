@@ -23,9 +23,9 @@ assert.deepStrictEqual(rows(), [['軒哥', '月薪', 45910, '薪資'], ['PT', 'P
 sync(mgr, '大埔平板', [{ id: 's3', type: 'payroll.slip', data: { date: '2026-11-04', items: [{ name: 'PT', item: 'PT薪資', amount: 800, kind: '薪資' }], editedAt: '2026-11-04 22:00:00' } }]);
 sync(mgr, '大埔平板', [{ id: 's4', type: 'payroll.slip', data: { date: '2026-11-03', items: [], editedAt: '2026-11-04 22:01:00' } }]);
 assert.deepStrictEqual(rows(), [['軒哥', '月薪', 45910, '薪資'], ['PT', 'PT薪資（日結 11/4）', 800, '薪資']]);
-// 店長還是不能直接改人事
-r = sync(mgr, '大埔平板', [{ id: 'x', type: 'payroll.upsert', data: { month: '2026-11', name: '軒哥', items: [], editedAt: '2026-11-04 23:00:00' } }]);
-assert.strictEqual(r.results[0].status, 'error', '店長不能改人事');
+// 店長可以改人事，但不能改分紅
+r = sync(mgr, '大埔平板', [{ id: 'x', type: 'deduct.add', data: { id: 'd1', month: '2026-11', type: '員工分紅', amount: 1 } }]);
+assert.strictEqual(r.results[0].status, 'error', '店長不能改分紅');
 // App 端的計算也一樣
 const C = require('../../docs/compute.js'); const applyOp = C.applyOp_ || global.applyOp_;
 const st = { daily: [], purchase: [], expense: [], payroll: [{ store: '大埔店', month: '2026-11', name: 'PT', item: 'PT薪資（日結 11/3）', amount: 1200, kind: '薪資' }], delivery: [], deduct: [] };

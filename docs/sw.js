@@ -1,7 +1,7 @@
 // 風味記帳｜離線快取
 // 有網路：一律先拿最新版（最多等 4 秒），所以改版後打開就是新的
 // 沒網路：用這台裝置存的版本，照樣能開
-const VERSION = '4.14.8';
+const VERSION = '4.15.0';
 const CACHE = 'fengwei-v' + VERSION;
 const ASSETS = ['./', './index.html', './app.js', './compute.js', './manifest.json',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png', './logo-ink.png', './logo-white.png'];

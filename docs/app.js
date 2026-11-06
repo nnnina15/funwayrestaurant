@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.14.8';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.15.0';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -133,7 +133,7 @@ function setNum(id, n) { $(id).value = n ? n : ''; }
 function isAdmin() { return ST.sess && ST.sess.role === 'admin'; }
 // 角色：管理（全部）／店長（看全部，人事・外送對帳・分紅扣除只能看）／員工（每日結帳、進貨、固定／其他支出）
 var ROLE_TABS = { manager: ['daily', 'purchase', 'expense', 'overview', 'payroll', 'delivery', 'deduct', 'loan', 'settings'], staff: ['daily', 'purchase', 'expense', 'settings'] };
-var RO_TABS = { manager: ['payroll', 'delivery', 'deduct', 'loan'] };
+var RO_TABS = { manager: ['delivery', 'deduct', 'loan'] };   // 店長：人事可以改，其他這幾頁只能看
 var ROLE_NAMES = { admin: '管理', manager: '店長', staff: '員工' };
 function myRole() { return (ST.sess && ST.sess.role) || 'manager'; }
 function canSee(tab) { var t = ROLE_TABS[myRole()]; return !t || t.indexOf(tab) >= 0; }
@@ -734,7 +734,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.6.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.7.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';

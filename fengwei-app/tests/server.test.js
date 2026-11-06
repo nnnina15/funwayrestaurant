@@ -55,9 +55,10 @@ const op = (type, data) => ({ id: Math.random().toString(36).slice(2), type, dat
 let r = g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [
   op('daily.upsert', { date: '2026-10-01', site: 31455, panda: 4974, uber: 555, allpay: 80, line: 1260, spend: 6510, cash: 23605, editedAt: '2026-10-01 21:00:00', device: '平板A' }),
   op('purchase.add', { id: 'p1', date: '2026-10-01', cat: '麵', amount: 1080, editedAt: '2026-10-01 21:01:00', device: '平板A' }),
+  op('deduct.add', { id: 'mg1', month: '2026-10', type: '員工分紅', amount: 1 }),
   op('payroll.upsert', { month: '2026-10', name: 'X', items: [], editedAt: '2026-10-01 21:00:00' })
 ]});
-assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'ok', 'error'], '店長不能改人事');
+assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'ok', 'error', 'ok'], '店長不能改分紅，但可以改人事');
 r = g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [
   op('expense.add', { id: 'E20261001abc', month: '2026-10', type: '其他', item: '燉滷', amount: 500 }),
   op('expense.add', { id: 'x1', month: '2026-10', type: '固定', item: '房租', amount: 1 })
