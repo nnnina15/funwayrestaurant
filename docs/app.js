@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.14.6';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.14.7';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1652,20 +1652,61 @@ function renderLoans() {
 }
 // 借還款分頁：記錄、欠款總表、每一筆紀錄（新的在上面）
 // 每年：借出、還款、年底還沒收回（累計借出 − 累計還款），不分人
+function loanMode(m) { ST.loanMode = m; renderLoanYears(); }
+function loanYear(d) { ST.loanYear = String(Number(ST.loanYear) + d); renderLoanYears(); }
+// 每年／每月還沒收回：右上「年｜月」切換；「月」可以左右切年份
 function renderLoanYears() {
   var recs = view().deduct.filter(function (d) { return d.type === '員工借款' || d.type === '員工還款'; });
+  var mode = ST.loanMode || 'year';
+  Array.prototype.forEach.call($('xl-mode').children, function (b) { b.classList.toggle('on', b.dataset.v === mode); });
+  $('xl-yh').textContent = mode === 'month' ? '每月還沒收回' : '每年還沒收回';
+  $('xl-ynote').textContent = mode === 'month' ? '這一年每個月的借出、還款，和月底還沒收回的總數（含之前每年累積下來的）。' : '每一年借出、還款，和年底還沒收回的總數（累計到那年 12 月；今年算到現在）。';
   if (!recs.length) { $('xl-years').innerHTML = '<p class="muted">還沒有借還款紀錄</p>'; return; }
   var years = [];
   recs.forEach(function (d) { var y = String(d.month).slice(0, 4); if (years.indexOf(y) < 0) years.push(y); });
   years.sort();
-  var yr = function (y, type) { return recs.reduce(function (a, d) { return a + (d.type === type && String(d.month).slice(0, 4) === y ? Number(d.amount || 0) : 0); }, 0); };
-  var owe = function (y) { return recs.reduce(function (a, d) { return String(d.month).slice(0, 4) > y ? a : a + (d.type === '員工借款' ? 1 : -1) * Number(d.amount || 0); }, 0); };
+  var sumOf = function (test, type) { return recs.reduce(function (a, d) { return a + (d.type === type && test(String(d.month)) ? Number(d.amount || 0) : 0); }, 0); };
+  var oweTo = function (last) { return recs.reduce(function (a, d) { return String(d.month) > last ? a : a + (d.type === '員工借款' ? 1 : -1) * Number(d.amount || 0); }, 0); };
   var cell = function (v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + '">' + (v ? money(v) : '<span class="muted">—</span>') + '</td>'; };
-  $('xl-years').innerHTML = '<div class="xscroll"><table class="ytable eq" style="min-width:' + (110 + years.length * 100) + 'px"><thead><tr><th></th>' +
-    years.map(function (y) { return '<th class="n">' + y + (y === todayStr().slice(0, 4) ? '<span class="tag">至今</span>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' +
-    '<tr><th>借出</th>' + years.map(function (y) { return cell(yr(y, '員工借款')); }).join('') + '</tr>' +
-    '<tr><th>還款</th>' + years.map(function (y) { return cell(yr(y, '員工還款')); }).join('') + '</tr>' +
-    '<tr class="yrow"><th>年底還沒收回</th>' + years.map(function (y) { return cell(owe(y), owe(y) > 0 ? 'neg' : ''); }).join('') + '</tr></tbody></table></div>';
+  var now = todayStr().slice(0, 7), cols, head, out, back, owe, owLabel, pre = '';
+  if (mode === 'month') {
+    var thisY = now.slice(0, 4);
+    if (!ST.loanYear) ST.loanYear = years.indexOf(thisY) >= 0 ? thisY : years[years.length - 1];
+    var y = ST.loanYear, minY = years[0], maxY = years[years.length - 1] > thisY ? years[years.length - 1] : thisY;
+    if (y < minY) y = ST.loanYear = minY; if (y > maxY) y = ST.loanYear = maxY;
+    pre = '<div class="xl-ystep"><button class="step" onclick="loanYear(-1)"' + (y <= minY ? ' disabled' : '') + ' aria-label="上一年">‹</button><b>' + y + '</b><button class="step" onclick="loanYear(1)"' + (y >= maxY ? ' disabled' : '') + ' aria-label="下一年">›</button></div>';
+    cols = []; for (var k = 1; k <= 12; k++) { var m = y + '-' + (k < 10 ? '0' : '') + k; if (m <= now) cols.push(m); }
+    head = function (m) { return Number(m.slice(5)) + '月' + (m === now ? '<span class="tag">至今</span>' : ''); };
+    out = function (m) { return sumOf(function (x) { return x === m; }, '員工借款'); };
+    back = function (m) { return sumOf(function (x) { return x === m; }, '員工還款'); };
+    owe = function (m) { return oweTo(m); }; owLabel = '月底還沒收回';
+  } else {
+    cols = years;
+    head = function (y) { return y + (y === now.slice(0, 4) ? '<span class="tag">至今</span>' : ''); };
+    out = function (y) { return sumOf(function (x) { return x.slice(0, 4) === y; }, '員工借款'); };
+    back = function (y) { return sumOf(function (x) { return x.slice(0, 4) === y; }, '員工還款'); };
+    owe = function (y) { return oweTo(y + '-12'); }; owLabel = '年底還沒收回';
+  }
+  if (!cols.length) { $('xl-years').innerHTML = pre + '<p class="muted">這一年還沒開始</p>'; return; }
+  if (mode === 'month') {
+    // 月：一個月一列，借出／還款寫出是誰、多少
+    var who = function (d) { return String(d.note || '').replace(/（.*?）|\(.*?\)/g, '').trim() || '（沒寫名字）'; };
+    var list = function (m, type) {
+      var by = {}, order = [];
+      recs.forEach(function (d) { if (String(d.month) === m && d.type === type) { var n = who(d); if (!(n in by)) { by[n] = 0; order.push(n); } by[n] += Number(d.amount || 0); } });
+      return order.length ? order.map(function (n) { return '<div class="xl-p"><span>' + esc(n) + '</span><b>' + money(by[n]) + '</b></div>'; }).join('') : '<span class="muted">—</span>';
+    };
+    $('xl-years').innerHTML = pre + '<div class="xscroll"><table class="ytable xl-mt"><thead><tr><th>月份</th><th>借出</th><th>還款</th><th class="n">月底未收回</th></tr></thead><tbody>' +
+      cols.slice().reverse().map(function (m) { var v = owe(m);
+        return '<tr><th>' + head(m) + '</th><td class="xl-out">' + list(m, '員工借款') + '</td><td class="xl-back">' + list(m, '員工還款') + '</td>' + cell(v, v > 0 ? 'neg' : '') + '</tr>'; }).join('') +
+      '</tbody><tfoot><tr class="yrow"><th>' + y + ' 合計</th><td class="n">' + money(sumOf(function (x) { return x.slice(0, 4) === y; }, '員工借款')) + '</td><td class="n">' + money(sumOf(function (x) { return x.slice(0, 4) === y; }, '員工還款')) + '</td>' + cell(owe(cols[cols.length - 1]), 'neg') + '</tr></tfoot></table></div>';
+    return;
+  }
+  $('xl-years').innerHTML = pre + '<div class="xscroll"><table class="ytable eq" style="min-width:' + (120 + cols.length * 100) + 'px"><thead><tr><th></th>' +
+    cols.map(function (c) { return '<th class="n">' + head(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    '<tr><th>借出</th>' + cols.map(function (c) { return cell(out(c)); }).join('') + '</tr>' +
+    '<tr><th>還款</th>' + cols.map(function (c) { return cell(back(c)); }).join('') + '</tr>' +
+    '<tr class="yrow"><th>' + owLabel + '</th>' + cols.map(function (c) { var v = owe(c); return cell(v, v > 0 ? 'neg' : ''); }).join('') + '</tr></tbody></table></div>';
 }
 function renderLoanTab() {
   if (!$('xl-month').value) $('xl-month').value = todayStr().slice(0, 7);

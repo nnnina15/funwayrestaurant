@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.14.6">
+<meta name="app-version" content="4.14.7">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -313,6 +313,12 @@
   .sp-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--soft); margin: 0 0 10px; cursor: pointer; }
   .sp-row span { display: flex; flex-direction: column; } .sp-row b { font-size: 17px; color: var(--ink); } .sp-row small { font-size: 13px; color: var(--muted); }
   .sp-row input { width: 26px; height: 26px; flex: none; margin: 0; }
+  .xl-mt { width: 100%; } .xl-mt td, .xl-mt th { vertical-align: top; } .xl-mt thead th:nth-child(2), .xl-mt thead th:nth-child(3) { text-align: left; }
+  .xl-p { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; } .xl-p + .xl-p { margin-top: 4px; }
+  .xl-out .xl-p b { color: var(--bad); } .xl-back .xl-p b { color: var(--ok); } .xl-p b { font-weight: 700; }
+  @media (max-width: 520px) { .xl-mt th, .xl-mt td { font-size: 14px; padding-left: 8px; padding-right: 8px; } .xl-p { gap: 6px; } }
+  .xl-mt tfoot td.n { color: inherit; font-weight: 800; }
+  .xl-ystep { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 12px; } .xl-ystep b { font-size: 18px; min-width: 64px; text-align: center; } .xl-ystep .step { height: 38px; width: 42px; }
   .h2row .seg.ymode { margin: 0; } .seg.ymode button { padding: 6px 16px; font-size: 15px; }
   .pp-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 40px 40px auto; gap: 6px; align-items: center; margin-bottom: 6px; }
   .pp-row input { font-size: 16px; padding: 10px; min-width: 0; }
@@ -868,7 +874,7 @@
       <button class="primary" id="xl-btn" onclick="addLoan()">記錄借出</button>
     </div>
     <div class="card" id="xl-sum-card"><h2>員工欠款</h2><div id="xl-sum"></div></div>
-    <div class="card"><h2>每年還沒收回</h2><p class="muted">每一年借出、還款，和年底還沒收回的總數（累計到那年 12 月；今年算到現在）。</p><div id="xl-years"></div></div>
+    <div class="card"><div class="h2row" style="margin-top:0"><h2 id="xl-yh">每年還沒收回</h2><div class="seg ymode" id="xl-mode"><button data-v="year" onclick="loanMode('year')">年</button><button data-v="month" onclick="loanMode('month')">月</button></div></div><p class="muted" id="xl-ynote"></p><div id="xl-years"></div></div>
     <div class="card"><h2>借還款紀錄</h2><table class="xlist"><tbody id="xl-list"></tbody></table></div>
   </section>
 
