@@ -239,13 +239,13 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   const mb = await B.pg.textContent('#m-body');
   assert.ok(mb.includes('線上支付手續費') && !mb.includes('線上支付手續費（估計）'), '對帳後不再是估計');
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-summary.png'), fullPage: true });
-  // 店長：看得到總覽、人事、外送對帳、分紅扣除；外送／分紅／借還款只能看，人事可以改
+  // 店長：看得到總覽、人事、外送對帳、分紅扣除；和管理一樣，只是看不到別家店
   const tabsA = await A.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent));
   assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '固定/其他支出', '總覽', '人事', '外送對帳', '分紅扣除', '借還款', '裝置'], '店長的分頁');
   await A.pg.click('#tb-payroll'); await A.pg.waitForTimeout(200);
   assert.ok(!(await A.pg.isVisible('#tab-payroll .ro-note')), '店長可以改人事（沒有「只能看」）');
   await A.pg.click('#tb-delivery'); await A.pg.waitForTimeout(200);
-  assert.ok(await A.pg.isVisible('#tab-delivery .ro-note'), '外送對帳店長還是只能看');
+  assert.ok(!(await A.pg.isVisible('#tab-delivery .ro-note')), '外送對帳店長也可以改（店長和管理一樣）');
   await A.pg.click('#tb-expense'); await A.pg.waitForTimeout(200);
   assert.ok(!(await A.pg.isVisible('#tab-expense .ro-note')) && await A.pg.isVisible('#tab-expense .primary'), '固定／其他支出店長可以新增');
   await A.pg.click('#tb-daily');

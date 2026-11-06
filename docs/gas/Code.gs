@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.7.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '店長可以修改人事（薪資）';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.8.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '店長和管理功能一樣（只能看、改自己的店）';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -68,7 +68,6 @@ const DEFAULT_PRESETS = [
 const PRESET_USES = ['每日結帳', '固定支出', '人事'];
 // 店長、員工都能做的：每日結帳、進貨、固定／其他支出（日結的 PT／預支會自動記到人事）。其他只有管理能改
 const MANAGER_OPS = ['daily.upsert', 'purchase.add', 'purchase.del', 'expense.add', 'expense.del', 'payroll.slip'];
-const MANAGER_ONLY_OPS = ['payroll.upsert'];   // 店長可以改人事（員工不行）
 
 /* ============================================================
  * 試算表選單 & 初始化
@@ -561,7 +560,7 @@ function sync_(req) {
       ops.forEach(function (op) {
         try {
           const fromSlip = /^expense\.(add|del)$/.test(op.type) && /^E\d{8}/.test(str_((op.data || {}).id));   // 每日結帳自動產生的其他支出
-          if (role !== 'admin' && MANAGER_OPS.indexOf(op.type) < 0 && !(role === 'manager' && MANAGER_ONLY_OPS.indexOf(op.type) >= 0) && !fromSlip) throw new Error((role === 'staff' ? '員工' : '店長') + '沒有權限：' + op.type);
+          if (role === 'staff' && MANAGER_OPS.indexOf(op.type) < 0 && !fromSlip) throw new Error('員工沒有權限：' + op.type);   // 店長和管理一樣（只差在店別：上面已檢查這個帳號有沒有這家店）
           const st = applyServerOp_(s.name, op);
           if (st === 'ok') changed++;
           results.push({ id: op.id, status: st });
@@ -829,7 +828,7 @@ function byId_(store, id) { return function (x) { return str_(x['店別']) === s
 /* ---------- 回傳給 App 的資料 ---------- */
 
 function pull_(s, role) {
-  const all = role === 'admin' || role === 'manager';   // 管理、店長：全部資料（店長在 App 裡外送／分紅／借還款只能看，人事可以改）
+  const all = role === 'admin' || role === 'manager';   // 管理、店長：全部資料（店長和管理功能一樣，只是看不到別家店）
   const since = prevMonth_(Utilities.formatDate(new Date(), TZ, 'yyyy-MM'));   // 員工只拿上個月起的結帳、進貨、支出
   const mine = function (r) { return r.store === s.name; };
   const recent = function (r) { return all || r.date.slice(0, 7) >= since; };
@@ -847,7 +846,7 @@ function pull_(s, role) {
     store: { name: s.name, fee: s.fee, cashIn: s.cashIn, cashWarn: s.cashWarn },
     categories: storeCats_(s.name),
     employees: all ? employees_(s.name) : [],
-    employeesAll: role === 'admin' ? employees_(s.name, true) : [],   // 管理在 App「裝置」編輯員工名單用（含離職）
+    employeesAll: role !== 'staff' ? employees_(s.name, true) : [],   // 管理在 App「裝置」編輯員工名單用（含離職）
     partners: all ? partners_().filter(mine) : [],
     kinds: PAYROLL_KINDS, expenseTypes: EXPENSE_TYPES, deductTypes: DEDUCT_TYPES
   };

@@ -47,7 +47,7 @@ assert.strictEqual(x.ok, false); assert.ok(x.error.includes('權限'));
 assert.strictEqual(g.post({ action: 'sync', account: '雙店店長', token: two.token, store: '大埔店', ops: [] }).ok, true, '雙店店長可以切到大埔店');
 assert.ok(!mgr.config.categories.some(c => c.cat === '牛亨' && !c.to), '牛亨要有停用月份');
 assert.strictEqual(adm.config.partners.length, 3);
-assert.strictEqual(mgr.config.partners.length, 3, '店長看得到股東比例（App 裡分紅扣除只能看）');
+assert.strictEqual(mgr.config.partners.length, 3, '店長看得到股東比例');
 
 const op = (type, data) => ({ id: Math.random().toString(36).slice(2), type, data });
 
@@ -58,7 +58,8 @@ let r = g.post({ action: 'sync', store: '大埔店', account: mgr.account, token
   op('deduct.add', { id: 'mg1', month: '2026-10', type: '員工分紅', amount: 1 }),
   op('payroll.upsert', { month: '2026-10', name: 'X', items: [], editedAt: '2026-10-01 21:00:00' })
 ]});
-assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'ok', 'error', 'ok'], '店長不能改分紅，但可以改人事');
+assert.deepStrictEqual(r.results.map(x => x.status), ['ok', 'ok', 'ok', 'ok'], '店長和管理一樣：可以改分紅、人事');
+g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [op('deduct.del', { id: 'mg1' })] });
 r = g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [
   op('expense.add', { id: 'E20261001abc', month: '2026-10', type: '其他', item: '燉滷', amount: 500 }),
   op('expense.add', { id: 'x1', month: '2026-10', type: '固定', item: '房租', amount: 1 })
@@ -145,10 +146,10 @@ assert.strictEqual(row26['支出明細'], '燉滷 500｜米 3516（記帳→米#
 assert.strictEqual(row26['應有現金'], 29125 - 575 - 3713 - 1300);
 assert.deepStrictEqual(r.data.daily.find(x => x.date === '2026-10-26').lines, lines);
 
-// 常用項目：預設有資料；管理可以改（只改這家店），店長不行
+// 常用項目：預設有資料；管理、店長都可以改（只改這家店）
 assert.ok(adm.data.presets.some(x => x.use === '每日結帳' && x.name === 'PT' && x.cat === 'PT薪資' && x.store === '全部'));
 r = g.post({ action: 'sync', store: '大埔店', account: mgr.account, token: mgr.token, ops: [op('presets.set', { use: '每日結帳', items: [{ name: 'X', cat: '米' }] })] });
-assert.strictEqual(r.results[0].status, 'error', '店長不能改常用項目');
+assert.strictEqual(r.results[0].status, 'ok', '店長和管理一樣，可以改自己店的常用項目');
 r = g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, ops: [op('presets.set', { use: '每日結帳', items: [{ name: '豬肉', cat: '豬肉攤' }, { name: '米', cat: '米' }] })] });
 assert.strictEqual(r.results[0].status, 'ok');
 assert.deepStrictEqual(r.data.presets.filter(x => x.use === '每日結帳' && x.store === '大埔店').map(x => x.name), ['豬肉', '米']);
@@ -240,6 +241,8 @@ assert.ok(g.rows(S.EMP).some(e => e['店別'] === '大埔店'), '別家店的員
 addAcc('師大店長', '店長', '師大店', 'Temp#0009');
 const sdm = login('師大店長', 'Temp#0009', { newPin: 'Shida#2026' });
 const mgrTry = g.post({ action: 'sync', store: '師大店', account: sdm.account, token: sdm.token, ops: [op('employees.set', { items: [] })] });
-assert.ok(mgrTry.ok && mgrTry.results[0].status === 'error' && /權限/.test(mgrTry.results[0].error), '店長不能改員工名單：' + JSON.stringify(mgrTry).slice(0, 150));
-assert.strictEqual(mgrTry.config.employeesAll.length, 0, '店長拿不到含離職的員工名單');
+assert.ok(mgrTry.ok && mgrTry.results[0].status === 'ok', '店長可以改自己店的員工名單：' + JSON.stringify(mgrTry).slice(0, 150));
+const sdOther = g.post({ action: 'sync', store: '大埔店', account: sdm.account, token: sdm.token, ops: [op('employees.set', { items: [] })] });
+assert.ok(!sdOther.ok && /權限/.test(sdOther.error), '店長不能改別家店');
+assert.ok(g.rows(S.EMP).some(e => e['店別'] === '大埔店'), '別家店的員工不受影響');
 console.log('同步服務測試通過 ✓');
