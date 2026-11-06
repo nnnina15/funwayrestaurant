@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.16.0">
+<meta name="app-version" content="4.16.1">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -655,6 +655,15 @@
     body.has-bar #sync.pending .sync-ic, body.has-bar #sync.err .sync-ic { color: inherit; font-size: 15px; }
     body.has-bar #sync.pending { background: var(--amber); color: #3d2600; }
     body.has-bar #sync.err { background: #ff8a75; color: #3d0b04; }
+  }
+  /* 電腦：同步／提醒／亮暗三顆按鈕排成一排，貼在右下角（不要蓋住表格右邊） */
+  @media (min-width: 900px) {
+    #themeBtn { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 42px; height: 42px; }
+    #warnBtn { right: 64px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 42px; height: 42px; }
+    body.has-bar #sync, body.app-on #sync { right: 114px; bottom: calc(14px + env(safe-area-inset-bottom)); height: 42px; min-width: 42px; }
+    body.has-bar #sync:not(.open), body.app-on #sync:not(.open) { width: 42px; }
+    body.has-bar #sync .sync-ic, body.app-on #sync .sync-ic { width: 40px; height: 40px; flex: 0 0 40px; }
+    main { padding-bottom: 72px; }
   }
 </style>
 </head>
