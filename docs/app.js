@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.16.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.0';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1421,11 +1421,13 @@ function renderExpenseTab() {
   $('e-names').innerHTML = ST.expPresets.map(function (p) { return '<option value="' + esc(p.name) + '">'; }).join('');
   var month = $('e-month').value;
   var list = view().expense.filter(function (x) { return x.month === month; });
-  var total = list.reduce(function (a, x) { return a + Number(x.amount || 0); }, 0);
+  var total = list.reduce(function (a, x) { return a + (isOldProfit_(x) ? 0 : Number(x.amount || 0)); }, 0);
   $('e-list').innerHTML = list.map(function (x) {
+    if (isOldProfit_(x)) return '<tr class="oldp"><td class="nowrap">舊帳盈餘</td><td>這個月只有舊表的盈餘合計（沒有明細），不算支出 <span class="muted">' + esc(x.note) + '</span></td><td class="n">' + money(-Number(x.amount || 0)) +
+      '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delExpense(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
     return '<tr><td class="nowrap">' + esc(x.type) + '</td><td>' + esc(x.item) + pendTag('expense', x.id) + ' <span class="muted">' + esc(x.note) + '</span></td><td class="n">' + money(x.amount) +
       '</td><td class="n">' + (/^E\d{8}/.test(x.id) ? '<span class="muted" style="font-size:13px">在每日結帳改</span>' : '<button class="danger del-x" aria-label="刪除" title="刪除" onclick="delExpense(\'' + jsq(x.id) + '\')">✕</button>') + '</td></tr>';
-  }).join('') + (list.length ? '<tr><td></td><td><b>合計</b></td><td class="n"><b>' + money(total) + '</b></td><td></td></tr>' : '<tr><td class="muted">還沒有支出</td></tr>');
+  }).join('') + (list.length ? '<tr><td></td><td><b>支出合計</b></td><td class="n"><b>' + money(total) + '</b></td><td></td></tr>' : '<tr><td class="muted">還沒有支出</td></tr>');
 }
 function addExpense() {
   var amt = v('e-amount');
@@ -1877,6 +1879,7 @@ function renderDayView() {
 // 歷年：一年一列（月盈餘、分紅、員工分紅、存年終、其他扣除、借出−還款、當年盈餘＝含上一年留下的）
 // 成本比例圓餅圖：實際營收拆成 食材成本／人事成本／其他支出（固定、其他、手續費、現金差額）／盈餘
 function costBox(title, pur, staff, profit, actual) {
+  if (!(actual > 0)) return '<div class="costpie nodet"><div class="legend"><div class="lg-h">' + esc(title) + ' 成本比例</div><p class="muted" style="margin:6px 0 0">' + (profit ? '這段期間只有舊表的盈餘合計 ' + money(profit) + '，沒有營收和成本明細，畫不出成本比例。' : '還沒有營收資料。') + '</p></div></div>';
   var other = actual - pur - staff - profit;
   var parts = [['食材成本', pur, 'var(--pie1)'], ['人事成本', staff, 'var(--pie2)'], ['其他支出', other, 'var(--pie3)'], ['盈餘', profit, 'var(--pie4)']];
   var shown = parts.filter(function (p) { return p[1] > 0; });
@@ -2057,9 +2060,8 @@ function renderSummaryTab() {
     ['現場營收', m.site], ['Panda', m.pandaN === null ? '未對帳' : m.pandaN, false, '', m.pandaG], ['Uber', m.uberN === null ? '未對帳' : m.uberN, false, '', m.uberG],
     ['＝ 實際營收', m.actual, true], ['進貨', -m.purchase, false, pct(m.purchasePct)], ['人事成本', -m.staff, false, pct(m.staffPct)],
     ['固定支出', -m.fixed], ['其他支出', -m.other], [m.feeEst ? '線上支付手續費（估計）' : '線上支付手續費', -m.fee],
-    ['現金差額', m.cashDiff], ['＝ 月盈餘', m.profit, true],
-    ['員工分紅', -m.bonus], ['年終預留', -m.reserve], ['其他扣除', -m.deductOther], ['＝ 可分配給股東', m.dist, true]
-  ];
+    ['現金差額', m.cashDiff]].concat(m.oldProfit ? [['舊帳盈餘（舊表只有合計）', m.oldProfit]] : []).concat([['＝ 月盈餘', m.profit, true],
+    ['員工分紅', -m.bonus], ['年終預留', -m.reserve], ['其他扣除', -m.deductOther], ['＝ 可分配給股東', m.dist, true]]);
   var shares = R.shares.filter(function (x) { return x.month === month; });
   var warns = R.warns.filter(function (x) { return x.month === month || x.month === ''; });
   var cats = R.cats.filter(function (x) { return x.month === month; }).sort(function (a, b) { return b.amount - a.amount; });

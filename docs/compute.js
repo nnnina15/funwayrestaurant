@@ -26,6 +26,8 @@ function daysInMonth_(month) {
  *       deduct:[{store,month,type,amount}], employees:{店名:[姓名]} }
  * today = 'yyyy-MM-dd'
  */
+// 舊帳月盈餘：舊表那個月只有盈餘合計（沒有營收、成本明細），匯入時記成一筆「舊表月盈餘（只有合計）」，金額是盈餘的負數
+function isOldProfit_(r) { return r.type === '舊帳盈餘' || /^舊表月盈餘/.test(String(r.item || '')); }
 function computeAll_(D, today) {
   const curMonth = today.slice(0, 7);
   const lastMonth = prevMonth_(curMonth);
@@ -36,7 +38,7 @@ function computeAll_(D, today) {
     const k = store + '|' + month;
     if (!M[k]) M[k] = { store: store, month: month, days: 0, dates: {}, site: 0, pandaG: 0, uberG: 0,
       allpay: 0, line: 0, cashDiff: 0, pandaN: null, uberN: null, allpayN: null, lineN: null, purchase: 0, staff: 0, staffNames: {},
-      fixed: 0, other: 0, bonus: 0, reserve: 0, deductOther: 0, paid: 0, loan: 0, repay: 0, cats: {}, warns: [] };
+      fixed: 0, other: 0, oldProfit: 0, bonus: 0, reserve: 0, deductOther: 0, paid: 0, loan: 0, repay: 0, cats: {}, warns: [] };
     return M[k];
   }
   function fmt(n) { return (Math.round(n) || 0).toLocaleString('en-US'); }
@@ -61,7 +63,8 @@ function computeAll_(D, today) {
   D.expense.forEach(function (r) {
     if (!r.store || !r.month) return;
     const m = get(r.store, r.month);
-    if (r.type === '固定') m.fixed += n(r.amount); else m.other += n(r.amount);
+    if (isOldProfit_(r)) m.oldProfit -= n(r.amount);   // 舊帳月盈餘（只有舊表合計、沒有明細的月份）：不算支出，直接算進盈餘
+    else if (r.type === '固定') m.fixed += n(r.amount); else m.other += n(r.amount);
   });
   D.payroll.forEach(function (r) {
     if (!r.store || !r.month) return;
@@ -135,7 +138,7 @@ function computeAll_(D, today) {
     const fee = Math.round(feeAll + feeLine);
     const feeEst = (m.allpay > 0 && m.allpayN === null) || (m.line > 0 && m.lineN === null);
     if (status === '已結束' && feeEst) m.warns.push(['線上支付未對帳', '全支付／LINE Pay 月底實際入帳還沒填，手續費先用 ' + n(st.fee) + '% 估計']);
-    const profit = actual - m.purchase - m.staff - m.fixed - m.other - fee + m.cashDiff;   // 現金差額一律算進盈餘（多收加、短少扣）
+    const profit = actual - m.purchase - m.staff - m.fixed - m.other - fee + m.cashDiff + m.oldProfit;   // 現金差額一律算進盈餘（多收加、短少扣）
     const dist = profit - m.bonus - m.reserve - m.deductOther;
     if (status === '已結束' && dist < 0) m.warns.push(['虧損', '可分配金額為負數 ' + fmt(dist) + '，股東分紅會是負的']);
 
@@ -143,7 +146,7 @@ function computeAll_(D, today) {
       pandaG: m.pandaG, pandaN: m.pandaN, uberG: m.uberG, uberN: m.uberN, actual: actual,
       allpay: m.allpay, line: m.line, allpayN: m.allpayN, lineN: m.lineN, feeEst: feeEst,
       avg: m.days ? Math.round(actual / m.days) : 0, purchase: m.purchase, staff: m.staff,
-      fixed: m.fixed, other: m.other, fee: fee, cashDiff: m.cashDiff, profit: profit,
+      fixed: m.fixed, other: m.other, oldProfit: m.oldProfit, fee: fee, cashDiff: m.cashDiff, profit: profit,
       bonus: m.bonus, reserve: m.reserve, deductOther: m.deductOther, dist: dist, paid: m.paid, loan: m.loan, repay: m.repay,
       purchasePct: actual ? m.purchase / actual : 0, staffPct: actual ? m.staff / actual : 0,
       warnCount: m.warns.length });
@@ -231,4 +234,4 @@ function applyOp_(state, op, store) {
   return state;
 }
 
-if (typeof module !== 'undefined') module.exports = { computeAll_: computeAll_, applyOp_: applyOp_, prevMonth_: prevMonth_ };
+if (typeof module !== 'undefined') module.exports = { isOldProfit_: isOldProfit_, computeAll_: computeAll_, applyOp_: applyOp_, prevMonth_: prevMonth_ };

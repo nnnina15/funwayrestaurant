@@ -68,4 +68,9 @@ D4.deduct.push({ store: '大埔店', month: '2026-09', type: '員工借款', amo
 const sep4 = ctx.computeAll_(D4, '2026-11-01').months.find(m => m.month === '2026-09');
 assert.strictEqual(sep4.loan, 50000); assert.strictEqual(sep4.repay, 20000);
 assert.strictEqual(sep4.dist, base4.dist, '借還款不影響可分配'); assert.strictEqual(sep4.profit, base4.profit);
+// 舊帳月盈餘：不算進其他支出，直接算進盈餘
+const R5 = ctx.computeAll_({ stores: [{ name: 'A', fee: 2 }], partners: [], employees: {}, daily: [], purchase: [], payroll: [], delivery: [], deduct: [],
+  expense: [{ store: 'A', month: '2022-01', type: '其他', item: '舊表月盈餘（只有合計）', amount: -4254 }, { store: 'A', month: '2022-01', type: '其他', item: '菜單', amount: 100 }] }, '2026-11-01');
+const j5 = R5.months[0];
+assert.deepStrictEqual([j5.profit, j5.other, j5.oldProfit], [4154, 100, 4254], '舊帳盈餘不算支出');
 console.log('全部測試通過 ✓');
