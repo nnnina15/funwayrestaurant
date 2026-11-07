@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.17.5">
+<meta name="app-version" content="4.17.6">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -680,6 +680,20 @@
   /* 左下角的按鈕不要蓋到內容：畫面不夠寬（內容貼到左邊）時，左邊多留一點空 */
   @media (min-width: 900px) and (max-width: 1540px) { body.page-wide main { padding-left: 66px; } }
   @media (min-width: 900px) and (max-width: 1040px) { main { padding-left: 66px; } }
+
+  /* 手機／平板：三顆按鈕放進最上面的深色標題列右邊（不再浮在內容上，不會蓋到字） */
+  @media (max-width: 899px) {
+    body.has-bar #themeBtn, body.has-bar #warnBtn, body.has-bar #sync { position: fixed; left: auto; bottom: auto; top: calc(8px + env(safe-area-inset-top)); width: 36px; height: 36px; min-width: 36px; z-index: 7; box-shadow: none; }
+    body.has-bar #themeBtn { right: 12px; background: rgba(255,255,255,.14); color: #fff; border: 0; }
+    body.has-bar #sync { right: 54px; background: rgba(255,255,255,.14); color: #fff; border: 0; }
+    body.has-bar #sync:not(.open) { width: 36px; }
+    body.has-bar #sync .sync-ic { width: 34px; height: 34px; flex: 0 0 34px; font-size: 16px; color: #8fe0a8; }
+    body.has-bar #sync.pending .sync-ic, body.has-bar #sync.err .sync-ic { color: inherit; }
+    body.has-bar #warnBtn { right: 96px; font-size: 18px; }
+    body.has-bar #warnBtn b { top: -6px; right: -6px; min-width: 18px; height: 18px; line-height: 18px; font-size: 11px; }
+    body.has-bar #themeBtn svg { width: 19px; height: 19px; }
+    body.has-bar header h1 { max-width: calc(100% - 140px); }
+  }
 </style>
 </head>
 <body>
