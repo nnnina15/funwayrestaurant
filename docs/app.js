@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.18.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.18.1';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1092,10 +1092,11 @@ function renderPayrollTab(full) {
     if (!list.length) return;
     h += '<div class="grp"><div class="grp-h"><b>' + g[1] + '</b><span class="muted">' + list.length + ' 人｜小計 ' + money(sub(list)) + '</span></div><div class="emp-grid">' + list.map(btn).join('') + '</div></div>';
   });
+  $('s-emps-h').classList.toggle('hide', !h);   // 還沒人填：只留一句提示，不重複
   $('s-emps').innerHTML = (h || '<p class="muted">這個月還沒有人填，點下面的名字加入</p>') +
     '<p class="muted">本月人事成本合計：<b>' + money(total) + '</b></p>';
   $('s-roster').innerHTML = notYet.map(function (n) { return '<button onclick="openEmp(\'' + jsq(n) + '\')">＋' + esc(n) + '</button>'; }).join('');
-  $('s-roster-h').textContent = rosterNames.length ? (notYet.length ? '名單上這個月還沒填的人，點名字加入' : '') : '員工名單是空的，可以到試算表「設定_員工」新增';
+  $('s-roster-h').textContent = rosterNames.length ? (notYet.length && h ? '名單上這個月還沒填的人，點名字加入' : '') : '員工名單是空的，可以到試算表「設定_員工」新增';
   if (full) $('s-editor').classList.toggle('hide', !ST.emp);
 }
 // 這個人放哪一組：員工名單的類型 → 自己選過的（正職／計時） → 有時數×時薪就算計時 → 其他
@@ -1359,7 +1360,7 @@ function renderDeliveryTab() {
   var pay = { '全支付': 0, 'LINE Pay': 0 };
   V.daily.forEach(function (x) { if (x.date.slice(0, 7) === month && !x.closed) { pay['全支付'] += Number(x.allpay || 0); pay['LINE Pay'] += Number(x.line || 0); } });
   ST.op = pay;
-  $('v-body').insertAdjacentHTML('beforeend', '<div class="dv"><div class="dv-h"><span>全支付／LINE Pay 月底入帳</span><span class="muted">手續費＝實際入帳－本月收款</span></div><table><thead><tr><th></th><th>本月收款</th><th>月底實際入帳</th><th>手續費</th></tr></thead><tbody>' +
+  $('v-body').insertAdjacentHTML('beforeend', '<div class="dv"><div class="dv-h"><span>全支付／LINE Pay 月底入帳</span><span class="muted">手續費＝實際入帳－本月收款</span></div><table><thead><tr><th></th><th>本月收款</th><th>實際入帳</th><th>手續費</th></tr></thead><tbody>' +
     ['全支付', 'LINE Pay'].map(function (p, i) {
       var rec = V.delivery.filter(function (x) { return x.month === month && x.platform === p; })[0];
       return '<tr><th>' + p + pendTag('delivery', month + '|' + p) + '</th><td class="n">' + money(pay[p]) + '</td>' +
