@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.17.7">
+<meta name="app-version" content="4.17.8">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -431,9 +431,10 @@
   .h2row select { width: auto; padding: 5px 10px; font-size: 14px; font-weight: 700; }
 
   /* 日期／月份：顯示自己的格式，真正的輸入框疊在上面（點了還是跳出日曆） */
-  .pk { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 1; min-width: 0; }
+  .pk { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 1; min-width: 0; overflow: hidden; }   /* iPhone 的日期框會比框框大，蓋到旁邊的箭頭：裁掉 */
   .pk-label { font-weight: 700; white-space: nowrap; padding: 4px 8px; pointer-events: none; color: var(--ink); }
-  .pk input { position: absolute; inset: 0; width: 100% !important; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: 0; }
+  .pk input { position: absolute; inset: 0; width: 100% !important; min-width: 0 !important; max-width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: 0; -webkit-appearance: none; appearance: none; z-index: 1; }
+  .stepper > .step { position: relative; z-index: 2; }   /* 左右箭頭永遠在日期框上面，按箭頭不會打開日曆 */
   #pickbar .pk-label { font-size: 16px; min-width: 96px; text-align: center; }
   @media (max-width: 899px) { header #pickbar .pk-label { font-size: 15px; min-width: 84px; padding: 4px 4px; } }
   main { zoom: var(--fz, 1); }
@@ -653,7 +654,7 @@
     header #pickbar input::-webkit-calendar-picker-indicator { display: none; }
     header #pickbar input[type=date] { width: 96px; } header #pickbar input[type=month] { width: 96px; }
     header #pickbar.multi input[type=month] { width: 120px; }
-    header #pickbar .step { width: 26px; height: 26px; font-size: 17px; }
+    header #pickbar .step { width: 34px; height: 30px; font-size: 18px; }
     header #pickbar .pin, header #pickbar #ov-month-pick, header #pickbar #ov-year-pick, header #pickbar #ov-seg { box-shadow: none; }
     body.has-bar #sync { position: fixed; z-index: 7; left: 16px; bottom: calc(144px + env(safe-area-inset-bottom)); height: 48px; min-width: 48px;
       display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px;
