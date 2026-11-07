@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.14';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.15';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -605,9 +605,16 @@ function refreshTab(full) {
 }
 
 /* ---------- 資料：雲端快照 + 還沒上傳的操作 ---------- */
+// 畫面上看到的資料＝試算表資料＋還沒上傳的變更。資料沒變就沿用上次算好的（切換分頁、總覽不用每次重算 4 年）
+// 注意：拿到的是共用的資料，畫面程式只能讀、不能改（要排序請先 slice()）
+var VCACHE = {};
+function sameData(c) { var o = ST.outbox, last = o.length ? o[o.length - 1].id : ''; return c.snap === ST.snap && c.data === (ST.snap && ST.snap.data) && c.out === o && c.n === o.length && c.last === last && c.store === (ST.sess && ST.sess.store); }
+function markData(c) { var o = ST.outbox; c.snap = ST.snap; c.data = ST.snap && ST.snap.data; c.out = o; c.n = o.length; c.last = o.length ? o[o.length - 1].id : ''; c.store = ST.sess && ST.sess.store; }
 function view() {
+  if (VCACHE.v && sameData(VCACHE)) return VCACHE.v;
   var st = JSON.parse(JSON.stringify(ST.snap.data));
   ST.outbox.forEach(function (op) { applyOp_(st, op, ST.sess.store); });
+  markData(VCACHE); VCACHE.v = st;
   return st;
 }
 function pendingIds() {
@@ -1780,11 +1787,16 @@ function kpi(label, v, sub, main) {
   return '<div class="kpi' + (main ? ' main' : '') + '"><div class="k">' + label + '</div><div class="v' + (typeof v === 'number' ? sgn(v) : '') + '">' +
     (typeof v === 'number' ? money(v) : v) + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
 }
+var CCACHE = {};
 function computeLocal() {
   var store = ST.sess.store, V = view(), C = ST.snap.config;
+  var cfg = JSON.stringify([C.store, C.partners, (C.employees || []).map(function (e) { return e.name; }), todayStr()]);
+  if (CCACHE.r && CCACHE.V === V && CCACHE.cfg === cfg) return CCACHE.r;   // 資料和設定都沒變：用上次算好的
   var emps = {}; emps[store] = (C.employees || []).map(function (e) { return e.name; });
-  return { V: V, C: C, R: computeAll_({ stores: [C.store], partners: C.partners || [], employees: emps,
+  var r = { V: V, C: C, R: computeAll_({ stores: [C.store], partners: C.partners || [], employees: emps,
     daily: V.daily, purchase: V.purchase, expense: V.expense, payroll: V.payroll, delivery: V.delivery, deduct: V.deduct }, todayStr()) };
+  CCACHE = { r: r, V: V, cfg: cfg };
+  return r;
 }
 
 /* ---------- 年度總覽：像舊表「總計」頁 ---------- */
