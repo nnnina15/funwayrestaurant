@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.9';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.10';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -684,6 +684,8 @@ function relogin() {
 function onSyncClick() {
   if (ST.authLost) return relogin();
   var b = $('sync');
+  // 手機／平板：按鈕在標題列、沒空間展開文字 → 直接同步，狀態用提示文字顯示
+  if (document.body.classList.contains('has-bar') && window.matchMedia && window.matchMedia('(max-width: 899px)').matches) { toast(b.title || '同步'); trySync(true); return; }
   if (!b.classList.contains('open')) { b.classList.add('open'); syncAutoClose(); return; }
   trySync(true);
 }
