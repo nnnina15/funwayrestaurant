@@ -241,7 +241,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-summary.png'), fullPage: true });
   // 店長：看得到總覽、人事、外送對帳、分紅扣除；和管理一樣，只是看不到別家店
   const tabsA = await A.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent));
-  assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '固定/其他支出', '總覽', '人事', '外送對帳', '分紅扣除', '借還款', '裝置'], '店長的分頁');
+  assert.deepStrictEqual(tabsA, ['每日結帳', '進貨', '固定/其他支出', '總覽', '人事', '平台對帳', '分紅扣除', '借還款', '裝置'], '店長的分頁');
   await A.pg.click('#tb-payroll'); await A.pg.waitForTimeout(200);
   assert.ok(!(await A.pg.isVisible('#tab-payroll .ro-note')), '店長可以改人事（沒有「只能看」）');
   await A.pg.click('#tb-delivery'); await A.pg.waitForTimeout(200);
@@ -424,9 +424,9 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.setViewportSize({ width: 390, height: 844 });
   assert.ok(await B.pg.isVisible('#bottombar') && !(await B.pg.isVisible('#tabs')), '手機要用下方分頁列');
   assert.deepStrictEqual(await B.pg.$$eval('#tabs button', bs => bs.map(b => b.textContent)),
-    ['每日結帳', '進貨', '固定/其他支出', '總覽', '人事', '外送對帳', '分紅扣除', '借還款', '裝置'], '分頁順序');
+    ['每日結帳', '進貨', '固定/其他支出', '總覽', '人事', '平台對帳', '分紅扣除', '借還款', '裝置'], '分頁順序');
   assert.deepStrictEqual(await B.pg.$$eval('#bottombar button', bs => bs.map(b => b.textContent)), ['結帳', '進貨', '支出', '總覽', '更多']);
-  assert.deepStrictEqual(await B.pg.$$eval('#moregrid button', bs => bs.map(b => b.textContent)), ['人事', '外送對帳', '分紅扣除', '借還款', '裝置']);
+  assert.deepStrictEqual(await B.pg.$$eval('#moregrid button', bs => bs.map(b => b.textContent)), ['人事', '平台對帳', '分紅扣除', '借還款', '裝置']);
   await B.pg.click('#bb-more'); await B.pg.click('#moregrid button:has-text("人事")');
   assert.ok(await B.pg.isVisible('#tab-payroll') && (await B.pg.getAttribute('#bb-more', 'class')).includes('on'));
   await B.pg.click('#bb-daily');

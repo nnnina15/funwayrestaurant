@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.2';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -23,7 +23,7 @@ function isBuiltinUrl(u) { return !!DEFAULT_URL && u === DEFAULT_URL; }
 // [代號, 名稱, 只限管理]　手機下方列放前 4 個，其餘收進「更多」（同樣順序）
 var TABS = [
   ['daily', '每日結帳', false], ['purchase', '進貨', false], ['expense', '固定/其他支出', true],
-  ['overview', '總覽', true], ['payroll', '人事', true], ['delivery', '外送對帳', true],
+  ['overview', '總覽', true], ['payroll', '人事', true], ['delivery', '平台對帳', true],
   ['deduct', '分紅扣除', true], ['loan', '借還款', true], ['settings', '裝置', false]
 ];
 var SHORT = { daily: '結帳', purchase: '進貨', expense: '支出', overview: '總覽', settings: '裝置' };
@@ -1276,7 +1276,7 @@ function savePayroll() {
   renderPayrollTab(false);
 }
 
-/* ---------- 外送對帳 ---------- */
+/* ---------- 平台對帳（外送平台、線上支付；試算表分頁名稱還是「外送對帳」） ---------- */
 // 對帳單項目：[代號, 名稱, 是否為扣項]
 var DV_ROWS = [['gross', '費用明細（訂單金額）', false], ['commission', '佣金', true], ['monthly', '月費', true], ['reject', '拒單費用', true], ['other', '其他調整', false]];
 function dvPeriods(platform, month, split) {
@@ -2090,7 +2090,7 @@ function renderSummaryTab() {
 
 /* ---------- 裝置設定 ---------- */
 var OP_NAMES = { 'presets.set': '常用項目設定', 'daily.upsert': '每日結帳', 'purchase.add': '新增進貨', 'purchase.del': '刪除進貨', 'expense.add': '新增支出',
-  'expense.del': '刪除支出', 'deduct.add': '新增扣除', 'deduct.del': '刪除扣除', 'payroll.upsert': '人事', 'payroll.slip': '日結→人事', 'delivery.upsert': '外送對帳' };
+  'expense.del': '刪除支出', 'deduct.add': '新增扣除', 'deduct.del': '刪除扣除', 'payroll.upsert': '人事', 'payroll.slip': '日結→人事', 'delivery.upsert': '平台對帳' };
 function opLabel(op) {
   if (!op) return '';
   var d = op.data || {};
