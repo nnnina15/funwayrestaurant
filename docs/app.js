@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.8';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.9';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1698,11 +1698,11 @@ function renderLoanYears() {
       recs.forEach(function (d) { if (String(d.month) === m && d.type === type) { var n = who(d); if (!(n in by)) { by[n] = 0; order.push(n); } by[n] += Number(d.amount || 0); } });
       return order.length ? order.map(function (n) { return '<div class="xl-p"><span>' + esc(n) + '</span><b>' + money(by[n]) + '</b></div>'; }).join('') : '<span class="muted">—</span>';
     };
-    // 1 月在最上面往下排；月底未收回放在月份旁邊（右邊會被浮動按鈕蓋住）
-    $('xl-years').innerHTML = pre + '<div class="xscroll"><table class="ytable xl-mt"><thead><tr><th class="n">月份</th><th class="n">月底未收回</th><th>借出</th><th>還款</th></tr></thead><tbody>' +
+    // 1 月在最上面往下排；月底未收回放最右邊
+    $('xl-years').innerHTML = pre + '<div class="xscroll"><table class="ytable xl-mt"><thead><tr><th class="n">月份</th><th>借出</th><th>還款</th><th class="n">月底未收回</th></tr></thead><tbody>' +
       cols.map(function (m) { var v = owe(m);
-        return '<tr><th class="n">' + head(m) + '</th>' + cell(v, v > 0 ? 'neg' : '') + '<td class="xl-out">' + list(m, '員工借款') + '</td><td class="xl-back">' + list(m, '員工還款') + '</td></tr>'; }).join('') +
-      '</tbody><tfoot><tr class="yrow"><th class="n">' + y + ' 合計</th>' + cell(owe(cols[cols.length - 1]), 'neg') + '<td class="n">' + money(sumOf(function (x) { return x.slice(0, 4) === y; }, '員工借款')) + '</td><td class="n">' + money(sumOf(function (x) { return x.slice(0, 4) === y; }, '員工還款')) + '</td></tr></tfoot></table></div>';
+        return '<tr><th class="n">' + head(m) + '</th><td class="xl-out">' + list(m, '員工借款') + '</td><td class="xl-back">' + list(m, '員工還款') + '</td>' + cell(v, v > 0 ? 'neg' : '') + '</tr>'; }).join('') +
+      '</tbody><tfoot><tr class="yrow"><th class="n">' + y + ' 合計</th><td class="n">' + money(sumOf(function (x) { return x.slice(0, 4) === y; }, '員工借款')) + '</td><td class="n">' + money(sumOf(function (x) { return x.slice(0, 4) === y; }, '員工還款')) + '</td>' + cell(owe(cols[cols.length - 1]), 'neg') + '</tr></tfoot></table></div>';
     return;
   }
   $('xl-years').innerHTML = pre + '<div class="xscroll"><table class="ytable eq" style="min-width:' + (120 + cols.length * 100) + 'px"><thead><tr><th></th>' +
