@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.15';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.18.0';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -409,7 +409,7 @@ function switchStore(name) {
   if (ST.snap) { enterApp(); trySync(); return; }
   if (navigator.onLine === false) { ST.sess.store = prev; LS.set('fw_sess', ST.sess); loadLocal(); enterApp(); return toast('「' + name + '」還沒下載過，請先連上網路'); }
   busy(true);
-  api('sync', { account: ST.sess.account, token: ST.sess.token, store: name, ops: [] }).then(function (r) {
+  api('sync', { account: ST.sess.account, token: ST.sess.token, store: name, ops: [], have: haveOf(name) }).then(function (r) {
     busy(false); acceptPull(r, name);
     if (ST.sess.store !== name) return;  // 又切去別家了
     enterApp(); toast('已切換到 ' + name);
@@ -434,18 +434,42 @@ function logout() {
   showView('login');
 }
 
+// 同步時帶上手上每一段資料的指紋（每張表按年份切段）：試算表那邊沒變的段就不再下載
+function haveOf(store) {
+  var sn = (!store || store === (ST.sess && ST.sess.store)) ? ST.snap : LS.get(k_('snap', store), null);
+  return sn && sn.hashes && sn.data ? sn.hashes : {};
+}
+function partYear(r) { return String(r.date || r.month || '').slice(0, 4); }
 function acceptPull(r, store) {
-  var snap = { config: r.config, data: r.data, serverTime: r.serverTime };
-  if (r.stores && ST.sess) {
-    var changed = (ST.sess.stores || []).join('|') !== r.stores.join('|');
-    ST.sess.stores = r.stores; if (r.role) ST.sess.role = r.role; LS.set('fw_sess', ST.sess);
-    if (changed && !$('v-app').classList.contains('hide')) renderTitle();   // 試算表新增／移除店家：店別選單馬上更新
+  var other = store && ST.sess && store !== ST.sess.store;
+  var old = other ? LS.get(k_('snap', store), null) : ST.snap;
+  var data = r.data || {}, same = false;
+  if (r.parts && r.hashes) {   // 新版試算表程式：只回傳有變的段，其他段沿用手上的
+    var od = (old && old.hashes && old.data) || {}, byPart = {}, changed = Object.keys(r.parts).length > 0;
+    Object.keys(od).forEach(function (k) { (od[k] || []).forEach(function (x) { var pk = k + '|' + partYear(x); (byPart[pk] = byPart[pk] || []).push(x); }); });
+    var keys = Object.keys(r.hashes).sort(), merged = {};
+    keys.forEach(function (pk) {
+      var k = pk.split('|')[0], rows = r.parts[pk] !== undefined ? r.parts[pk] : (byPart[pk] || []);
+      merged[k] = (merged[k] || []).concat(rows);
+    });
+    // 原本有、這次沒有的段（例如整年刪光）也算有變
+    if (!changed && old && old.hashes) changed = Object.keys(old.hashes).some(function (pk) { return !(pk in r.hashes); });
+    same = !changed && !!(old && old.data);
+    data = same ? old.data : merged;
   }
-  if (store && store !== ST.sess.store) { LS.set(k_('snap', store), snap); LS.set(k_('last', store), nowStr()); return; }
-  ST.snap = snap;
+  var snap = { config: r.config, data: data, hashes: r.hashes || null, serverTime: r.serverTime };
+  var cfgSame = old && JSON.stringify(old.config) === JSON.stringify(r.config);
+  if (r.stores && ST.sess) {
+    var stChanged = (ST.sess.stores || []).join('|') !== r.stores.join('|');
+    ST.sess.stores = r.stores; if (r.role) ST.sess.role = r.role; LS.set('fw_sess', ST.sess);
+    if (stChanged && !$('v-app').classList.contains('hide')) renderTitle();   // 試算表新增／移除店家：店別選單馬上更新
+  }
+  if (other) { if (!(same && cfgSame)) LS.set(k_('snap', store), snap); LS.set(k_('last', store), nowStr()); return; }
   ST.lastSync = nowStr();
-  LS.set(k_('snap'), ST.snap);
   LS.set(k_('last'), ST.lastSync);
+  if (same && cfgSame && ST.snap) { ST.snap.serverTime = r.serverTime; return; }   // 什麼都沒變：不用重存（存一次要寫好幾 MB）
+  ST.snap = snap;
+  LS.set(k_('snap'), ST.snap);
 }
 
 /* ---------- 進入主畫面 ---------- */
@@ -642,7 +666,7 @@ function trySync(manual) {
   if (navigator.onLine === false) { renderStatus(); if (manual) toast('目前沒有網路，資料已存在這台裝置'); return; }
   ST.syncing = true; renderStatus();
   var batch = ST.outbox.slice(0, 40), store = ST.sess.store;
-  api('sync', { account: ST.sess.account, store: store, token: ST.sess.token, ops: batch }).then(function (r) {
+  api('sync', { account: ST.sess.account, store: store, token: ST.sess.token, ops: batch, have: haveOf(store) }).then(function (r) {
     // 同步途中切換了店：結果記回原本那家店，不能蓋到現在這家店
     if (!ST.sess || ST.sess.store !== store) {
       ST.syncing = false;
@@ -680,7 +704,7 @@ function syncOtherStores() {
     var ob = LS.get(k_('outbox', st), []);
     if (!ob.length) return;
     var batch = ob.slice(0, 40);
-    api('sync', { account: ST.sess.account, store: st, token: ST.sess.token, ops: batch }).then(function (r) {
+    api('sync', { account: ST.sess.account, store: st, token: ST.sess.token, ops: batch, have: haveOf(st) }).then(function (r) {
       if (ST.sess) finishOther(st, batch, r);
     }, function () { /* 下次再試 */ });
   });
@@ -766,7 +790,7 @@ function renderStatus() {
   if (navigator.onLine === false) return set('離線｜已全部上傳', '✓');
   set((ST.lastSync ? ST.lastSync.slice(11, 16) + ' ' : '') + '已同步', '✓');
 }
-var NEED_SERVER = '4.8.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
+var NEED_SERVER = '4.9.0';   // 試算表 Code.gs 至少要這一版（和 Code.gs 的 SERVER_VERSION 對應）
 function verNum(v) { return String(v || '0').split('.').reduce(function (a, x) { return a * 1000 + Number(x || 0); }, 0); }
 function renderBanner() {
   var h = '';

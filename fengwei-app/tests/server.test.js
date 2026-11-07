@@ -245,4 +245,14 @@ assert.ok(mgrTry.ok && mgrTry.results[0].status === 'ok', '店長可以改自己
 const sdOther = g.post({ action: 'sync', store: '大埔店', account: sdm.account, token: sdm.token, ops: [op('employees.set', { items: [] })] });
 assert.ok(!sdOther.ok && /權限/.test(sdOther.error), '店長不能改別家店');
 assert.ok(g.rows(S.EMP).some(e => e['店別'] === '大埔店'), '別家店的員工不受影響');
+// 同步變快：帶上次的指紋，沒變的表不再傳
+const full = g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, ops: [] });
+assert.ok(full.hashes && full.data.purchase.length > 0, '第一次拿全部＋指紋');
+assert.ok(Object.keys(full.hashes).some(k => /^purchase\|\d{4}$/.test(k)), '每張表按年份切段：' + Object.keys(full.hashes).join(','));
+const again = g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, ops: [], have: full.hashes });
+assert.deepStrictEqual(Object.keys(again.parts), [], '都沒變：一段都不用傳');
+const add1 = g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, have: full.hashes, ops: [op('purchase.add', { id: 'hz1', date: '2026-10-02', cat: '麵', amount: 99 })] });
+assert.deepStrictEqual(Object.keys(add1.parts), ['purchase|2026'], '只有 2026 進貨變了，只傳那一段');
+assert.ok(add1.parts['purchase|2026'].some(p => p.id === 'hz1'));
+g.post({ action: 'sync', store: '大埔店', account: adm.account, token: adm.token, ops: [op('purchase.del', { id: 'hz1' })] });
 console.log('同步服務測試通過 ✓');

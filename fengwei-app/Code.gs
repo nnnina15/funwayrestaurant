@@ -1,5 +1,5 @@
-const SERVER_VERSION = '4.8.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
-const SERVER_NOTES = '店長和管理功能一樣（只能看、改自己的店）';   // 「⑤ 更新程式」會顯示這段說明
+const SERVER_VERSION = '4.9.0';   // 和 App 的 NEED_SERVER 一起改：App 會檢查試算表程式有沒有更新
+const SERVER_NOTES = '同步變快：沒有變動的資料不再重複下載';   // 「⑤ 更新程式」會顯示這段說明
 const UPDATE_BASES = ['https://nnnina15.github.io/funwayrestaurant/docs/', 'https://nnnina15.github.io/funwayrestaurant/'];   // 只從你自己的 GitHub Pages 抓程式（根目錄或 docs 發布都可以）
 /**
  * 風味記帳系統 v2（離線版的同步服務）
@@ -571,7 +571,7 @@ function sync_(req) {
     });
   }
   const s2 = changed ? (stores_().filter(function (x) { return x.name === s.name; })[0] || s) : s;   // 店家設定可能剛改過
-  return Object.assign({ ok: true, account: acc.name, role: role, stores: list, results: results }, pull_(s2, role));
+  return Object.assign({ ok: true, account: acc.name, role: role, stores: list, results: results }, pull_(s2, role, req.have && typeof req.have === 'object' ? req.have : null));
 }
 
 /* ---------- 登入權杖：改 PIN、停用帳號，舊權杖就自動失效 ---------- */
@@ -827,7 +827,9 @@ function byId_(store, id) { return function (x) { return str_(x['店別']) === s
 
 /* ---------- 回傳給 App 的資料 ---------- */
 
-function pull_(s, role) {
+// 資料指紋：每張表算一個短碼，App 下次同步帶回來，沒變的表就不用再傳（中正店進貨就有上萬筆）
+function hashOf_(v) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(v))).slice(0, 22); }
+function pull_(s, role, have) {
   const all = role === 'admin' || role === 'manager';   // 管理、店長：全部資料（店長和管理功能一樣，只是看不到別家店）
   const since = prevMonth_(Utilities.formatDate(new Date(), TZ, 'yyyy-MM'));   // 員工只拿上個月起的結帳、進貨、支出
   const mine = function (r) { return r.store === s.name; };
@@ -850,8 +852,18 @@ function pull_(s, role) {
     partners: all ? partners_().filter(mine) : [],
     kinds: PAYROLL_KINDS, expenseTypes: EXPENSE_TYPES, deductTypes: DEDUCT_TYPES
   };
-  return { config: config, data: data, serverTime: now_() };
+  // 每張表按年份切段、每段一個指紋（例：purchase|2026）。App 帶了上次的指紋（have）就只回傳有變的段（parts）
+  const parts = {}, hashes = {};
+  Object.keys(data).forEach(function (k) {
+    data[k].forEach(function (r) { const pk = k + '|' + partYear_(r); (parts[pk] = parts[pk] || []).push(r); });
+    if (!data[k].length) parts[k + '|'] = [];
+  });
+  Object.keys(parts).forEach(function (pk) { hashes[pk] = hashOf_(parts[pk]); });
+  if (!have) return { config: config, data: data, hashes: hashes, serverTime: now_() };
+  Object.keys(parts).forEach(function (pk) { if (have[pk] === hashes[pk]) delete parts[pk]; });
+  return { config: config, parts: parts, hashes: hashes, serverTime: now_() };
 }
+function partYear_(r) { return String(r.date || r.month || '').slice(0, 4); }
 
 const rec_ = {
   preset: function (r) {
