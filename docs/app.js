@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.12';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.13';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -491,7 +491,24 @@ function reportErr(where, e) {
   try { (ST.failed = ST.failed || []).push({ at: nowStr(), op: { type: '畫面錯誤' }, msg: msg }); saveOutbox(); } catch (x) { /* ignore */ }
   toast('⚠ 畫面出錯：' + msg + '（請截圖給管理者，重新整理通常就好）');
 }
-window.addEventListener('error', function (ev) { reportErr('', ev.error || ev.message); });
+ST.bootAt = Date.now();
+window.addEventListener('error', function (ev) {
+  var msg = (ev.error && ev.error.message) || ev.message || '';
+  var where = ev.filename ? String(ev.filename).split('/').pop().split('?')[0] + ':' + (ev.lineno || '') : '';
+  // 剛打開（或剛更新版本）幾秒內就出錯：多半是新舊版本檔案交接的一瞬間 → 自動重新整理一次（同一次只試一次）
+  if (Date.now() - ST.bootAt < 10000) {
+    var tried = false; try { tried = sessionStorage.getItem('fw_err_reload') === APP_VERSION; } catch (x) { /* ignore */ }
+    if (!tried && !ST.reloading) {
+      try { sessionStorage.setItem('fw_err_reload', APP_VERSION); } catch (x) { /* ignore */ }
+      try { if (ST.outbox) saveOutbox(); } catch (x) { /* ignore */ }
+      ST.reloading = true; location.reload(); return;
+    }
+  }
+  // 「Script error.」是瀏覽器把細節藏起來的錯誤（常見：外掛、翻譯、更新中），附上來源方便查
+  if (/^Script error\.?$/i.test(msg)) msg = '瀏覽器回報不明錯誤' + (where ? '（' + where + '）' : '（來源不明，可能是瀏覽器外掛或更新中）');
+  else if (where) msg += '（' + where + '）';
+  reportErr('', msg);
+});
 function openSettings() { showTab('settings'); }
 function openMore() { $('moresheet').classList.remove('hide'); }
 function closeMore() { $('moresheet').classList.add('hide'); }
