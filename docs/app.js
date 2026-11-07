@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.11';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.12';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
