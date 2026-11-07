@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.13';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.14';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1324,11 +1324,11 @@ function renderDeliveryTab() {
     return '<div class="dv" id="dv-' + p + '"></div>';
   }).join('');
   ['Panda', 'Uber'].forEach(function (p) { renderDv(p, gross[p]); });
-  // 全支付／LINE Pay：填月底實際入帳，手續費＝收款－入帳
+  // 全支付／LINE Pay：填月底實際入帳，手續費＝實際入帳－本月收款（正常是負數＝被扣掉的錢）
   var pay = { '全支付': 0, 'LINE Pay': 0 };
   V.daily.forEach(function (x) { if (x.date.slice(0, 7) === month && !x.closed) { pay['全支付'] += Number(x.allpay || 0); pay['LINE Pay'] += Number(x.line || 0); } });
   ST.op = pay;
-  $('v-body').insertAdjacentHTML('beforeend', '<div class="dv"><div class="dv-h"><span>全支付／LINE Pay 月底入帳</span><span class="muted">手續費＝收款－實際入帳</span></div><table><thead><tr><th></th><th>本月收款</th><th>月底實際入帳</th><th>手續費</th></tr></thead><tbody>' +
+  $('v-body').insertAdjacentHTML('beforeend', '<div class="dv"><div class="dv-h"><span>全支付／LINE Pay 月底入帳</span><span class="muted">手續費＝實際入帳－本月收款</span></div><table><thead><tr><th></th><th>本月收款</th><th>月底實際入帳</th><th>手續費</th></tr></thead><tbody>' +
     ['全支付', 'LINE Pay'].map(function (p, i) {
       var rec = V.delivery.filter(function (x) { return x.month === month && x.platform === p; })[0];
       return '<tr><th>' + p + pendTag('delivery', month + '|' + p) + '</th><td class="n">' + money(pay[p]) + '</td>' +
@@ -1339,10 +1339,11 @@ function renderDeliveryTab() {
 function opCalc() {
   ['全支付', 'LINE Pay'].forEach(function (p, i) {
     var raw = $('op-' + i).value.trim(), g = ST.op[p], el = $('op-fee-' + i);
-    if (raw === '') { el.innerHTML = g ? '<span class="muted">估計 ' + money(g * (ST.snap.config.store.fee || 0) / 100) + '</span>' : '—'; return; }
+    if (raw === '') { el.innerHTML = g ? '<span class="muted">估計 ' + money(-g * (ST.snap.config.store.fee || 0) / 100) + '</span>' : '—'; return; }
     var net = expr(raw); if (isNaN(net)) { el.innerHTML = '<span class="bad">看不懂</span>'; return; }
-    var fee = g - net;
-    el.innerHTML = '<span class="' + (fee < 0 ? 'warn' : '') + '">' + money(fee) + '</span>' + (g ? '<br><small class="muted">' + pct(fee / g) + '</small>' : '');
+    var diff = net - g;   // 實際入帳－本月收款：正常是負的（被平台扣掉）；變正的＝實收比收款多，帳有問題
+    el.innerHTML = '<span class="' + (diff > 0 ? 'warn' : 'neg') + '">' + money(diff) + '</span>' + (g ? '<br><small class="muted">' + pct(diff / g) + '</small>' : '') +
+      (diff > 0 ? '<br><small class="warn">實收比收款多，請檢查</small>' : '');
   });
 }
 function dvNet(o) {

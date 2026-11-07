@@ -224,7 +224,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   // 線上支付：11 月全支付收款 575，月底實際入帳 560 → 手續費 15；月結不再顯示「估計」
   await B.pg.click('#tb-delivery'); await B.pg.fill('#v-month', '2026-11'); await B.pg.dispatchEvent('#v-month', 'change');
   await B.pg.fill('#op-0', '560'); await B.pg.dispatchEvent('#op-0', 'input');
-  assert.ok((await B.pg.textContent('#op-fee-0')).startsWith('15'), await B.pg.textContent('#op-fee-0'));
+  assert.ok((await B.pg.textContent('#op-fee-0')).startsWith('-15'), await B.pg.textContent('#op-fee-0'));
   await B.pg.fill('#op-1', '3640'); await B.pg.dispatchEvent('#op-1', 'input');
   await B.pg.click('#tab-delivery .primary');
   await B.pg.click('#tb-overview');
