@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.17.10">
+<meta name="app-version" content="4.17.11">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -696,6 +696,12 @@
     body.has-bar #themeBtn svg { width: 19px; height: 19px; }
     body.has-bar header h1 { max-width: calc(100% - 140px); }
     body.has-bar header #pickbar { flex: 1 1 100%; margin: 0; justify-content: center; }   /* 日期／月份一律放第二排，第一排右邊留給按鈕 */
+  }
+  /* 手機打字時（鍵盤打開）：藏起下面的分頁列、儲存鈕不黏在下面，不會浮在鍵盤上蓋住內容 */
+  @media (max-width: 899px) {
+    body.has-bar.kb #bottombar { display: none; }
+    body.has-bar.kb .sticky-save { position: static; }
+    body.has-bar.kb main { padding-bottom: 24px; }
   }
 </style>
 </head>

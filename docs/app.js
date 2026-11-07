@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.17.10';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.17.11';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -539,10 +539,16 @@ function updateStickyTop() {
   document.documentElement.style.setProperty('--sticky-top', (h + (tabsOn ? t.offsetHeight : 0)) + 'px');
   // 月份／日期列在內容上方（平板、電腦）也是黏在上面：底下會黏住的東西（人事的員工名字、表格標題）要排在它下面，不然會疊在一起
   var bar = $('pickbar'), under = h + (tabsOn ? t.offsetHeight : 0);
-  if (bar && bar.parentNode !== document.querySelector('header') && !bar.classList.contains('hide')) under += bar.offsetHeight;
+  if (bar && bar.parentNode !== document.querySelector('header') && !bar.classList.contains('hide')) under += bar.getBoundingClientRect().height;   // 用螢幕上實際的高度（字體放大時月份列也會變高）
   document.documentElement.style.setProperty('--sticky-under', under + 'px');
 }
 window.addEventListener('resize', function () { if (ST.sess) updateStickyTop(); });
+// 手機打字時：鍵盤跳出來，下面那排分頁會被推到鍵盤上面蓋住內容 → 打字時先藏起來
+(function () {
+  var typing = function (el) { return el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|date|month|file)$/.test(el.type))); };
+  document.addEventListener('focusin', function (e) { if (typing(e.target)) document.body.classList.add('kb'); });
+  document.addEventListener('focusout', function () { setTimeout(function () { if (!typing(document.activeElement)) document.body.classList.remove('kb'); }, 80); });
+})();
 
 function showTab(name) {
   try { showTab_(name); } catch (e) { reportErr('分頁「' + name + '」', e); }
