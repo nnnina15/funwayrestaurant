@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.17.3">
+<meta name="app-version" content="4.17.4">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -84,7 +84,7 @@
   header nav#tabs button:hover { background: rgba(255,255,255,.12); color: #fff; }
   header nav#tabs button.on { background: #fff; color: #1d1a17; }
   @media (min-width: 900px) {
-    body.has-bar #sync, body.app-on #sync { position: fixed; z-index: 7; right: 16px; bottom: calc(134px + env(safe-area-inset-bottom)); height: 48px; min-width: 48px;
+    body.has-bar #sync, body.app-on #sync { position: fixed; z-index: 7; left: 16px; bottom: calc(134px + env(safe-area-inset-bottom)); height: 48px; min-width: 48px;
       display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; margin: 0; box-sizing: border-box;
       background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15); font-size: 14px; padding: 0; }
     body.app-on #sync .sync-txt { display: none; }
@@ -108,7 +108,7 @@
     body.has-bar main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   }
   /* 需要注意：顯示模式上面的圓鈕（有幾項就顯示數字），點了跳出清單 */
-  #warnBtn { position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 7; width: 48px; height: 48px; padding: 0; border-radius: 50%;
+  #warnBtn { position: fixed; left: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 7; width: 48px; height: 48px; padding: 0; border-radius: 50%;
     background: var(--amber); color: #3d2600; border: 0; box-shadow: 0 6px 18px rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center;
     font-size: 22px; font-weight: 900; box-sizing: border-box; min-height: 0; -webkit-appearance: none; appearance: none; }
   #warnBtn.hide { display: none; }
@@ -623,7 +623,7 @@
   :root[data-theme="dark"] .logo-light { display: none; } :root[data-theme="dark"] .logo-dark { display: inline; }
 
   /* ===== 右下角：亮／暗切換 ===== */
-  #themeBtn { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 7; width: 48px; height: 48px; padding: 0;
+  #themeBtn { position: fixed; left: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 7; width: 48px; height: 48px; padding: 0;
     border-radius: 50%; background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15);
     display: flex; align-items: center; justify-content: center; }
   #themeBtn svg { width: 22px; height: 22px; }
@@ -643,7 +643,7 @@
     header #pickbar.multi input[type=month] { width: 120px; }
     header #pickbar .step { width: 26px; height: 26px; font-size: 17px; }
     header #pickbar .pin, header #pickbar #ov-month-pick, header #pickbar #ov-year-pick, header #pickbar #ov-seg { box-shadow: none; }
-    body.has-bar #sync { position: fixed; z-index: 7; right: 16px; bottom: calc(144px + env(safe-area-inset-bottom)); height: 48px; min-width: 48px;
+    body.has-bar #sync { position: fixed; z-index: 7; left: 16px; bottom: calc(144px + env(safe-area-inset-bottom)); height: 48px; min-width: 48px;
       display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px;
       background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0,0,0,.15); font-size: 14px; padding: 0; }
     body.has-bar #sync .sync-txt { display: none; }
