@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.1';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1061,7 +1061,11 @@ function dailyCalc() {
   var spend = cashSpend();
   var expected = site - v('d-allpay') - v('d-line') - spend;
   $('d-total').textContent = money(site + panda + uber);
-  $('d-spendv').textContent = spend ? '-' + money(spend) : '0';
+  // 總支出：正常顯示「-金額」；明細算出來是負的（例如把＋打成－）就顯示紅字提醒，不會出現「--」
+  var sv = $('d-spendv');
+  sv.textContent = spend > 0 ? '-' + money(spend) : spend < 0 ? '+' + money(-spend) + ' ⚠' : '0';
+  sv.classList.toggle('bad', spend < 0); sv.title = spend < 0 ? '支出明細加起來是負的，請檢查金額有沒有把＋打成－' : '';
+  Array.prototype.forEach.call(document.querySelectorAll('#d-lines input.amt'), function (inp) { var x = expr(inp.value); inp.classList.toggle('neg-bad', !isNaN(x) && x < 0); });
   $('d-expected').textContent = money(expected);
   var typed = $('d-cash').value.trim() !== '';
   var diff = v('d-cash') - expected, lim = ST.snap.config.store.cashWarn || 500;
@@ -1074,6 +1078,8 @@ function saveDaily() {
   var ids = ['d-site', 'd-panda', 'd-uber', 'd-allpay', 'd-line', 'd-cash'];
   if (ids.some(function (id) { return isNaN(v(id)); })) return toast('有欄位格式不對');
   if (ST.lines.some(function (l) { return String(l.amount).trim() !== '' && isNaN(expr(l.amount)); })) return toast('支出明細有金額看不懂');
+  var negL = ST.lines.filter(function (l) { return expr(l.amount) < 0; });
+  if (negL.length && !confirm('支出明細有負數金額：\n' + negL.map(function (l) { return (l.name || '（未命名）') + '　' + l.amount + ' ＝ ' + money(expr(l.amount)); }).join('\n') + '\n\n是不是把＋打成－了？確定要這樣存嗎？')) return;
   var closed = $('d-closed').checked;
   if (!closed && !v('d-site') && !v('d-panda') && !v('d-uber')) return toast('請輸入營業額，或勾選公休');
   var date = $('d-date').value;

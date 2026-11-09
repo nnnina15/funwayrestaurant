@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.19.0">
+<meta name="app-version" content="4.19.1">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -728,6 +728,8 @@
   body.calc-on #toast { bottom: calc(330px + env(safe-area-inset-bottom)) !important; }
   @media (pointer: coarse) { .negbtn { display: none; } }   /* 手機有計算機（有 − 鍵），不用另外的正負鈕 */
   body.calc-on #bottombar, body.calc-on .sticky-save { visibility: hidden; }
+  #d-spendv.bad { color: #ff8a75; }
+  input.neg-bad { border-color: var(--bad) !important; color: var(--bad); }
 </style>
 </head>
 <body>
