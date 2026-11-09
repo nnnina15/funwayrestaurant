@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.18.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.0';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -76,6 +76,89 @@ function applyFont() {
 }
 function setFont(f) { LS.set('fw_font', f); applyFont(); }
 
+/* ---------- 計算機鍵盤（手機／平板）：金額、時數這些格子點下去，跳出 App 自己的計算機，不跳系統鍵盤 ---------- */
+var CALC = { el: null, touch: window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false };
+function isNumField(el) { return el && el.tagName === 'INPUT' && el.hasAttribute('inputmode') && el.getAttribute('data-kb') !== 'sys'; }
+// 算式：支援 + − × ÷（先乘除後加減），回傳數字或 NaN
+function calcEval(s) {
+  s = String(s || '').replace(/[,\s]/g, '').replace(/×/g, '*').replace(/÷/g, '/');
+  if (s === '') return 0;
+  if (!/^[-+]?\d*\.?\d+([+\-*/][-+]?\d*\.?\d+)*$/.test(s)) return NaN;
+  var t = s.match(/(\d*\.?\d+)|[+\-*/]/g), out = [], op = '+', neg = false, i = 0;
+  // 拆成「加減的項」，每一項裡先算乘除
+  var terms = [], cur = null, mul = '*';
+  var push = function (n) { if (cur === null) cur = n; else cur = mul === '*' ? cur * n : cur / n; };
+  for (i = 0; i < t.length; i++) {
+    var k = t[i];
+    if (k === '+' || k === '-') {
+      if (cur === null && (i === 0 || t[i - 1] === '*' || t[i - 1] === '/')) { neg = k === '-' ? !neg : neg; continue; }   // 正負號
+      terms.push([op, cur]); op = k; cur = null; mul = '*'; neg = false;
+    } else if (k === '*' || k === '/') mul = k;
+    else { push((neg ? -1 : 1) * Number(k)); neg = false; }
+  }
+  terms.push([op, cur]);
+  var r = terms.reduce(function (a, x) { return x[1] === null ? NaN : (x[0] === '-' ? a - x[1] : a + x[1]); }, 0);
+  return isFinite(r) ? Math.round(r * 100) / 100 : NaN;
+}
+function calcBuild() {
+  if ($('calcpad')) return;
+  var keys = [['7', '8', '9', '÷', 'AC'], ['4', '5', '6', '×', '⌫'], ['1', '2', '3', '+', 'OK'], ['00', '0', '.', '−']];
+  var d = document.createElement('div'); d.id = 'calcpad'; d.className = 'hide';
+  d.innerHTML = '<div class="cp-show"><span id="cp-expr"></span><b id="cp-res"></b></div><div class="cp-keys">' +
+    keys.map(function (row) { return row.map(function (k) {
+      var cls = /[0-9.]/.test(k) ? 'n' : (k === 'OK' ? 'ok' : (k === 'AC' || k === '⌫' ? 'fn' : 'op'));
+      return '<button type="button" class="' + cls + '" data-k="' + k + '">' + k + '</button>'; }).join(''); }).join('') + '</div>';
+  document.body.appendChild(d);
+  // 用 pointerdown 而且不讓按鈕搶走焦點：游標一直留在原本的格子
+  d.addEventListener('pointerdown', function (e) { e.preventDefault(); var b = e.target.closest('button'); if (b) calcKey(b.getAttribute('data-k')); });
+}
+function calcShow() {
+  var el = CALC.el; if (!el) return;
+  var v = el.value, r = calcEval(v);
+  $('cp-expr').textContent = !v ? '0' : (v.length > 18 ? '…' + v.slice(-18) : v);   // 太長只顯示最後面
+  $('cp-res').textContent = /[+\-×÷*/]/.test(v.replace(/^-/, '')) ? (isNaN(r) ? '算式還沒打完' : '＝ ' + money(r)) : '';
+}
+function calcSet(v) { var el = CALC.el; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); calcShow(); }
+function calcKey(k) {
+  var el = CALC.el; if (!el) return;
+  var v = el.value, last = v.slice(-1), isOp = function (c) { return /[+\-×÷]/.test(c); };
+  if (k === 'AC') return calcSet('');
+  if (k === '⌫') return calcSet(v.slice(0, -1));
+  if (k === 'OK') return calcDone(true);
+  if (k === '−') k = '-';
+  if (isOp(k)) {
+    if (v === '' && k !== '-') return;               // 開頭只能打負號
+    if (isOp(last)) v = v.slice(0, -1);              // 連按兩個運算符號：換成新的
+    return calcSet(v + k);
+  }
+  if (k === '.') { var seg = v.split(/[+\-×÷]/).pop(); if (seg.indexOf('.') >= 0) return; if (seg === '') k = '0.'; }
+  calcSet(v + k);
+}
+// 按 OK 或離開這格：有乘除的算式先算成數字（加減的算式照舊保留，旁邊會顯示＝多少）
+function calcDone(close) {
+  var el = CALC.el; if (!el) return;
+  var intOnly = el.getAttribute('data-im') === 'numeric';   // 只能整數的格子（營業額、現金…）：有算式就算成整數
+  if (/[×÷]/.test(el.value) || (intOnly && /\d[+\-]/.test(el.value))) { var r = calcEval(el.value); if (!isNaN(r)) calcSet(String(intOnly ? Math.max(0, Math.round(r)) : r)); }
+  if (close) { el.blur(); calcHide(); }
+}
+function calcHide() { var p = $('calcpad'); if (p) p.classList.add('hide'); document.body.classList.remove('calc-on'); CALC.el = null; }
+function calcOpen(el) {
+  calcBuild(); CALC.el = el;
+  $('calcpad').classList.remove('hide'); document.body.classList.add('calc-on');
+  calcShow();
+  setTimeout(function () { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* ignore */ } }, 50);
+}
+if (CALC.touch) {
+  // 手機／平板：這些格子不叫出系統鍵盤（inputmode=none），改用 App 的計算機
+  document.addEventListener('focusin', function (e) {
+    var el = e.target;
+    if (isNumField(el)) { if (el.getAttribute('inputmode') !== 'none') { el.setAttribute('data-im', el.getAttribute('inputmode')); el.setAttribute('inputmode', 'none'); } calcOpen(el); }
+  });
+  document.addEventListener('focusout', function (e) {
+    if (CALC.el && e.target === CALC.el) { calcDone(false); setTimeout(function () { if (!isNumField(document.activeElement)) calcHide(); }, 60); }
+  });
+}
+
 /* ---------- 本機儲存 ---------- */
 var LS = {
   get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -124,6 +207,7 @@ function uid() {
 function expr(s) {
   s = String(s === undefined || s === null ? '' : s).replace(/[,\s]/g, '');
   if (s === '') return 0;
+  if (/[×÷]/.test(s) && typeof calcEval === 'function') return calcEval(s);   // 計算機打的乘除
   if (!/^[-+]?\d+(\.\d+)?([+-]\d+(\.\d+)?)*$/.test(s)) return NaN;
   return s.match(/[+-]?\d+(\.\d+)?/g).reduce(function (a, b) { return a + Number(b); }, 0);
 }
@@ -249,7 +333,7 @@ function addEyes() {
 function numOnly(el) {
   var v = el.value;
   var n = v.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
-    .replace(/[＋]/g, '+').replace(/[－−–—]/g, '-').replace(/[．。]/g, '.').replace(/[^0-9+\-.]/g, '');
+    .replace(/[＋]/g, '+').replace(/[－−–—]/g, '-').replace(/[．。]/g, '.').replace(/[^0-9+\-.×÷]/g, '');
   if (n !== v) { var p = Math.max(0, (el.selectionStart || n.length) - (v.length - n.length)); el.value = n; try { el.setSelectionRange(p, p); } catch (e) {} }
 }
 document.addEventListener('input', function (e) {
@@ -270,6 +354,7 @@ function toggleNeg(el) {
   el.focus();
 }
 function digitsOnly(el) {
+  if (typeof CALC !== 'undefined' && CALC.el === el) return;   // 計算機打算式中：先不濾，按 OK 再算成整數
   var v = el.value, n = v.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[^0-9]/g, '');
   if (n !== v) { var p = el.selectionStart - (v.length - n.length); el.value = n; try { el.setSelectionRange(p, p); } catch (e) {} }
 }

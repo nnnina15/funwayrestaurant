@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.18.3">
+<meta name="app-version" content="4.19.0">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -711,6 +711,23 @@
   .negwrap { display: flex; gap: 6px; align-items: stretch; } .negwrap input { flex: 1; min-width: 0; }
   .negbtn { flex: none; width: auto; padding: 0 10px; margin: 0; font-size: 14px; background: var(--soft); color: var(--ink); border-radius: 10px; }
   td .negwrap .negbtn { padding: 0 6px; font-size: 12px; }
+  /* 計算機鍵盤 */
+  #calcpad { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: #1f1d1b; padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 24px rgba(0,0,0,.25); }
+  #calcpad.hide { display: none; }
+  #calcpad .cp-show { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; color: #fff; padding: 4px 6px 8px; min-height: 28px; }
+  #calcpad .cp-show span { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; overflow: hidden; white-space: nowrap; text-align: left; flex: 1; min-width: 0; }
+  #calcpad .cp-show b { color: #ffd166; font-size: 15px; white-space: nowrap; }
+  #calcpad .cp-keys { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 54px; gap: 8px; max-width: 520px; margin: 0 auto; }
+  #calcpad button { margin: 0; padding: 0; min-height: 0; height: 100%; width: 100%; border-radius: 16px; font-size: 22px; font-weight: 600; border: 0; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+  #calcpad button.n { background: #34312d; color: #fff; }
+  #calcpad button.op { background: #3fa7d6; color: #fff; font-size: 26px; }
+  #calcpad button.fn { background: #2b6f8f; color: #fff; font-size: 18px; }
+  #calcpad button.ok { background: #e4553a; color: #fff; grid-row: span 2; font-size: 22px; }
+  #calcpad button:active { filter: brightness(1.25); }
+  body.calc-on { padding-bottom: 330px; }
+  body.calc-on #toast { bottom: calc(330px + env(safe-area-inset-bottom)) !important; }
+  @media (pointer: coarse) { .negbtn { display: none; } }   /* 手機有計算機（有 − 鍵），不用另外的正負鈕 */
+  body.calc-on #bottombar, body.calc-on .sticky-save { visibility: hidden; }
 </style>
 </head>
 <body>
