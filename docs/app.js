@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.18.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.18.2';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -245,6 +245,22 @@ function addEyes() {
   });
 }
 // 只能打數字：其他字（例如 / . - 空白、全形數字以外的字）打了會直接拿掉；全形數字自動換成半形
+// 金額／天數／時數這些格子（有設 inputmode 的）：只能打數字、＋、－、小數點，其他字一打就濾掉（全形自動轉半形）
+function numOnly(el) {
+  var v = el.value;
+  var n = v.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+    .replace(/[＋]/g, '+').replace(/[－−–—]/g, '-').replace(/[．。]/g, '.').replace(/[^0-9+\-.]/g, '');
+  if (n !== v) { var p = Math.max(0, (el.selectionStart || n.length) - (v.length - n.length)); el.value = n; try { el.setSelectionRange(p, p); } catch (e) {} }
+}
+document.addEventListener('input', function (e) {
+  var el = e.target;
+  if (el && el.tagName === 'INPUT' && el.hasAttribute('inputmode') && !el.isComposing) numOnly(el);
+}, true);
+// 中文輸入法打完字（選字）後再濾一次
+document.addEventListener('compositionend', function (e) {
+  var el = e.target;
+  if (el && el.tagName === 'INPUT' && el.hasAttribute('inputmode')) { numOnly(el); el.dispatchEvent(new Event('input', { bubbles: true })); }
+}, true);
 function digitsOnly(el) {
   var v = el.value, n = v.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[^0-9]/g, '');
   if (n !== v) { var p = el.selectionStart - (v.length - n.length); el.value = n; try { el.setSelectionRange(p, p); } catch (e) {} }
