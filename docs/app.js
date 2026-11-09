@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.18.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.18.3';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -261,6 +261,14 @@ document.addEventListener('compositionend', function (e) {
   var el = e.target;
   if (el && el.tagName === 'INPUT' && el.hasAttribute('inputmode')) { numOnly(el); el.dispatchEvent(new Event('input', { bubbles: true })); }
 }, true);
+// 數字鍵盤沒有負號：按「＋／－」把這格切換成負數（再按一次變回正數）
+function toggleNeg(el) {
+  if (!el) return;
+  var v = String(el.value || '').trim();
+  el.value = v.charAt(0) === '-' ? v.slice(1) : '-' + v;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus();
+}
 function digitsOnly(el) {
   var v = el.value, n = v.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[^0-9]/g, '');
   if (n !== v) { var p = el.selectionStart - (v.length - n.length); el.value = n; try { el.setSelectionRange(p, p); } catch (e) {} }
@@ -929,7 +937,7 @@ function renderLines() {
     var opt = function (v, t) { return '<option value="' + esc(v) + '"' + (v === l.cat ? ' selected' : '') + '>' + esc(t || v) + '</option>'; };
     return '<div class="line">' +
       '<input list="d-names" value="' + esc(l.name) + '" placeholder="名稱（例：米、PT）" oninput="setLine(' + i + ',\'name\',this.value)" onchange="guessLine(' + i + ')">' +
-      '<input class="amt" value="' + esc(l.amount) + '" inputmode="text" placeholder="金額" oninput="setLine(' + i + ',\'amount\',this.value)">' +
+      '<input class="amt" value="' + esc(l.amount) + '" inputmode="tel" autocomplete="off" placeholder="金額" oninput="setLine(' + i + ',\'amount\',this.value)">' +
       '<select onchange="setLine(' + i + ',\'cat\',this.value)">' +
         '<optgroup label="進貨">' + ST.lineCats.map(function (c) { return opt(c); }).join('') + '</optgroup>' +
         '<optgroup label="其他">' + opt(LINE_OTHER, '其他支出') + (function () { var ph = window.matchMedia && window.matchMedia('(max-width: 560px)').matches; return opt(LINE_PT, ph ? 'PT薪資' : 'PT薪資（記到人事）') + opt(LINE_ADV, ph ? '預支' : '預支（記到人事）') + (l.cat === LINE_WAGE ? opt(LINE_WAGE, '薪資／預支（舊）') : '') + (l.cat === LINE_OLD ? opt(LINE_OLD, '舊表合計') : ''); })() + '</optgroup>' +
@@ -1297,8 +1305,8 @@ function renderItems() {
   var kinds = ST.snap.config.kinds || ['薪資', '公司負擔', '預支'];
   $('s-items').innerHTML = ST.items.map(function (it, i) {
     var amt = hasRate(it)
-      ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="上班時數" inputmode="text" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal"' + '' + ' oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
-      : '<input' + (it.neg ? ' class="neg-in"' : '') + ' value="' + esc(it.amount) + '" inputmode="text" placeholder="' + (it.neg ? (it.fixed ? '扣多少' : '扣多少（打正數就好）') : (it.fixed ? '金額' : '金額（扣款打負數）')) + '" oninput="setItem(' + i + ',\'amount\',this.value)">';
+      ? '<div class="hours"><input value="' + esc(it.hours) + '" placeholder="上班時數" inputmode="tel" autocomplete="off" oninput="setItem(' + i + ',\'hours\',this.value)"> × <input value="' + esc(it.rate) + '" placeholder="時薪" inputmode="decimal"' + '' + ' oninput="setItem(' + i + ',\'rate\',this.value)"></div>'
+      : '<input' + (it.neg ? ' class="neg-in"' : '') + ' value="' + esc(it.amount) + '" inputmode="tel" autocomplete="off" placeholder="' + (it.neg ? (it.fixed ? '扣多少' : '扣多少（打正數就好）') : (it.fixed ? '金額' : '金額（扣款打負數）')) + '" oninput="setItem(' + i + ',\'amount\',this.value)">';
     var fx = it.fixed;
     if (fx) return '<div class="item-row fixed' + (hasRate(it) ? ' rate' : '') + '"><span class="fx-name">' + esc(it.item) + '</span>' + amt + '</div>';
     return '<div class="item-row' + (hasRate(it) ? ' rate' : '') + '"><input value="' + esc(it.item) + '" placeholder="項目名稱" oninput="setItem(' + i + ',\'item\',this.value)">' + amt +
@@ -1380,7 +1388,7 @@ function renderDeliveryTab() {
     ['全支付', 'LINE Pay'].map(function (p, i) {
       var rec = V.delivery.filter(function (x) { return x.month === month && x.platform === p; })[0];
       return '<tr><th>' + p + pendTag('delivery', month + '|' + p) + '</th><td class="n">' + money(pay[p]) + '</td>' +
-        '<td><input id="op-' + i + '" inputmode="text" value="' + (rec ? esc(rec.amount) : '') + '" placeholder="沒填＝先估計" oninput="opCalc()"></td><td class="n" id="op-fee-' + i + '"></td></tr>';
+        '<td><input id="op-' + i + '" inputmode="tel" autocomplete="off" value="' + (rec ? esc(rec.amount) : '') + '" placeholder="沒填＝先估計" oninput="opCalc()"></td><td class="n" id="op-fee-' + i + '"></td></tr>';
     }).join('') + '</tbody></table></div>');
   opCalc();
 }
@@ -1404,7 +1412,8 @@ function renderDv(p, gross) {
   var head = '<tr><th class="split-th"><label class="split"><input type="checkbox" ' + (st.split ? 'checked' : '') + ' onchange="dvSplit(\'' + p + '\',this.checked)"> 分上半月／下半月兩期</label></th>' + st.periods.map(function (o) { return '<th>' + esc(o.label) + '</th>'; }).join('') + '</tr>';
   var rows = DV_ROWS.map(function (r) {
     return '<tr><th>' + r[1] + '</th>' + st.periods.map(function (o, i) {
-      return '<td><input' + (r[2] ? ' class="neg-in"' : '') + ' inputmode="text" value="' + esc(o[r[0]]) + '" placeholder="' + (r[2] ? '扣' : '0') + '" oninput="dvSet(\'' + p + '\',' + i + ',\'' + r[0] + '\',this.value)"></td>';
+      var inp = '<input' + (r[2] ? ' class="neg-in"' : '') + ' inputmode="tel" autocomplete="off" value="' + esc(o[r[0]]) + '" placeholder="' + (r[2] ? '扣' : '0') + '" oninput="dvSet(\'' + p + '\',' + i + ',\'' + r[0] + '\',this.value)">';
+      return '<td>' + (r[0] === 'other' ? '<div class="negwrap">' + inp + '<button type="button" class="negbtn" onclick="toggleNeg(this.previousElementSibling)" title="切換正負">±</button></div>' : inp) + '</td>';
     }).join('') + '</tr>';
   }).join('');
   var total = st.periods.reduce(function (a, o) { return a + dvNet(o); }, 0);

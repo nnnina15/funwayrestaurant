@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.18.2">
+<meta name="app-version" content="4.18.3">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -707,6 +707,10 @@
     .dv-h { flex-direction: column; align-items: flex-start; gap: 2px; }
     .dv-h .muted { font-size: 12.5px; }
   }
+  /* 數字鍵盤沒有負號：需要負數的格子旁邊放一個「＋／－」切換鈕 */
+  .negwrap { display: flex; gap: 6px; align-items: stretch; } .negwrap input { flex: 1; min-width: 0; }
+  .negbtn { flex: none; width: auto; padding: 0 10px; margin: 0; font-size: 14px; background: var(--soft); color: var(--ink); border-radius: 10px; }
+  td .negwrap .negbtn { padding: 0 6px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -816,7 +820,7 @@
       <label>分類（點一下選擇）</label>
       <div class="chips" id="p-cats"></div>
       <div class="grid2">
-        <div><label>金額（可以打 3200+575+140）</label><input id="p-amount" inputmode="text" oninput="showExpr('p-amount','p-amount-hint')"><div id="p-amount-hint" class="muted"></div></div>
+        <div><label>金額（可以打 3200+575+140）</label><input id="p-amount" inputmode="tel" autocomplete="off" oninput="showExpr('p-amount','p-amount-hint')"><div id="p-amount-hint" class="muted"></div></div>
         <div><label>備註</label><input id="p-note"></div>
       </div>
       <button class="primary" onclick="addPurchase()">新增這筆</button>
@@ -870,7 +874,7 @@
       <div class="grid2">
         <div><label>類型</label><select id="e-type"><option>固定</option><option>其他</option></select></div>
         <div><label>項目（例：房租、電費、洗冷氣）</label><input id="e-item" list="e-names" oninput="expenseHint()"><datalist id="e-names"></datalist></div>
-        <div><label>金額（可以打 360+262+320）</label><input id="e-amount" inputmode="text" oninput="showExpr('e-amount','e-amount-hint')"><div id="e-amount-hint" class="muted"></div></div>
+        <div><label>金額（可以打 360+262+320）</label><div class="negwrap"><input id="e-amount" inputmode="tel" autocomplete="off" oninput="showExpr('e-amount','e-amount-hint')"><button type="button" class="negbtn" onclick="toggleNeg(this.previousElementSibling)" title="切換正負（例如賣東西的收入打負數）">＋／－</button></div><div id="e-amount-hint" class="muted"></div></div>
         <div><label>備註</label><input id="e-note"></div>
       </div>
       <label>常用項目（點一下帶入）</label>
