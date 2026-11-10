@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.2';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -773,9 +773,10 @@ function trySync(manual) {
   if (ST.syncing) return;
   if (ST.authLost) { if (manual) relogin(); return; }
   if (navigator.onLine === false) { renderStatus(); if (manual) toast('目前沒有網路，資料已存在這台裝置'); return; }
-  ST.syncing = true; renderStatus();
+  ST.syncing = true; ST.syncAt = Date.now(); renderStatus();
   var batch = ST.outbox.slice(0, 40), store = ST.sess.store;
   api('sync', { account: ST.sess.account, store: store, token: ST.sess.token, ops: batch, have: haveOf(store) }).then(function (r) {
+   try {
     // 同步途中切換了店：結果記回原本那家店，不能蓋到現在這家店
     if (!ST.sess || ST.sess.store !== store) {
       ST.syncing = false;
@@ -793,12 +794,16 @@ function trySync(manual) {
     ST.outbox = ST.outbox.filter(function (o) { return !done[o.id]; });
     if (ST.failed.length > 50) ST.failed = ST.failed.slice(-50);
     saveOutbox();
-    acceptPull(r);
-    syncOtherStores();
+    try { acceptPull(r); }
+    catch (err) { if (ST.snap) ST.snap.hashes = null; reportErr('同步資料合併', err); }   // 合併失敗：下次整份重新下載
     ST.syncing = false;
-    renderStatus(); refreshTab(false);
+    syncOtherStores();
+    renderStatus(); safe('畫面更新', function () { refreshTab(false); });
     if (manual) toast('同步完成 ✓');
     if (ST.outbox.length) setTimeout(trySync, 300);
+   } catch (err) {   // 任何錯誤都不能讓同步一直卡在「轉圈」
+    ST.syncing = false; reportErr('同步', err); renderStatus();
+   }
   }, function (e) {
     ST.syncing = false; ST.syncDown = !!e.down;
     if (e.auth) { ST.authLost = true; toast('登入已失效，請重新輸入 PIN（資料都還在）'); }
@@ -886,6 +891,8 @@ function openWarns(month) {
   $('warnsheet').classList.remove('hide');
 }
 function closeWarns() { $('warnsheet').classList.add('hide'); }
+// 保險：同步超過 75 秒還沒結束（正常最多 60 秒就會逾時），當作卡住，解除轉圈讓它可以再試
+setInterval(function () { if (ST.syncing && ST.syncAt && Date.now() - ST.syncAt > 75000) { ST.syncing = false; renderStatus(); } }, 15000);
 function renderStatus() {
   updateWarns();
   renderBanner();
