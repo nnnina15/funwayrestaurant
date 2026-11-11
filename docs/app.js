@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.2';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.3';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1974,7 +1974,12 @@ function fixTheads(root) {
     var oldCg = t.querySelector('colgroup.fixw'); if (oldCg) oldCg.remove();
     t.style.tableLayout = ''; t.style.width = '';
     var top = t.tBodies[0] && t.tBodies[0].rows[0], lift = top && top.classList.contains('trow');
-    var widths = Array.prototype.map.call(t.tHead.rows[0].cells, function (c) { return Math.ceil(c.offsetWidth) + 1; });
+    // 欄寬＝目前寬度和「字需要的寬度」取大的（等寬表格裡，長的欄名像「醬油/胡椒/麻油」會超出格子，最右邊就多一塊空白）
+    var widths = Array.prototype.map.call(t.tHead.rows[0].cells, function (c, ci) {
+      var w = Math.max(c.offsetWidth, c.scrollWidth);
+      Array.prototype.forEach.call(t.tBodies[0] ? t.tBodies[0].rows : [], function (r) { var d = r.cells[ci]; if (d && r.cells.length === t.tHead.rows[0].cells.length) w = Math.max(w, d.scrollWidth); });
+      return Math.ceil(w) + 1;
+    });
     var total = widths.reduce(function (s, w) { return s + w; }, 0);
     // 原本的表格和表頭複本用「同一組」欄寬，兩邊一定對齊
     function colgroup() {
