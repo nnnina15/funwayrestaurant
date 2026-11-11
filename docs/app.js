@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.4';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -2216,11 +2216,11 @@ function renderYearTab() {
   V.expense.forEach(function (x) {
     ['電費', '水費'].forEach(function (k) { if (String(x.item).indexOf(k) >= 0) util[x.month + '|' + k] = (util[x.month + '|' + k] || 0) + Number(x.amount || 0); });
   });
-  var dcols = [['實際營收', function (m) { return m.actual; }], ['人事', function (m) { return m.staff; }],
-    ['電費', function (m) { return util[m.month + '|電費'] || 0; }], ['水費', function (m) { return util[m.month + '|水費'] || 0; }],
+  // 順序：工作天 → 實際營收 → 貨款 → 人事 → 固定支出 → 其他支出 → 現金差額 → 電費 → 水費 → 各進貨分類
+  var dcols = [['實際營收', function (m) { return m.actual; }], ['貨款', function (m) { return m.purchase; }], ['人事', function (m) { return m.staff; }],
     ['固定支出', function (m) { return m.fixed; }], ['其他支出', function (m) { return m.other; }],
     ['現金差額', function (m) { return -m.cashDiff; }],   // 正數＝多收（顯示時會再乘 −1 變回正的）
-    ['貨款', function (m) { return m.purchase; }]].concat(cats.map(function (c) { return [c, function (m) { return catAmt[m.month + '|' + c] || 0; }]; }));
+    ['電費', function (m) { return util[m.month + '|電費'] || 0; }], ['水費', function (m) { return util[m.month + '|水費'] || 0; }]].concat(cats.map(function (c) { return [c, function (m) { return catAmt[m.month + '|' + c] || 0; }]; }));
   var dv = function (list, f) { var days = sum(list, function (m) { return m.days; }); var t = sum(list, f); return perDay ? (days ? t / days : 0) : t; };
   var drow = function (list, name, cls) {
     return '<tr class="' + cls + '"><th>' + name + '</th><td class="n">' + sum(list, function (m) { return m.days; }) + '</td>' +
