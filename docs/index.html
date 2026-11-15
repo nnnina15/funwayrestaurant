@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.20.1">
+<meta name="app-version" content="4.21.0">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -246,6 +246,15 @@
   .xp-tbl input.xp-memo { width: 100%; min-width: 150px; text-align: left; font-weight: 400; }
   .xp-tbl .xp-net b { font-size: 17px; color: var(--brand); }
   .xp-how { font-size: 12.5px; margin: 4px 0 0; }
+  .xm-calc { background: var(--soft); border-radius: 14px; padding: 10px 12px; margin: 8px 0 12px; }
+  .xm-calc table { width: 100%; }
+  .xm-calc td { padding: 6px 4px; border: 0; }
+  .xm-calc tr.tot td { border-top: 1.5px solid var(--line); font-weight: 800; }
+  .xm-calc input { width: 120px; text-align: right; font-weight: 700; padding: 6px 8px; background: var(--card); }
+  .xm-calc input.xm-pct { width: 64px; }
+  .xm-calc input.xm-memo { width: 100%; text-align: left; font-weight: 400; }
+  .xm-calc .xm-net { font-size: 20px; color: var(--brand); font-weight: 800; }
+  .xp-hint { background: color-mix(in srgb, var(--amber) 16%, var(--card)); border-radius: 10px; padding: 8px 10px; font-size: 13.5px; margin: 6px 0; }
   .xp-range { background: var(--soft); border-radius: 14px; padding: 10px 12px; margin: 8px 0 12px; display: grid; gap: 8px; }
   .xp-range-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 8px; }
   .xp-range-row label { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
@@ -931,7 +940,7 @@
     <div><label>月份</label><input id="xs-month" type="month" onchange="renderDeductTab()"></div>
     <select id="x-year" class="hide"></select><input id="xp-month" type="hidden"><input id="x-month" type="hidden">
     <div class="card edit-card">
-      <div class="seg xtabs" id="x-tabs"><button data-v="pay" onclick="xTab('pay')">記錄分紅</button><button data-v="ded" onclick="xTab('ded')">分配前扣除</button></div>
+      <div class="seg xtabs" id="x-tabs"><button data-v="pay" onclick="xTab('pay')">股東</button><button data-v="mgr" onclick="xTab('mgr')">店長</button><button data-v="ded" onclick="xTab('ded')">分配前扣除</button></div>
       <div id="xpane-pay">
         <p class="muted">點名字選這次要發的人（可以選很多個），金額照比例自動算好，可以改。</p>
         <div class="xp-range" id="xp-range"></div>
@@ -940,6 +949,7 @@
         <p class="xp-done" id="xp-done"></p>
         <button class="primary" id="xp-btn" onclick="addPayouts()">記錄分紅</button>
       </div>
+      <div id="xpane-mgr" class="hide"><div id="xm-body"></div></div>
       <div id="xpane-ded" class="hide">
         <p class="muted">分給股東之前先扣掉的錢。</p>
         <select id="x-type" class="hide"></select>

@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.20.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.21.0';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1677,8 +1677,10 @@ function renderDeductTab() {
   $('xp-range').innerHTML = '<div class="xp-range-row"><label>分這幾個月的盈餘</label><div class="xp-mrange"><input type="month" value="' + esc(ST.xp.from) + '" max="' + month + '" onchange="xpFrom(this.value)"><span>到</span><b>' + month.replace('-', '/') + '</b></div></div>' +
     '<p class="xp-pool">' + ST.xp.from.replace('-', '/') + (ST.xp.from === month ? '' : '～' + month.replace('-', '/')) + ' 月盈餘合計 ＝ <b>這次可以分 ' + money(ST.xp.profit) + '</b>' + (ST.xp.profit !== ST.xp.pool ? '　（其中分配前扣除 ' + money(ST.xp.profit - ST.xp.pool) + '，由股東照比例分攤）' : '') + '</p>' +
     '<p class="muted xp-how">每位股東：月盈餘 × 比例 － 分配前扣除（員工季分紅＋存年終＋其他扣除）× 比例 ＝ 獲得分紅（記到總覽）；獲得分紅 － 借還欠款 ＝ 實發</p>';
-  var calc = {}; names.forEach(function (n) { calc[n] = xpCalc(n, month, L); });
   var partners = (L.C.partners || []).map(function (p) { return p.name; });
+  var allNames = names.slice();
+  names = names.filter(function (n) { return partners.indexOf(n) >= 0; });   // 股東頁只放股東；店長／其他人在「店長」頁
+  var calc = {}; names.forEach(function (n) { calc[n] = xpCalc(n, month, L); });
   if (!ST.xp.sel) {   // 預設勾：股東＋上次跟股東一起發的人（例：店長分紅）
     ST.xp.sel = {};
     var lastBatch = names.filter(function (n) { return partners.indexOf(n) >= 0; }).map(function (n) { return calc[n].last; }).sort().pop() || '';
@@ -1707,9 +1709,13 @@ function renderDeductTab() {
         '<td><input class="xp-memo" maxlength="80" value="' + esc(ST.xp.memo[n] || '') + '" placeholder="備註（可不填）" oninput="ST.xp.memo[\'' + q + '\']=this.value"></td></tr>';
     }
     return '<button type="button" class="who' + (on ? ' on' : '') + '" onclick="xpToggle(\'' + jsq(n) + '\')">' + esc(n) + '</button>';
-  }).join('') + '<button type="button" class="who add" onclick="xpOther()">＋ 其他</button>';
+  }).join('');
   $('xp-rows').innerHTML = rowsH ? '<p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="xp-tbl"><thead><tr><th></th><th class="n">月盈餘 × 比例</th><th class="n">− 分配前扣除</th><th class="n">＝ 獲得分紅<small>記到總覽</small></th><th class="n">− 借還欠款<small>從分紅扣回</small></th><th class="n">＝ 實發</th><th>備註</th></tr></thead><tbody>' + rowsH + '</tbody></table></div>' : '';
   $('xp-done').textContent = doneList.length ? '✓ ' + Number(month.slice(5)) + ' 月已發：' + doneList.join('、') : '';
+  var MG = xmLast(L);
+  if (MG && !L.V.deduct.some(function (d) { return d.month === month && d.type === '其他扣除' && /店長/.test(d.note || ''); }) && selN)
+    $('xp-done').innerHTML += '<div class="xp-hint">⚠ 這個月還沒記店長（' + esc(MG.who) + '）分紅。請先到「店長」頁記，股東分紅才會先扣掉店長那份，不然會多分。</div>';
+  renderMgr(L, month, allNames.filter(function (n) { return partners.indexOf(n) < 0; }));
   $('xp-btn').disabled = !selN;
   xpSum();
   // 分配前扣除：類型用卡片點選
@@ -1755,7 +1761,70 @@ function xpKeep(v) { ST.xp.keep = v; ST.xp.amt = {}; LS.set('fw_keep_' + ST.sess
 function xTab(t) {
   ST.xTab = t;
   Array.prototype.forEach.call($('x-tabs').children, function (b) { b.classList.toggle('on', b.dataset.v === t); });
-  $('xpane-pay').classList.toggle('hide', t !== 'pay'); $('xpane-ded').classList.toggle('hide', t !== 'ded');
+  $('xpane-pay').classList.toggle('hide', t !== 'pay'); $('xpane-mgr').classList.toggle('hide', t !== 'mgr'); $('xpane-ded').classList.toggle('hide', t !== 'ded');
+}
+// ---- 店長分紅：（月盈餘 − 存年終 − 員工季分紅 − 其他扣除〔不含分紅，例：買秘笈〕）× 店長 %
+// 記成「其他扣除」，備註「建燁分紅（店長10%）」→ 算分配前扣除，股東分的時候自動先扣掉；下次從最近一筆帶出人和 %
+function xmLast(L) {
+  var d = L.V.deduct.filter(function (d) { return d.type === '其他扣除' && /店長\s*[\d.]+\s*%/.test(d.note || ''); }).sort(function (a, b) { return a.month < b.month ? 1 : -1; })[0];
+  if (!d) return null;
+  return { who: String(d.note).replace(/（.*?）|\(.*?\)/g, '').replace(/分紅.*$/, '').trim(), pct: (String(d.note).match(/店長\s*([\d.]+)\s*%/) || [])[1], month: d.month };
+}
+function renderMgr(L, month, others) {
+  var key = ST.sess.store + '|' + month, last = xmLast(L);
+  if (!ST.xm || ST.xm.key !== key) ST.xm = { key: key, who: last ? last.who : '', pct: last ? last.pct : '10', amt: undefined, owe: undefined, memo: '', extra: [] };
+  var M = ST.xm, from = ST.xp.from;
+  ST.xm.extra.forEach(function (n) { if (others.indexOf(n) < 0) others.push(n); });
+  if (M.who && others.indexOf(M.who) < 0) others.unshift(M.who);
+  var ms = L.R.months.filter(function (m) { return m.month >= from && m.month <= month && m.status !== '未來'; });
+  var P = ms.reduce(function (a, m) { return a + m.profit; }, 0), Rv = ms.reduce(function (a, m) { return a + m.reserve; }, 0), B = ms.reduce(function (a, m) { return a + m.bonus; }, 0);
+  var O = L.V.deduct.filter(function (d) { return d.type === '其他扣除' && d.month >= from && d.month <= month && !/分紅/.test(d.note || ''); }).reduce(function (a, d) { return a + Number(d.amount || 0); }, 0);
+  M.base = P - Rv - B - O;
+  var done = M.who ? L.V.deduct.filter(function (d) { return d.month === month && d.type === '其他扣除' && /分紅/.test(d.note || '') && String(d.note).replace(/（.*?）|\(.*?\)/g, '').replace(/分紅.*$/, '').trim() === M.who; }) : [];
+  var owe = M.who ? Math.round(xpLoans(L, from, month).owe[M.who] || 0) : 0;
+  var auto = Math.round(M.base * (expr(M.pct) || 0) / 100);
+  var amt = M.amt !== undefined ? M.amt : String(Math.max(auto, 0));
+  var o = M.owe !== undefined ? M.owe : (owe > 0 ? String(Math.min(owe, Math.max(expr(amt) || 0, 0))) : '');
+  var rng = from.replace('-', '/') + (from === month ? '' : '～' + month.replace('-', '/'));
+  var neg = function (v) { return v ? '<span class="bad">−' + money(v) + '</span>' : '<span class="muted">0</span>'; };
+  var dup = L.V.deduct.filter(function (d) { return d.type === '其他扣除' && /店長/.test(d.note || '') && d.month >= from && d.month < month; }).map(function (d) { return Number(d.month.slice(5)) + ' 月'; });
+  var row = function (l, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + l + '</td><td class="n">' + v + '</td></tr>'; };
+  $('xm-body').innerHTML = '<p class="muted">店長分紅＝（月盈餘 − 存年終 − 員工季分紅 − 其他扣除〔例：買秘笈〕）× 比例。記好之後，股東頁會自動先扣掉這筆再分。</p>' +
+    '<div class="xp-range"><div class="xp-range-row"><label>分這幾個月的盈餘</label><div class="xp-mrange"><input type="month" value="' + esc(from) + '" max="' + month + '" onchange="xpFrom(this.value)"><span>到</span><b>' + month.replace('-', '/') + '</b></div></div></div>' +
+    '<div class="chips xp-chips">' + others.map(function (n) { return '<button type="button" class="who' + (n === M.who ? ' on' : '') + '" onclick="ST.xm.who=\'' + jsq(n) + '\';ST.xm.amt=undefined;ST.xm.owe=undefined;renderDeductTab()">' + esc(n) + '</button>'; }).join('') +
+    '<button type="button" class="who add" onclick="xmOther()">＋ 其他</button></div>' +
+    (!M.who ? '<p class="muted">點上面的名字選店長</p>' : done.length ? '<p class="xp-done">✓ ' + Number(month.slice(5)) + ' 月已記：' + esc(M.who) + ' ' + money(done.reduce(function (a, d) { return a + Number(d.amount || 0); }, 0)) + '（要改請到下面列表刪掉再記）</p>' :
+    (dup.length ? '<div class="xp-hint">⚠ 這段期間的 ' + dup.join('、') + ' 已經記過店長分紅，請把「分這幾個月的盈餘」改成從那之後開始，不然會重複發</div>' : '') +
+    '<div class="xm-calc"><table>' +
+      row(rng + ' 月盈餘', money(P)) + row('− 存年終', neg(Rv)) + row('− 員工季分紅', neg(B)) +
+      row('− 其他扣除（不含分紅，例：買秘笈）', neg(O)) + row('＝ 店長分紅的基數', '<b>' + money(M.base) + '</b>', 'tot') +
+      row('× 比例', '<input class="xm-pct" inputmode="decimal" value="' + esc(M.pct) + '" oninput="ST.xm.pct=this.value;ST.xm.amt=undefined;xmUpd(true)"> %') +
+      row('＝ ' + esc(M.who) + ' 店長分紅<small class="muted">（記到總覽）</small>', '<input class="xm-amt" inputmode="numeric" value="' + esc(amt) + '" oninput="digitsOnly(this);ST.xm.amt=this.value;xmUpd()">', 'tot') +
+      row('− 借還欠款（從分紅扣回）' + (owe ? '<small class="muted">　目前欠 ' + money(owe) + '</small>' : ''), '<input class="xm-owe" inputmode="numeric" value="' + esc(o) + '" placeholder="0" oninput="digitsOnly(this);ST.xm.owe=this.value;xmUpd()">') +
+      row('＝ 實發', '<span class="xm-net"></span>', 'tot') +
+    '</table><input class="xm-memo" maxlength="80" value="' + esc(M.memo) + '" placeholder="備註（可不填）" oninput="ST.xm.memo=this.value" style="margin-top:8px;width:100%"></div>' +
+    '<button class="primary" onclick="addMgrPayout()">記錄店長分紅</button>');
+  xmUpd();
+}
+function xmUpd(fromPct) {
+  var b = $('xm-body'), ai = b.querySelector('.xm-amt'); if (!ai) return;
+  if (fromPct) ai.value = String(Math.max(Math.round(ST.xm.base * (expr(ST.xm.pct) || 0) / 100), 0));
+  b.querySelector('.xm-net').textContent = money((expr(ai.value) || 0) - (expr(b.querySelector('.xm-owe').value) || 0));
+}
+function xmOther() { var n = prompt('店長／要記分紅的人叫什麼名字？'); if (!n || !(n = n.trim())) return; if (ST.xm.extra.indexOf(n) < 0) ST.xm.extra.push(n); ST.xm.who = n; ST.xm.amt = undefined; ST.xm.owe = undefined; renderDeductTab(); }
+function addMgrPayout() {
+  var b = $('xm-body'), month = $('xs-month').value, M = ST.xm;
+  var a = expr(b.querySelector('.xm-amt').value), o = expr(b.querySelector('.xm-owe').value) || 0, pct = String(expr(M.pct) || 0);
+  var memo = String(M.memo || '').replace(/[（）()]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!M.who) return toast('請先選店長');
+  if (isNaN(a) || !a) return toast('店長分紅金額沒填或看不懂');
+  if (isNaN(o) || o < 0) return toast('借還欠款要填 0 或正數');
+  if (!confirm(Number(month.slice(5)) + ' 月店長分紅：\n' + M.who + '　' + money(a) + (o ? ' − 扣回借款 ' + money(o) : '') + ' ＝ 實發 ' + money(a - o) + (memo ? '\n備註：' + memo : '') + '\n\n確定記錄？')) return;
+  enqueue('deduct.add', { id: uid(), month: month, type: '其他扣除', amount: a, note: M.who + '分紅（店長' + pct + '%' + (memo ? ' ' + memo : '') + '）' });
+  if (o) enqueue('deduct.add', { id: uid(), month: month, type: '員工還款', amount: o, note: M.who + '（從分紅扣回）' });
+  ST.xm = null; ST.xp = null;
+  renderDeductTab();
+  toast('已記錄店長分紅 ✓　接著到「股東」頁記股東分紅');
 }
 function xpToggle(n) { ST.xp.sel[n] = !ST.xp.sel[n]; renderDeductTab(); }
 function xpOther() { var n = prompt('要記誰的分紅？（例：建燁、佳茹）'); if (!n || !(n = n.trim())) return; if (ST.xp.extra.indexOf(n) < 0) ST.xp.extra.push(n); ST.xp.sel[n] = true; renderDeductTab(); }
