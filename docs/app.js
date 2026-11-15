@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.21.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.21.5';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -2087,8 +2087,13 @@ function renderLoanTab() {
   var h = '', settled = false, T = { out: 0, back: 0, owe: 0 };
   order.forEach(function (n) {
     var o = P[n], open = !!ST.loanOpen[n];
-    T.out += o.out; T.back += o.back; T.owe += o.owe;
-    if (o.owe <= 0 && !settled) { settled = true; h += '<tr class="mh"><th colspan="5">已還清</th></tr>'; }
+    if (o.owe > 0 || ST.loanSettled) { T.out += o.out; T.back += o.back; T.owe += o.owe; }
+    if (o.owe <= 0 && !settled) {   // 已還清的人：預設收起來，點標題展開
+      settled = true;
+      var nS = order.filter(function (k) { return P[k].owe <= 0; }).length;
+      h += '<tr class="mh xm" onclick="ST.loanSettled=!ST.loanSettled;renderLoanTab()"><th colspan="4"><span class="car">' + (ST.loanSettled ? '▾' : '▸') + '</span>已還清 ' + nS + ' 人' + (ST.loanSettled ? '' : '<small>（點一下展開）</small>') + '</th></tr>';
+    }
+    if (o.owe <= 0 && !ST.loanSettled) { T.out += o.out; T.back += o.back; T.owe += o.owe; return; }
     h += '<tr class="xm' + (open ? ' open' : '') + '" onclick="ST.loanOpen[\'' + jsq(n) + '\']=!ST.loanOpen[\'' + jsq(n) + '\'];renderLoanTab()"><th><span class="car">' + (open ? '▾' : '▸') + '</span>' + esc(n) + '<small>' + o.rows.length + ' 筆｜最近 ' + mm(o.last) + '</small></th>' +
       '<td class="n neg">' + (o.out ? '-' + money(o.out) : '<span class="muted">—</span>') + '</td><td class="n pos">' + (o.back ? '+' + money(o.back) : '<span class="muted">—</span>') + '</td>' +
       '<td class="n em' + (o.owe > 0 ? ' neg' : '') + '">' + (o.owe ? money(o.owe) : '<span class="ok">✓ 還清</span>') + '</td></tr>';
