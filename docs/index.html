@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.22.0">
+<meta name="app-version" content="4.23.0">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -727,6 +727,17 @@
   body.calc-on #bottombar, body.calc-on .sticky-save { visibility: hidden; }
   #d-spendv.bad { color: #ff8a75; }
   input.neg-bad { border-color: var(--bad) !important; color: var(--bad); }
+  /* ===== 表格統一樣式 B：斑馬紋（一列深一列淺）、表頭淡底粗字、合計列品牌色底 ===== */
+  :root { --zebra: color-mix(in srgb, var(--ink) 5%, var(--card)); --tot: color-mix(in srgb, var(--brand) 16%, var(--card)); }
+  :where(.ytable, .msum, .xsum, .xp-tbl, .dv table, #m-body > table) > tbody > tr:nth-child(even),
+  :where(#p-list, #e-list) > tr:nth-child(even) { background: var(--zebra); }
+  .ytable > tbody > tr:nth-child(even) > th { background: var(--zebra); }
+  :where(.xsum, .xp-tbl, .dv table) thead th { background: var(--soft); color: var(--ink); font-weight: 700; font-size: 13px; }
+  :where(.xsum, .xp-tbl, .dv table) thead th small { color: var(--muted); }
+  :where(.xsum, .xp-tbl, .dv table, .ytable, .msum) th, :where(.xsum, .xp-tbl, .dv table, .ytable, .msum) td { border-bottom-color: transparent; }
+  .xsum tr.yt > *, .xlist tr.yt > *, .ytable tr.yrow th, .ytable tr.yrow td, .ytable > tbody > tr.yrow > th, .ytable tfoot th, .ytable tfoot td, .dv tr.tot > * { background: var(--tot); border-top: 0; font-weight: 800; }
+  .xsum tr.xm.open, .xsum tr.xm:hover { background: color-mix(in srgb, var(--brand) 8%, var(--card)); }
+  .xsum tr.mh > th { background: transparent; }
 </style>
 </head>
 <body>
