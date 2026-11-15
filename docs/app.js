@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.5';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -774,7 +774,7 @@ function trySync(manual) {
   if (ST.authLost) { if (manual) relogin(); return; }
   if (navigator.onLine === false) { renderStatus(); if (manual) toast('目前沒有網路，資料已存在這台裝置'); return; }
   ST.syncing = true; ST.syncAt = Date.now(); renderStatus();
-  var batch = ST.outbox.slice(0, 40), store = ST.sess.store;
+  var batch = ST.outbox.slice(0, 15), store = ST.sess.store;   // 一次送 15 筆：試算表處理太久會逾時，分小批比較穩
   api('sync', { account: ST.sess.account, store: store, token: ST.sess.token, ops: batch, have: haveOf(store) }).then(function (r) {
    try {
     // 同步途中切換了店：結果記回原本那家店，不能蓋到現在這家店
@@ -805,7 +805,7 @@ function trySync(manual) {
     ST.syncing = false; reportErr('同步', err); renderStatus();
    }
   }, function (e) {
-    ST.syncing = false; ST.syncDown = !!e.down;
+    ST.syncing = false; ST.syncDown = !!e.down; ST.syncDownDetail = e.down ? String(e.detail || (e.cause && e.cause.message) || '') : '';
     if (e.auth) { ST.authLost = true; toast('登入已失效，請重新輸入 PIN（資料都還在）'); }
     else if (manual) toast(e.network ? '同步失敗：連不上網路，稍後會自動再試' : '⚠ ' + e.message);
     renderStatus(); renderBanner();
@@ -817,7 +817,7 @@ function syncOtherStores() {
     if (st === ST.sess.store) return;
     var ob = LS.get(k_('outbox', st), []);
     if (!ob.length) return;
-    var batch = ob.slice(0, 40);
+    var batch = ob.slice(0, 15);
     api('sync', { account: ST.sess.account, store: st, token: ST.sess.token, ops: batch, have: haveOf(st) }).then(function (r) {
       if (ST.sess) finishOther(st, batch, r);
     }, function () { /* 下次再試 */ });
@@ -912,7 +912,7 @@ function renderBanner() {
   var h = '';
   var sv = ST.snap && ST.snap.config && ST.snap.config.serverVersion;
   if (ST.snap && verNum(sv) < verNum(NEED_SERVER)) h += '<div class="banner err">試算表的程式還是舊版（' + esc(sv || '舊版') + '），請管理者到試算表按選單「風味記帳 → ⑤ 更新程式」。</div>';
-  if (ST.syncDown && !ST.authLost) h += '<div class="banner err">' + esc(SYNC_DOWN_MSG) + '資料都存在這台裝置，恢復後會自動上傳。</div>';
+  if (ST.syncDown && !ST.authLost) h += '<div class="banner err">' + esc(SYNC_DOWN_MSG) + '資料都存在這台裝置，恢復後會自動上傳。' + (ST.syncDownDetail ? '<br><small>試算表回應：' + esc(ST.syncDownDetail.slice(0, 160)) + '</small>' : '') + '</div>';
   if (ST.authLost) h += '<div class="banner err">登入已失效（PIN 可能改過）。<a href="#" onclick="relogin();return false">按這裡重新登入</a>，還沒上傳的 ' + ST.outbox.length + ' 筆都會保留。</div>';
   else if (ST.outbox.length && navigator.onLine === false) h += '<div class="banner">目前離線：有 ' + ST.outbox.length + ' 筆存在這台裝置，連上網路會自動上傳。</div>';
   var recent = ST.failed.filter(function (f) { return !f.seen; });
