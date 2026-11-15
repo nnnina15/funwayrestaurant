@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.6';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.7';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1673,13 +1673,14 @@ function renderDeductTab() {
   var pool = L.R.months.filter(function (m) { return m.month >= ST.xp.from && m.month <= month && m.status !== '未來'; });
   ST.xp.pool = pool.reduce(function (a, m) { return a + m.dist; }, 0);
   ST.xp.profit = pool.reduce(function (a, m) { return a + m.profit; }, 0);
+  ST.xp.loan = pool.reduce(function (a, m) { return a + (m.loan || 0) - (m.repay || 0); }, 0);   // 這段期間 借出−還款：錢不在店裡就先不分，還回來再分
   var keep = expr(ST.xp.keep) || 0;
   ST.xp.year = yearSurplus(L, ST.xp.from);
   var befM = prevMonth(ST.xp.from);
   ST.xp.tenth = ST.xp.year > 0 ? Math.round(ST.xp.year / 10) : 0;
   $('xp-range').innerHTML = '<div class="xp-range-row"><label>分這幾個月的盈餘</label><div class="xp-mrange"><input type="month" value="' + esc(ST.xp.from) + '" max="' + month + '" onchange="xpFrom(this.value)"><span>到</span><b>' + month.replace('-', '/') + '</b></div></div>' +
     '<div class="xp-range-row"><label>店裡留作備用基金</label><div class="xp-amt"><span>$</span><input inputmode="numeric" value="' + esc(ST.xp.keep) + '" placeholder="0" oninput="digitsOnly(this);xpKeep(this.value)" onchange="renderDeductTab()"></div></div>' +
-    '<p class="xp-pool">月盈餘 ' + money(ST.xp.profit) + '　扣員工分紅、存年終後可分配 ' + money(ST.xp.pool) + '　－ 備用基金 ' + money(keep) + '　＋ 到 ' + befM.replace('-', '/') + ' 累積的當年盈餘 ' + money(ST.xp.year) + ' 的 1/10 ' + money(ST.xp.tenth) + '　＝ <b>這次可以分 ' + money(ST.xp.pool - keep + ST.xp.tenth) + '</b></p>';
+    '<p class="xp-pool">月盈餘 ' + money(ST.xp.profit) + '　扣員工分紅、存年終後可分配 ' + money(ST.xp.pool) + '　－ 備用基金 ' + money(keep) + '　＋ 到 ' + befM.replace('-', '/') + ' 累積的當年盈餘 ' + money(ST.xp.year) + ' 的 1/10 ' + money(ST.xp.tenth) + (ST.xp.loan ? (ST.xp.loan > 0 ? '　－ 這段期間借出（扣掉還款）' + money(ST.xp.loan) : '　＋ 這段期間收回的還款（扣掉借出）' + money(-ST.xp.loan)) : '') + '　＝ <b>這次可以分 ' + money(ST.xp.pool - keep + ST.xp.tenth - ST.xp.loan) + '</b></p>';
   var calc = {}; names.forEach(function (n) { calc[n] = xpCalc(n, month, L); });
   var partners = (L.C.partners || []).map(function (p) { return p.name; });
   if (!ST.xp.sel) {   // 預設勾：股東＋上次跟股東一起發的人（例：店長分紅）
@@ -1766,13 +1767,15 @@ function xpCalc(who, month, L) {
   }
   // 股東：（選的月份範圍可分配 − 店裡備用基金）× 比例
   var from = ST.xp && ST.xp.from || month, keep = ST.xp ? (expr(ST.xp.keep) || 0) : 0;
-  var poolAmt = L.R.months.filter(function (m) { return m.month >= from && m.month <= month && m.status !== '未來'; }).reduce(function (a, m) { return a + m.dist; }, 0);
+  var pm = L.R.months.filter(function (m) { return m.month >= from && m.month <= month && m.status !== '未來'; });
+  var poolAmt = pm.reduce(function (a, m) { return a + m.dist; }, 0);
+  var loanNet = pm.reduce(function (a, m) { return a + (m.loan || 0) - (m.repay || 0); }, 0);   // 借出−還款
   var tenth = ST.xp && ST.xp.tenth || 0;   // 補當年盈餘的 1/10
-  var amt = (poolAmt - keep + tenth) * Number(p.pct || 0) / 100;
+  var amt = (poolAmt - keep + tenth - loanNet) * Number(p.pct || 0) / 100;
   out.amt = Math.round(amt);
   var range = from === month ? month.replace('-', '/') : from.replace('-', '/') + '～' + month.replace('-', '/');
   out.tag = p.pct + '%' + (already ? '｜已記過' : '');
-  out.info = p.pct + '%｜' + range + (keep ? '（留備用 ' + money(keep) + '）' : '') + (tenth ? '＋當年盈餘 1/10 ' + money(tenth) : '') + ' 應分 ' + money(amt) + (amt < 0 ? '｜虧損，金額先填 0' : '') + warn;
+  out.info = p.pct + '%｜' + range + (keep ? '（留備用 ' + money(keep) + '）' : '') + (tenth ? '＋當年盈餘 1/10 ' + money(tenth) : '') + (loanNet ? (loanNet > 0 ? '－借出 ' + money(loanNet) : '＋還款 ' + money(-loanNet)) : '') + ' 應分 ' + money(amt) + (amt < 0 ? '｜虧損，金額先填 0' : '') + warn;
   return out;
 }
 // 一次記錄勾選的人：股東記「股東分紅（已發）」，其他人（佳茹、店長…）記「其他扣除・某某分紅」
@@ -1785,12 +1788,14 @@ function addPayouts() {
   });
   if (bad) return toast(bad + ' 的金額沒填或看不懂');
   if (!rows.length) return toast('請勾選要發的人');
-  if (!confirm(Number(month.slice(5)) + ' 月分紅：\n' + rows.map(function (r) { return r[0] + '　' + money(r[1]); }).join('\n') + '\n\n合計 ' + money(rows.reduce(function (a, r) { return a + r[1]; }, 0)) + '，確定記錄？')) return;
+  var memo = String($('xp-note').value || '').replace(/[（）()]/g, ' ').replace(/\s+/g, ' ').trim();   // 備註放在括號裡：名字比對時會去掉括號內容
+  var tail = memo ? '（' + memo + '）' : '';
+  if (!confirm(Number(month.slice(5)) + ' 月分紅：\n' + rows.map(function (r) { return r[0] + '　' + money(r[1]); }).join('\n') + '\n\n合計 ' + money(rows.reduce(function (a, r) { return a + r[1]; }, 0)) + (memo ? '\n備註：' + memo : '') + '，確定記錄？')) return;
   rows.forEach(function (r) {
     var isPartner = partners.indexOf(r[0]) >= 0;
-    enqueue('deduct.add', { id: uid(), month: month, type: isPartner ? '股東分紅（已發）' : '其他扣除', amount: r[1], note: isPartner ? r[0] : r[0] + '分紅' });
+    enqueue('deduct.add', { id: uid(), month: month, type: isPartner ? '股東分紅（已發）' : '其他扣除', amount: r[1], note: (isPartner ? r[0] : r[0] + '分紅') + tail });
   });
-  ST.xp = null;
+  ST.xp = null; $('xp-note').value = '';
   renderDeductTab();
   toast('已記錄 ' + rows.length + ' 筆分紅 ✓');
 }

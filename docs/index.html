@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.19.6">
+<meta name="app-version" content="4.19.7">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -236,6 +236,8 @@
   .xp-row-who b { font-size: 17px; } .xp-row-who small { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .xp-row .xp-amt input { font-size: 18px; padding-top: 8px; padding-bottom: 8px; }
   #tab-deduct .edit-card .xp-row .xp-amt input { padding-left: 28px; }
+  .xp-note-l { margin: 4px 0 2px; font-size: 13px; color: var(--muted); }
+  #xp-note { margin-bottom: 10px; }
   .xp-range { background: var(--soft); border-radius: 14px; padding: 10px 12px; margin: 8px 0 12px; display: grid; gap: 8px; }
   .xp-range-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 8px; }
   .xp-range-row label { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
@@ -916,6 +918,8 @@
         <div class="chips xp-chips" id="xp-chips"></div>
         <div class="who-cards" id="xp-rows"></div>
         <p class="xp-done" id="xp-done"></p>
+        <label class="xp-note-l" for="xp-note">備註（選填，會記在這次每一筆分紅上）</label>
+        <input id="xp-note" maxlength="80" placeholder="例：10/15拿分紅借出 浩勤83750 小吉41250">
         <button class="primary" id="xp-btn" onclick="addPayouts()">記錄分紅</button>
       </div>
       <div id="xpane-ded" class="hide">
