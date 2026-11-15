@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.9';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.20.0';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1673,15 +1673,10 @@ function renderDeductTab() {
   var pool = L.R.months.filter(function (m) { return m.month >= ST.xp.from && m.month <= month && m.status !== '未來'; });
   ST.xp.pool = pool.reduce(function (a, m) { return a + m.dist; }, 0);
   ST.xp.profit = pool.reduce(function (a, m) { return a + m.profit; }, 0);
-  ST.xp.loan = xpLoans(L, ST.xp.from, month).pool;   // 這段期間員工（非股東）借出−還款：錢不在店裡就先不分，還回來再分；股東借的從他自己那份扣
-  var keep = expr(ST.xp.keep) || 0;
-  ST.xp.year = yearSurplus(L, ST.xp.from);
-  var befM = prevMonth(ST.xp.from);
-  ST.xp.tenth = ST.xp.year > 0 ? Math.round(ST.xp.year / 10) : 0;
+  ST.xp.tenth = 0;   // 這次可以分＝月盈餘：不再加當年盈餘 1/10
   $('xp-range').innerHTML = '<div class="xp-range-row"><label>分這幾個月的盈餘</label><div class="xp-mrange"><input type="month" value="' + esc(ST.xp.from) + '" max="' + month + '" onchange="xpFrom(this.value)"><span>到</span><b>' + month.replace('-', '/') + '</b></div></div>' +
-    '<div class="xp-range-row"><label>店裡留作備用基金</label><div class="xp-amt"><span>$</span><input inputmode="numeric" value="' + esc(ST.xp.keep) + '" placeholder="0" oninput="digitsOnly(this);xpKeep(this.value)" onchange="renderDeductTab()"></div></div>' +
-    '<p class="xp-pool">月盈餘 ' + money(ST.xp.profit) + '　扣分配前扣除後 ' + money(ST.xp.pool) + '　－ 備用基金 ' + money(keep) + '　＋ 到 ' + befM.replace('-', '/') + ' 累積的當年盈餘 ' + money(ST.xp.year) + ' 的 1/10 ' + money(ST.xp.tenth) + (ST.xp.loan ? (ST.xp.loan > 0 ? '　－ 這段期間借出（扣掉還款）' + money(ST.xp.loan) : '　＋ 這段期間收回的還款（扣掉借出）' + money(-ST.xp.loan)) : '') + '　＝ <b>這次可以分 ' + money(ST.xp.pool - keep + ST.xp.tenth - ST.xp.loan) + '</b></p>' +
-    '<p class="muted xp-how">每位股東：可分盈餘 × 比例 － 分配前扣除（員工季分紅＋存年終＋其他扣除）× 比例 ＝ 獲得分紅（記到總覽）；獲得分紅 － 借還欠款 ＝ 實發</p>';
+    '<p class="xp-pool">' + ST.xp.from.replace('-', '/') + (ST.xp.from === month ? '' : '～' + month.replace('-', '/')) + ' 月盈餘合計 ＝ <b>這次可以分 ' + money(ST.xp.profit) + '</b>' + (ST.xp.profit !== ST.xp.pool ? '　（其中分配前扣除 ' + money(ST.xp.profit - ST.xp.pool) + '，由股東照比例分攤）' : '') + '</p>' +
+    '<p class="muted xp-how">每位股東：月盈餘 × 比例 － 分配前扣除（員工季分紅＋存年終＋其他扣除）× 比例 ＝ 獲得分紅（記到總覽）；獲得分紅 － 借還欠款 ＝ 實發</p>';
   var calc = {}; names.forEach(function (n) { calc[n] = xpCalc(n, month, L); });
   var partners = (L.C.partners || []).map(function (p) { return p.name; });
   if (!ST.xp.sel) {   // 預設勾：股東＋上次跟股東一起發的人（例：店長分紅）
@@ -1700,7 +1695,7 @@ function renderDeductTab() {
     if (c.done) { doneList.push(n + ' ' + money(c.done)); return '<button type="button" class="who done" onclick="toast(\'' + jsq(n) + ' 這個月已經記過了；要改請到下面列表刪掉再記\')">✓ ' + esc(n) + '</button>'; }
     if (on) {
       var a = ST.xp.amt[n] !== undefined ? ST.xp.amt[n] : (c.amt !== null ? String(Math.max(c.amt, 0)) : '');
-      var o = ST.xp.owe[n] !== undefined ? ST.xp.owe[n] : (c.owe > 0 ? String(c.owe) : '');
+      var o = ST.xp.owe[n] !== undefined ? ST.xp.owe[n] : (c.owe > 0 ? String(Math.min(c.owe, Math.max(expr(a) || 0, 0))) : '');   // 預設扣回欠款，但不超過這次的分紅
       var q = jsq(n);
       selN++;
       rowsH += '<tr class="xpr" data-name="' + esc(n) + '"><th>' + esc(n) + '<small>' + esc(c.tag) + '</small></th>' +
@@ -1713,7 +1708,7 @@ function renderDeductTab() {
     }
     return '<button type="button" class="who' + (on ? ' on' : '') + '" onclick="xpToggle(\'' + jsq(n) + '\')">' + esc(n) + '</button>';
   }).join('') + '<button type="button" class="who add" onclick="xpOther()">＋ 其他</button>';
-  $('xp-rows').innerHTML = rowsH ? '<p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="xp-tbl"><thead><tr><th></th><th class="n">可分盈餘 × 比例</th><th class="n">− 分配前扣除</th><th class="n">＝ 獲得分紅<small>記到總覽</small></th><th class="n">− 借還欠款<small>從分紅扣回</small></th><th class="n">＝ 實發</th><th>備註</th></tr></thead><tbody>' + rowsH + '</tbody></table></div>' : '';
+  $('xp-rows').innerHTML = rowsH ? '<p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="xp-tbl"><thead><tr><th></th><th class="n">月盈餘 × 比例</th><th class="n">− 分配前扣除</th><th class="n">＝ 獲得分紅<small>記到總覽</small></th><th class="n">− 借還欠款<small>從分紅扣回</small></th><th class="n">＝ 實發</th><th>備註</th></tr></thead><tbody>' + rowsH + '</tbody></table></div>' : '';
   $('xp-done').textContent = doneList.length ? '✓ ' + Number(month.slice(5)) + ' 月已發：' + doneList.join('、') : '';
   $('xp-btn').disabled = !selN;
   xpSum();
@@ -1811,18 +1806,16 @@ function xpCalc(who, month, L) {
     return out;
   }
   // 股東：（選的月份範圍可分配 − 店裡備用基金）× 比例
-  var from = ST.xp && ST.xp.from || month, keep = ST.xp ? (expr(ST.xp.keep) || 0) : 0;
+  var from = ST.xp && ST.xp.from || month;
   var pm = L.R.months.filter(function (m) { return m.month >= from && m.month <= month && m.status !== '未來'; });
   var poolAmt = pm.reduce(function (a, m) { return a + m.dist; }, 0);
-  var loanNet = LN.pool;   // 員工（非股東）借出−還款
-  var tenth = ST.xp && ST.xp.tenth || 0;   // 補當年盈餘的 1/10
   var pre = pm.reduce(function (a, m) { return a + m.profit - m.dist; }, 0);   // 分配前扣除：員工季分紅＋存年終＋其他扣除
-  out.pct = Number(p.pct || 0); out.base = poolAmt + pre - keep + tenth - loanNet; out.ded = pre * out.pct / 100;
-  var amt = (poolAmt - keep + tenth - loanNet) * Number(p.pct || 0) / 100;
+  out.pct = Number(p.pct || 0); out.base = poolAmt + pre; out.ded = pre * out.pct / 100;   // base＝月盈餘
+  var amt = poolAmt * Number(p.pct || 0) / 100;   // （月盈餘 − 分配前扣除）× 比例
   out.amt = Math.round(amt);
   var range = from === month ? month.replace('-', '/') : from.replace('-', '/') + '～' + month.replace('-', '/');
   out.tag = p.pct + '%' + (already ? '｜已記過' : '');
-  out.info = p.pct + '%｜' + range + (keep ? '（留備用 ' + money(keep) + '）' : '') + (tenth ? '＋當年盈餘 1/10 ' + money(tenth) : '') + (loanNet ? (loanNet > 0 ? '－借出 ' + money(loanNet) : '＋還款 ' + money(-loanNet)) : '') + ' 應分 ' + money(amt) + (amt < 0 ? '｜虧損，金額先填 0' : '') + warn;
+  out.info = p.pct + '%｜' + range + ' 應分 ' + money(amt) + (amt < 0 ? '｜虧損，金額先填 0' : '') + warn;
   return out;
 }
 // 一次記錄勾選的人：股東記「股東分紅（已發）」，其他人（佳茹、店長…）記「其他扣除・某某分紅」
