@@ -111,8 +111,8 @@ function computeAll_(D, today) {
     const status = m.month === curMonth ? '進行中' : (m.month > curMonth ? '未來' : '已結束');
 
     if (status === '進行中') m.warns.push(['未結帳', '本月還沒結束，數字只供參考，先不要拿來分紅']);
-    if (m.pandaG > 0 && m.pandaN === null) m.warns.push(['外送未對帳', 'Panda 營業額 ' + fmt(m.pandaG) + '，實際入帳還沒填，盈餘會被低估']);
-    if (m.uberG > 0 && m.uberN === null) m.warns.push(['外送未對帳', 'Uber 營業額 ' + fmt(m.uberG) + '，實際入帳還沒填，盈餘會被低估']);
+    if (m.pandaG > 0 && m.pandaN === null) m.warns.push(['平台未對帳', 'Panda 營業額 ' + fmt(m.pandaG) + '，實際入帳還沒填，盈餘會被低估']);
+    if (m.uberG > 0 && m.uberN === null) m.warns.push(['平台未對帳', 'Uber 營業額 ' + fmt(m.uberG) + '，實際入帳還沒填，盈餘會被低估']);
 
     if (Object.keys(m.dates).length && status !== '未來') {
       const lastDay = status === '進行中' ? Number(today.slice(8, 10)) - 1 : daysInMonth_(m.month);

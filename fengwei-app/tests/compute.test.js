@@ -39,7 +39,7 @@ assert.strictEqual(sep.dist, profit - 12500 - 3000);
 const shares = R.shares.filter(s => s.month === '2026-09');
 assert.deepStrictEqual(shares.map(s => s.amount), [Math.round(sep.dist * 0.6), Math.round(sep.dist * 0.2), Math.round(sep.dist * 0.2)]);
 const types = R.warns.filter(w => w.month === '2026-09').map(w => w.type);
-assert.ok(types.includes('外送未對帳'), 'Uber 未對帳要警示');
+assert.ok(types.includes('平台未對帳'), 'Uber 未對帳要警示');
 assert.ok(types.includes('缺少每日結帳'), '漏填 9/15 要警示');
 assert.ok(types.includes('現金差額'), '9/10 差 800 要警示');
 assert.ok(!types.includes('人事未填'), '9 月不是上個月，不檢查個別員工');
