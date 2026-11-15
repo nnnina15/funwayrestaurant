@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.21.3';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.21.4';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1788,7 +1788,8 @@ function renderMgr(L, month, others) {
   var P = ms.reduce(function (a, m) { return a + m.profit; }, 0), Rv = ms.reduce(function (a, m) { return a + m.reserve; }, 0), B = ms.reduce(function (a, m) { return a + m.bonus; }, 0);
   var O = L.V.deduct.filter(function (d) { return d.type === '其他扣除' && d.month >= from && d.month <= month && !/分紅/.test(d.note || ''); }).reduce(function (a, d) { return a + Number(d.amount || 0); }, 0);
   M.base = P - Rv - B - O;
-  var done = M.who ? L.V.deduct.filter(function (d) { return d.month === month && d.type === '其他扣除' && /分紅/.test(d.note || '') && String(d.note).replace(/（.*?）|\(.*?\)/g, '').replace(/分紅.*$/, '').trim() === M.who; }) : [];
+  var mgrDone = function (n) { return L.V.deduct.filter(function (d) { return d.month === month && d.type === '其他扣除' && /分紅/.test(d.note || '') && String(d.note).replace(/（.*?）|\(.*?\)/g, '').replace(/分紅.*$/, '').trim() === n; }); };
+  var done = M.who ? mgrDone(M.who) : [];
   var owe = M.who ? Math.round(xpLoans(L, from, month).owe[M.who] || 0) : 0;
   var auto = Math.round(M.base * (expr(M.pct) || 0) / 100);
   var amt = M.amt !== undefined ? M.amt : String(Math.max(auto, 0));
@@ -1799,9 +1800,9 @@ function renderMgr(L, month, others) {
   var row = function (l, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + l + '</td><td class="n">' + v + '</td></tr>'; };
   $('xm-body').innerHTML = '<p class="muted">店長分紅＝（月盈餘 − 存年終 − 員工季分紅 − 其他扣除〔例：買秘笈〕）× 比例。記好之後，股東頁會自動先扣掉這筆再分。</p>' +
     '<div class="xp-range"><div class="xp-range-row"><label>分這幾個月的盈餘</label><div class="xp-mrange"><input type="month" value="' + esc(from) + '" max="' + month + '" onchange="xpFrom(this.value)"><span>到</span><b>' + month.replace('-', '/') + '</b></div></div></div>' +
-    '<div class="chips xp-chips">' + others.map(function (n) { return '<button type="button" class="who' + (n === M.who ? ' on' : '') + '" onclick="ST.xm.who=\'' + jsq(n) + '\';ST.xm.amt=undefined;ST.xm.owe=undefined;renderDeductTab()">' + esc(n) + '</button>'; }).join('') +
+    '<div class="chips xp-chips">' + others.map(function (n) { var dn = mgrDone(n); return '<button type="button" class="who' + (dn ? ' done' : '') + (n === M.who ? ' on' : '') + '" onclick="ST.xm.who=\'' + jsq(n) + '\';ST.xm.amt=undefined;ST.xm.owe=undefined;renderDeductTab()">' + (dn ? '✓ ' : '') + esc(n) + '</button>'; }).join('') +
     '<button type="button" class="who add" onclick="xmOther()">＋ 其他</button></div>' +
-    (!M.who ? '<p class="muted">點上面的名字選店長</p>' : done.length ? '<p class="xp-done">✓ ' + Number(month.slice(5)) + ' 月已記：' + esc(M.who) + ' ' + money(done.reduce(function (a, d) { return a + Number(d.amount || 0); }, 0)) + '（要改請到下面列表刪掉再記）</p>' :
+    (!M.who ? '<p class="muted">點上面的名字選店長</p>' : done.length ? mgrDoneCard(M.who, done, month, L, rng, P, Rv, B, O, neg) :
     (dup.length ? '<div class="xp-hint">⚠ 這段期間的 ' + dup.join('、') + ' 已經記過店長分紅，請把「分這幾個月的盈餘」改成從那之後開始，不然會重複發</div>' : '') +
     '<div class="xm-calc"><table>' +
       row(rng + ' 月盈餘', money(P)) + row('− 存年終', neg(Rv)) + row('− 員工季分紅', neg(B)) +
@@ -1813,6 +1814,32 @@ function renderMgr(L, month, others) {
     '</table><input class="xm-memo" maxlength="80" value="' + esc(M.memo) + '" placeholder="備註（可不填）" oninput="ST.xm.memo=this.value" style="margin-top:8px;width:100%"></div>' +
     '<button class="primary" onclick="addMgrPayout()">記錄店長分紅</button>');
   xmUpd();
+}
+// 點店長頁已發（✓）的人：看這個月記了什麼，可以刪掉重記
+function mgrDoneCard(n, done, month, L, rng, P, Rv, B, O, neg) {
+  var got = done.reduce(function (a, d) { return a + Number(d.amount || 0); }, 0);
+  var backs = L.V.deduct.filter(function (d) { return d.month === month && d.type === '員工還款' && loanWho(d.note) === n && /從分紅扣回/.test(d.note || ''); });
+  var back = backs.reduce(function (a, d) { return a + Number(d.amount || 0); }, 0);
+  var pct = done.map(function (d) { return (String(d.note || '').match(/店長\s*([\d.]+)\s*%/) || [])[1]; }).filter(Boolean)[0];
+  var memo = done.map(function (d) { return String((String(d.note || '').match(/（(.*)）/) || [])[1] || '').replace(/店長\s*[\d.]+\s*%\s*/, '').trim(); }).filter(Boolean).join('；');
+  var base = P - Rv - B - O;
+  var row = function (l, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + l + '</td><td class="n">' + v + '</td></tr>'; };
+  var calcd = pct ? Math.round(base * Number(pct) / 100) : null;
+  var ids = done.concat(backs).map(function (d) { return jsq(d.id); }).join(',');
+  return '<div class="xm-calc xp-view"><b>' + esc(n) + '　' + Number(month.slice(5)) + ' 月已發的紀錄</b><table>' +
+    row(rng + ' 月盈餘', money(P)) + row('− 存年終', neg(Rv)) + row('− 員工季分紅', neg(B)) + row('− 其他扣除（不含分紅，例：買秘笈）', neg(O)) +
+    row('＝ 店長分紅的基數', '<b>' + money(base) + '</b>', 'tot') + (pct ? row('× 比例', pct + ' %') : '') +
+    (calcd !== null && Math.abs(calcd - got) > 1 ? row('<small class="warn">⚠ 照上面算是 ' + money(calcd) + '，跟記錄的不一樣（可能月份範圍不同，或之後資料有改）</small>', '') : '') +
+    row('＝ ' + esc(n) + ' 分紅（已記到總覽）', '<b>' + money(got) + '</b>', 'tot') +
+    row('− 借還欠款（從分紅扣回）', back ? '<span class="bad">−' + money(back) + '</span>' : '<span class="muted">0</span>') +
+    row('＝ 實發', '<span class="xm-net">' + money(got - back) + '</span>', 'tot') +
+    (memo ? row('備註', '<span class="muted">' + esc(memo) + '</span>') : '') +
+    '</table><div class="row" style="gap:8px;margin-top:8px"><button class="danger" onclick="xmRedo(\'' + ids + '\')">刪掉這筆重記</button></div></div>';
+}
+function xmRedo(ids) {
+  if (!confirm('刪掉這個月記的店長分紅（和從分紅扣回的借款），重新記？')) return;
+  ids.split(',').filter(Boolean).forEach(function (id) { enqueue('deduct.del', { id: id }); });
+  ST.xm = null; ST.xp = null; renderDeductTab(); toast('已刪除，可以重新記');
 }
 function xmUpd(fromPct) {
   var b = $('xm-body'), ai = b.querySelector('.xm-amt'); if (!ai) return;
