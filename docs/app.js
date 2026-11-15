@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.6';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -2249,7 +2249,7 @@ function renderSummaryTab() {
   if (!m) { $('m-body').innerHTML = note + '<p class="muted">這個月還沒有任何資料</p>'; return; }
   var rows = [
     ['現場營收', m.site], ['Panda', m.pandaN === null ? '未對帳' : m.pandaN, false, '', m.pandaG], ['Uber', m.uberN === null ? '未對帳' : m.uberN, false, '', m.uberG],
-    ['＝ 實際營收', m.actual, true], ['進貨', -m.purchase, false, pct(m.purchasePct)], ['人事成本', -m.staff, false, pct(m.staffPct)],
+    ['＝ 實際營收', m.actual, true, '', undefined, m.site + m.pandaG + m.uberG], ['進貨', -m.purchase, false, pct(m.purchasePct)], ['人事成本', -m.staff, false, pct(m.staffPct)],
     ['固定支出', -m.fixed], ['其他支出', -m.other], [m.feeEst ? '線上支付手續費（估計）' : '線上支付手續費', -m.fee],
     ['現金差額', m.cashDiff]].concat(m.oldProfit ? [['舊帳盈餘（舊表只有合計）', m.oldProfit]] : []).concat([['＝ 月盈餘', m.profit, true],
     ['員工分紅', -m.bonus], ['年終預留', -m.reserve], ['其他扣除', -m.deductOther], ['＝ 可分配給股東', m.dist, true]]);
@@ -2266,6 +2266,10 @@ function renderSummaryTab() {
       return '<tr class="dlv"><td><span>' + x[0] + '</span><span class="dlv-g"><small>日結</small>' + money(x[4]) + '<i>−</i></span></td><td class="n">' +
         (got ? '<small>實際收到</small><span class="' + sgn(x[1]) + '">' + money(x[1]) + '</span>' : '<span class="warn">未對帳</span>') + '</td><td class="n dlv-p">' +
         (got ? '<i>＝</i><small>付給平台</small><span class="bad">' + money(pay) + '</span>' + (x[4] ? '<em>' + Math.round(pay / x[4] * 100) + '%</em>' : '') : '<span class="muted">—</span>') + '</td></tr>';
+    }
+    if (x[5] !== undefined) {                       // 實際營收：旁邊顯示 現場＋平台日結 的總營業額
+      return '<tr class="dlv" style="font-weight:700"><td><span style="white-space:nowrap">' + x[0] + '</span><span class="dlv-g"><small>日結合計</small>' + money(x[5]) + '<i></i></span></td><td class="n">' +
+        '<span class="' + sgn(x[1]) + '">' + money(x[1]) + '</span></td><td class="n muted"></td></tr>';
     }
     return '<tr' + (x[2] ? ' style="font-weight:700"' : '') + '><td>' + x[0] + '</td><td class="n">' +
       (typeof x[1] === 'number' ? '<span class="' + sgn(x[1]) + '">' + money(x[1]) + '</span>' : '<span class="warn">' + x[1] + '</span>') + '</td><td class="n muted">' + (x[3] || '') + '</td></tr>';
