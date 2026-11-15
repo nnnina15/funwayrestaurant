@@ -348,7 +348,7 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   await B.pg.click('#xl-kind button:has-text("還款")');
   assert.ok((await B.pg.textContent('#xl-chips')).includes('建燁'), '還款時列出還有欠錢的人');
   await B.pg.click('#xl-chips button:has-text("建燁")'); await B.pg.fill('#xl-amount', '20000'); await B.pg.click('#xl-btn');
-  assert.ok((await B.pg.textContent('#xl-sum')).includes('30,000'), '欠款要算出 30,000：' + await B.pg.textContent('#xl-sum'));
+  assert.ok((await B.pg.textContent('#xl-list')).includes('30,000'), '欠款要算出 30,000：' + await B.pg.textContent('#xl-list'));
   await B.pg.waitForFunction(() => /已同步/.test(document.getElementById('sync').textContent), null, { timeout: 8000 });
   assert.ok(g.rows(S.DEDUCT).some(r => r['類型'] === '員工借款' && r['備註'] === '建燁（9月借）' && r['金額'] === 50000), '借款存到試算表');
   await B.pg.click('#tb-overview'); await B.pg.click('#ov-seg button[data-v="year"]'); await B.pg.waitForSelector('#y-body .ytable');

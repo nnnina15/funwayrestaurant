@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.23.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.23.1';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1979,13 +1979,6 @@ function renderLoans() {
     var o = list.filter(function (x) { return x.name === n; })[0];
     return '<button type="button" class="who' + ($('xl-who').value === n ? ' on' : '') + '" onclick="$(\'xl-who\').value=\'' + jsq(n) + '\';renderLoans()">' + esc(n) + (o && o.owe > 0 ? '<small> 欠' + money(o.owe) + '</small>' : '') + '</button>';
   }).join('');
-  var owe = list.reduce(function (a, o) { return a + Math.max(o.owe, 0); }, 0);
-  $('xl-sum').innerHTML = list.length ? '<table class="xlist"><tbody><tr class="mh"><th>借款人</th><th class="n">借出</th><th class="n">已還</th><th class="n">還欠</th></tr>' +
-    list.map(function (o) {
-      return '<tr' + (o.owe > 0 ? '' : ' class="muted"') + '><td>' + esc(o.name) + '</td><td class="n">' + money(o.lent) + '</td><td class="n">' + money(o.back) + '</td><td class="n' + (o.owe > 0 ? ' neg' : '') + '">' + (o.owe ? money(o.owe) : '已還清') + '</td></tr>';
-    }).join('') + '<tr class="yt"><th>還沒收回</th><td></td><td></td><td class="n neg">' + money(owe) + '</td></tr></tbody></table>' +
-    ''
-    : '<p class="muted">還沒有借還款紀錄</p>';
 }
 // 借還款分頁：記錄、欠款總表、每一筆紀錄（新的在上面）
 // 每年：借出、還款、年底還沒收回（累計借出 − 累計還款），不分人
