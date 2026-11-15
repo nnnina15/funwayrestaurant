@@ -362,17 +362,17 @@ const URL_ = 'https://script.google.com/macros/s/TEST/exec';
   console.log('員工借還款 ✓');
   // 記錄股東分紅：選股東自動照比例算金額
   await B.pg.click('#tb-deduct'); await B.pg.fill('#xs-month', '2026-11'); await B.pg.dispatchEvent('#xs-month', 'change');
-  assert.strictEqual(await B.pg.$$eval('#xp-rows .wc', c => c.length), 3, '預設選三位股東');
+  assert.strictEqual(await B.pg.$$eval('#xp-rows .xpr', c => c.length), 3, '預設選三位股東');
   assert.ok((await B.pg.textContent('#xp-rows')).includes('50%'), '要有比例');
   await B.pg.click('#xp-chips button:has-text("呀肥")');   // 取消呀肥
-  assert.strictEqual(await B.pg.$$eval('#xp-rows .wc', c => c.length), 2);
+  assert.strictEqual(await B.pg.$$eval('#xp-rows .xpr', c => c.length), 2);
   assert.ok(/記錄 2 筆分紅/.test(await B.pg.textContent('#xp-btn')));
   await B.pg.setViewportSize({ width: 390, height: 844 }); await B.pg.screenshot({ path: path.join(require('os').tmpdir(), 'e2e-xp-sel.png') }); await B.pg.setViewportSize({ width: 1100, height: 1300 });
   // 備用基金：留 10,000，豐吉（50%）少 5,000
-  const fengA = Number(await B.pg.inputValue('#xp-rows .wc[data-name="豐吉"] .card-amt'));
+  const fengA = Number(await B.pg.inputValue('#xp-rows .xpr[data-name="豐吉"] .xp-got'));
   await B.pg.fill('#xp-range .xp-amt input', '10000'); await B.pg.dispatchEvent('#xp-range .xp-amt input', 'change');
   await B.pg.waitForTimeout(500);
-  const fengB = Number(await B.pg.inputValue('#xp-rows .wc[data-name="豐吉"] .card-amt'));
+  const fengB = Number(await B.pg.inputValue('#xp-rows .xpr[data-name="豐吉"] .xp-got'));
   assert.strictEqual(fengA - fengB, 5000, '留備用基金 10,000，豐吉 50% 要少 5,000：' + fengA + '→' + fengB);
   assert.ok((await B.pg.textContent('#xp-range')).includes('這次可以分'), '要顯示這次可以分多少');
   await B.pg.fill('#xp-range .xp-amt input', ''); await B.pg.dispatchEvent('#xp-range .xp-amt input', 'change'); await B.pg.waitForTimeout(500);
