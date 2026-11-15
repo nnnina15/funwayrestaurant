@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.19.8">
+<meta name="app-version" content="4.19.9">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -461,6 +461,17 @@
   .pw .eye.on { color: var(--brand); }
   .xlist tr.mh th { text-align: left; background: var(--soft); font-size: 14px; padding: 6px 10px; }
   .xlist tr.mh th.n { text-align: right; }
+  .xsum { min-width: 640px; }
+  .xsum thead th { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .xsum tr.xm { cursor: pointer; }
+  .xsum tr.xm:hover, .xsum tr.xm.open { background: var(--soft); }
+  .xsum tr.xm th { text-align: left; white-space: nowrap; }
+  .xsum tr.xm th small { margin-left: 6px; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .xsum .car { display: inline-block; width: 14px; color: var(--muted); }
+  .xsum td.em { font-weight: 700; }
+  .xsum tr.xd > td { padding: 0 0 8px 18px; background: var(--soft); }
+  .xsum tr.xd table { width: 100%; max-width: calc(100vw - 72px); position: sticky; left: 18px; }
+  .xsum tr.xd td { font-size: 14px; }
   .xlist tr.yt td, .xlist tr.yt th { font-weight: 800; border-top: 2px solid var(--amber); }
   .chips .who.on { background: var(--brand); color: #fff; }
   /* 店長只能看的頁：隱藏新增／儲存／刪除，輸入格不能改 */
@@ -939,7 +950,7 @@
         <button class="primary" onclick="addDeduct()">新增扣除</button>
       </div>
     </div>
-    <div class="card"><h2 id="x-list-h">這一年的分紅和扣除</h2><table class="xlist"><tbody id="x-list"></tbody></table></div>
+    <div class="card"><h2 id="x-list-h">這一年的分紅和扣除</h2><div id="x-list"></div></div>
   </section>
 
   <section id="tab-loan" class="hide">

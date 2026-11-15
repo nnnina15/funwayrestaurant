@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.19.8';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.19.9';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1722,15 +1722,35 @@ function renderDeductTab() {
   $('x-type-seg').innerHTML = types.map(function (t) { return '<button type="button" class="' + ($('x-type').value === t ? 'on' : '') + '" onclick="$(\'x-type\').value=\'' + jsq(t) + '\';renderDeductTab()">' + esc(t === '員工分紅' ? '員工季分紅' : t) + '</button>'; }).join('');
   var list = view().deduct.filter(function (x) { return String(x.month || '').slice(0, 4) === y && x.type !== '員工借款' && x.type !== '員工還款'; }).sort(function (a, b) { return a.month < b.month ? -1 : a.month > b.month ? 1 : 0; });
   $('x-list-h').textContent = y + ' 年的分紅和扣除';
-  var h = '', last = '', tot = 0;
+  // 一個月一列：分配前扣除（員工季分紅、存年終、其他扣除）＋ 每位股東實際發的分紅；點月份展開明細（可刪除）
+  var nmOf = function (d) { return String(d.note || '').replace(/（.*?）|\(.*?\)/g, '').trim() || '股東'; };
+  var people = [], byM = {}, T = { b: 0, r: 0, o: 0, p: {} };
   list.forEach(function (x) {
-    if (x.month !== last) { last = x.month; h += '<tr class="mh"><th colspan="4">' + Number(x.month.slice(5, 7)) + ' 月</th></tr>'; }
-    tot += Number(x.amount || 0);
-    var t = x.type === '股東分紅（已發）' ? '股東分紅' : x.type === '員工借款' ? '借出' : x.type === '員工還款' ? '還款' : x.type;
-    h += '<tr><td class="nowrap">' + esc(t) + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
-      '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delDeduct(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
+    var M = byM[x.month] || (byM[x.month] = { b: 0, r: 0, o: 0, p: {}, rows: [] }), a = Number(x.amount || 0);
+    M.rows.push(x);
+    if (x.type === '員工分紅') { M.b += a; T.b += a; }
+    else if (x.type === '年終預留') { M.r += a; T.r += a; }
+    else if (x.type === '股東分紅（已發）') { var n = nmOf(x); if (people.indexOf(n) < 0) people.push(n); M.p[n] = (M.p[n] || 0) + a; T.p[n] = (T.p[n] || 0) + a; }
+    else { M.o += a; T.o += a; }
   });
-  $('x-list').innerHTML = h ? h + '<tr class="yt"><th>全年合計</th><td></td><td class="n">' + money(tot) + '</td><td></td></tr>' : '<tr><td class="muted">這一年還沒有分紅或扣除</td></tr>';
+  var cell = function (v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + '">' + (v ? money(v) : '<span class="muted">—</span>') + '</td>'; };
+  var psum = function (o) { return people.reduce(function (a, n) { return a + (o.p[n] || 0); }, 0); };
+  var line = function (o) { return cell(o.b) + cell(o.r) + cell(o.o) + cell(o.b + o.r + o.o, 'em') + people.map(function (n) { return cell(o.p[n]); }).join('') + cell(psum(o), 'em'); };
+  var ncol = 6 + people.length;
+  ST.xOpen = ST.xOpen || {};
+  var h = Object.keys(byM).sort().map(function (m) {
+    var M = byM[m], open = !!ST.xOpen[m];
+    var r = '<tr class="xm' + (open ? ' open' : '') + '" onclick="ST.xOpen[\'' + m + '\']=!ST.xOpen[\'' + m + '\'];renderDeductTab()"><th><span class="car">' + (open ? '▾' : '▸') + '</span>' + Number(m.slice(5, 7)) + ' 月<small>' + M.rows.length + ' 筆</small></th>' + line(M) + '</tr>';
+    if (open) r += '<tr class="xd"><td colspan="' + ncol + '"><table>' + M.rows.map(function (x) {
+      var t = x.type === '股東分紅（已發）' ? '股東分紅' : x.type === '員工分紅' ? '員工季分紅' : x.type;
+      return '<tr><td class="nowrap">' + esc(t) + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(x.note) + '</td><td class="n">' + money(x.amount) +
+        '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="event.stopPropagation();delDeduct(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
+    }).join('') + '</table></td></tr>';
+    return r;
+  }).join('');
+  $('x-list').innerHTML = h ? '<p class="muted swipe">點月份看明細、刪除｜← 表格可以左右滑動 →</p><div class="xscroll"><table class="xlist xsum"><thead><tr><th>月份</th><th class="n">員工季分紅</th><th class="n">存年終</th><th class="n">其他扣除</th><th class="n">＝ 分配前扣除</th>' +
+    people.map(function (n) { return '<th class="n">' + esc(n) + '</th>'; }).join('') + '<th class="n">＝ 股東分紅</th></tr></thead><tbody>' + h +
+    '<tr class="yt"><th>全年合計</th>' + line(T) + '</tr></tbody></table></div>' : '<p class="muted">這一年還沒有分紅或扣除</p>';
 }
 // 記錄實際發出的股東分紅：設定裡的股東（浩勤、豐吉…）記「股東分紅（已發）」；其他人（佳茹、Nina…）記「其他扣除・某某分紅」
 function nextMonth(m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7) + 1; if (mo > 12) { y++; mo = 1; } return y + '-' + (mo < 10 ? '0' : '') + mo; }
