@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.21.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.21.3';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1694,7 +1694,7 @@ function renderDeductTab() {
   // 下面：選了的人排成計算表：可分盈餘×比例 − 分配前扣除 ＝ 獲得分紅 − 借還欠款 ＝ 實發
   $('xp-chips').innerHTML = names.map(function (n) {
     var c = calc[n], on = !!ST.xp.sel[n];
-    if (c.done) { doneList.push(n + ' ' + money(c.done)); return '<button type="button" class="who done" onclick="toast(\'' + jsq(n) + ' 這個月已經記過了；要改請到下面列表刪掉再記\')">✓ ' + esc(n) + '</button>'; }
+    if (c.done) { doneList.push(n + ' ' + money(c.done)); return '<button type="button" class="who done' + (ST.xp.view === n ? ' on' : '') + '" onclick="ST.xp.view=ST.xp.view===\'' + jsq(n) + '\'?\'\':\'' + jsq(n) + '\';renderDeductTab()">✓ ' + esc(n) + '</button>'; }
     if (on) {
       var a = ST.xp.amt[n] !== undefined ? ST.xp.amt[n] : (c.amt !== null ? String(Math.max(c.amt, 0)) : '');
       var o = ST.xp.owe[n] !== undefined ? ST.xp.owe[n] : (c.owe > 0 ? String(Math.min(c.owe, Math.max(expr(a) || 0, 0))) : '');   // 預設扣回欠款，但不超過這次的分紅
@@ -1711,7 +1711,9 @@ function renderDeductTab() {
     return '<button type="button" class="who' + (on ? ' on' : '') + '" onclick="xpToggle(\'' + jsq(n) + '\')">' + esc(n) + '</button>';
   }).join('');
   $('xp-rows').innerHTML = rowsH ? '<p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="xp-tbl"><thead><tr><th></th><th class="n">月盈餘 × 比例</th><th class="n">− 分配前扣除</th><th class="n">＝ 獲得分紅<small>記到總覽</small></th><th class="n">− 借還欠款<small>從分紅扣回</small></th><th class="n">＝ 實發</th><th>備註</th></tr></thead><tbody>' + rowsH + '</tbody></table></div>' : '';
+  var vw = ST.xp.view && calc[ST.xp.view] && calc[ST.xp.view].done ? xpDoneCard(ST.xp.view, calc[ST.xp.view], month, L) : '';
   $('xp-done').textContent = doneList.length ? '✓ ' + Number(month.slice(5)) + ' 月已發：' + doneList.join('、') : '';
+  if (vw) $('xp-done').innerHTML += vw;
   var MG = xmLast(L);
   if (MG && !L.V.deduct.some(function (d) { return d.month === month && d.type === '其他扣除' && /店長/.test(d.note || ''); }) && selN)
     $('xp-done').innerHTML += '<div class="xp-hint">⚠ 這個月還沒記店長（' + esc(MG.who) + '）分紅。請先到「店長」頁記，股東分紅才會先扣掉店長那份，不然會多分。</div>';
@@ -1831,6 +1833,29 @@ function addMgrPayout() {
   ST.xm = null; ST.xp = null;
   renderDeductTab();
   toast('已記錄店長分紅 ✓　接著到「股東」頁記股東分紅');
+}
+// 點已發（綠色 ✓）的股東：看這個月記了什麼（獲得分紅、從分紅扣回的借款、實發、備註），可以刪掉重記
+function xpDoneCard(n, c, month, L) {
+  var nm = function (d) { return String(d.note || '').replace(/（.*?）|\(.*?\)/g, '').replace(/分紅.*$/, '').trim(); };
+  var pays = L.V.deduct.filter(function (d) { return d.month === month && d.type === '股東分紅（已發）' && nm(d) === n; });
+  var backs = L.V.deduct.filter(function (d) { return d.month === month && d.type === '員工還款' && loanWho(d.note) === n && /從分紅扣回/.test(d.note || ''); });
+  var got = pays.reduce(function (a, d) { return a + Number(d.amount || 0); }, 0), back = backs.reduce(function (a, d) { return a + Number(d.amount || 0); }, 0);
+  var memo = pays.map(function (d) { return (String(d.note || '').match(/（(.*)）/) || [])[1] || ''; }).filter(Boolean).join('；');
+  var row = function (l, v, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + l + '</td><td class="n">' + v + '</td></tr>'; };
+  var ids = pays.concat(backs).map(function (d) { return d.id; });
+  return '<div class="xm-calc xp-view"><b>' + esc(n) + '　' + Number(month.slice(5)) + ' 月已發的紀錄</b><table>' +
+    (c.pct !== undefined ? row('月盈餘 ' + money(c.base) + ' × ' + c.pct + '%', money(Math.round(c.base * c.pct / 100))) + row('− 分配前扣除 × ' + c.pct + '%', '<span class="bad">−' + money(Math.round(c.ded)) + '</span>') +
+      (Math.abs(Math.round(c.base * c.pct / 100 - c.ded) - got) > 1 ? row('<small class="warn">⚠ 照上面「分這幾個月」算是 ' + money(Math.round(c.base * c.pct / 100 - c.ded)) + '，跟記錄的不一樣（可能月份範圍不同，或之後資料有改）</small>', '') : '') : '') +
+    row('＝ 獲得分紅（已記到總覽）', '<b>' + money(got) + '</b>', 'tot') +
+    row('− 借還欠款（從分紅扣回）', back ? '<span class="bad">−' + money(back) + '</span>' : '<span class="muted">0</span>') +
+    row('＝ 實發', '<span class="xm-net">' + money(got - back) + '</span>', 'tot') +
+    (memo ? row('備註', '<span class="muted">' + esc(memo) + '</span>') : '') +
+    '</table><div class="row" style="gap:8px;margin-top:8px"><button onclick="ST.xp.view=\'\';renderDeductTab()">收起</button><button class="danger" onclick="xpRedo(\'' + ids.map(jsq).join(',') + '\')">刪掉這筆重記</button></div></div>';
+}
+function xpRedo(ids) {
+  if (!confirm('刪掉這個月記的分紅（和從分紅扣回的借款），重新記？')) return;
+  ids.split(',').filter(Boolean).forEach(function (id) { enqueue('deduct.del', { id: id }); });
+  ST.xp = null; renderDeductTab(); toast('已刪除，可以重新記');
 }
 function xpToggle(n) { ST.xp.sel[n] = !ST.xp.sel[n]; renderDeductTab(); }
 function xpOther() { var n = prompt('要記誰的分紅？（例：建燁、佳茹）'); if (!n || !(n = n.trim())) return; if (ST.xp.extra.indexOf(n) < 0) ST.xp.extra.push(n); ST.xp.sel[n] = true; renderDeductTab(); }
@@ -2019,16 +2044,35 @@ function renderLoanTab() {
   if (!$('xl-month').value) $('xl-month').value = todayStr().slice(0, 7);
   renderLoans();
   renderLoanYears();
+  // 借還款紀錄：一人一列（借出、還款、目前欠），點名字展開那個人的每一筆（新的在上面，可刪除）；還清的放最下面
   var list = view().deduct.filter(function (d) { return d.type === '員工借款' || d.type === '員工還款'; })
     .sort(function (a, b) { return a.month < b.month ? 1 : a.month > b.month ? -1 : 0; });
-  var h = '', last = '';
+  var P = {}, order = [];
   list.forEach(function (x) {
-    if (x.month !== last) { last = x.month; h += '<tr class="mh"><th colspan="4">' + x.month.slice(0, 4) + '/' + Number(x.month.slice(5, 7)) + ' 月</th></tr>'; }
-    var out = x.type === '員工借款';
-    h += '<tr><td class="nowrap">' + (out ? '借出' : '還款') + pendTag('deduct', x.id) + '</td><td>' + esc(x.note) + '</td><td class="n' + (out ? ' neg' : ' pos') + '">' + (out ? '-' : '+') + money(x.amount) +
-      '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="delLoan(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
+    var n = loanWho(x.note), o = P[n] || (P[n] = { out: 0, back: 0, last: x.month, rows: [] });
+    if (order.indexOf(n) < 0) order.push(n);
+    o[x.type === '員工借款' ? 'out' : 'back'] += Number(x.amount || 0); o.rows.push(x);
   });
-  $('xl-list').innerHTML = h || '<tr><td class="muted">還沒有借還款紀錄</td></tr>';
+  order.forEach(function (n) { P[n].owe = P[n].out - P[n].back; });
+  order.sort(function (a, b) { var A = P[a], B = P[b]; if ((A.owe > 0) !== (B.owe > 0)) return A.owe > 0 ? -1 : 1; return A.last < B.last ? 1 : A.last > B.last ? -1 : 0; });
+  ST.loanOpen = ST.loanOpen || {};
+  var mm = function (m) { return m.slice(0, 4) + '/' + Number(m.slice(5, 7)); };
+  var h = '', settled = false, T = { out: 0, back: 0, owe: 0 };
+  order.forEach(function (n) {
+    var o = P[n], open = !!ST.loanOpen[n];
+    T.out += o.out; T.back += o.back; T.owe += o.owe;
+    if (o.owe <= 0 && !settled) { settled = true; h += '<tr class="mh"><th colspan="5">已還清</th></tr>'; }
+    h += '<tr class="xm' + (open ? ' open' : '') + '" onclick="ST.loanOpen[\'' + jsq(n) + '\']=!ST.loanOpen[\'' + jsq(n) + '\'];renderLoanTab()"><th><span class="car">' + (open ? '▾' : '▸') + '</span>' + esc(n) + '<small>' + o.rows.length + ' 筆｜最近 ' + mm(o.last) + '</small></th>' +
+      '<td class="n neg">' + (o.out ? '-' + money(o.out) : '<span class="muted">—</span>') + '</td><td class="n pos">' + (o.back ? '+' + money(o.back) : '<span class="muted">—</span>') + '</td>' +
+      '<td class="n em' + (o.owe > 0 ? ' neg' : '') + '">' + (o.owe ? money(o.owe) : '<span class="ok">✓ 還清</span>') + '</td></tr>';
+    if (open) h += '<tr class="xd"><td colspan="4"><table>' + o.rows.map(function (x) {
+      var out = x.type === '員工借款', memo = (String(x.note || '').match(/（(.*)）|\((.*)\)/) || [])[1] || '';
+      return '<tr><td class="nowrap">' + mm(x.month) + ' 月</td><td class="nowrap">' + (out ? '借出' : '還款') + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(memo) + '</td><td class="n' + (out ? ' neg' : ' pos') + '">' + (out ? '-' : '+') + money(x.amount) +
+        '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="event.stopPropagation();delLoan(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
+    }).join('') + '</table></td></tr>';
+  });
+  $('xl-list').innerHTML = h ? '<p class="muted swipe">點名字看每一筆、刪除</p><div class="xscroll"><table class="xlist xsum xl-ppl"><thead><tr><th>借款人</th><th class="n">借出</th><th class="n">還款</th><th class="n">目前欠</th></tr></thead><tbody>' + h +
+    '<tr class="yt"><th>合計</th><td class="n">-' + money(T.out) + '</td><td class="n">+' + money(T.back) + '</td><td class="n">' + money(T.owe) + '</td></tr></tbody></table></div>' : '<p class="muted">還沒有借還款紀錄</p>';
 }
 function delLoan(id) { if (confirm('確定刪除這筆借還款？')) { enqueue('deduct.del', { id: id }); renderLoanTab(); } }
 function addLoan() {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.21.1">
+<meta name="app-version" content="4.21.3">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -252,6 +252,8 @@
   .xm-calc tr.tot td { border-top: 1.5px solid var(--line); font-weight: 800; }
   .xm-calc input { width: 120px; text-align: right; font-weight: 700; padding: 6px 8px; background: var(--card); }
   .xm-calc input.xm-pct { width: 64px; }
+  .xp-view { margin-top: 10px; color: var(--ink); }
+  .xp-view > b { display: block; margin-bottom: 4px; }
   .xm-calc input.xm-memo { width: 100%; text-align: left; font-weight: 400; }
   .xm-calc .xm-net { font-size: 20px; color: var(--brand); font-weight: 800; }
   .xp-hint { background: color-mix(in srgb, var(--amber) 16%, var(--card)); border-radius: 10px; padding: 8px 10px; font-size: 13.5px; margin: 6px 0; }
@@ -471,6 +473,10 @@
   .xlist tr.mh th { text-align: left; background: var(--soft); font-size: 14px; padding: 6px 10px; }
   .xlist tr.mh th.n { text-align: right; }
   .xsum { min-width: 640px; }
+  .xsum.xl-ppl { min-width: 0; }
+  .xl-ppl tr.xm th small { display: block; margin: 2px 0 0 20px; }
+  .xl-ppl td, .xl-ppl th { padding-left: 6px; padding-right: 6px; }
+  .xsum tr.mh th { text-align: left; background: var(--soft); font-size: 13px; color: var(--muted); }
   .xsum thead th { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
   .xsum thead th small { display: block; font-size: 11px; font-weight: 400; }
   .xsum tr.xm { cursor: pointer; }
@@ -982,7 +988,7 @@
     </div>
     <div class="card" id="xl-sum-card"><h2>員工欠款</h2><div id="xl-sum"></div></div>
     <div class="card"><div class="h2row" style="margin-top:0"><h2 id="xl-yh">每年還沒收回</h2><div class="seg ymode" id="xl-mode"><button data-v="year" onclick="loanMode('year')">年</button><button data-v="month" onclick="loanMode('month')">月</button></div></div><p class="muted" id="xl-ynote"></p><div id="xl-years"></div></div>
-    <div class="card"><h2>借還款紀錄</h2><table class="xlist"><tbody id="xl-list"></tbody></table></div>
+    <div class="card"><h2>借還款紀錄</h2><div id="xl-list"></div></div>
   </section>
 
   <section id="tab-overview" class="hide">
