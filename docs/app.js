@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.20.0';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.20.1';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1730,7 +1730,7 @@ function renderDeductTab() {
   });
   var cell = function (v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + '">' + (v ? money(v) : '<span class="muted">—</span>') + '</td>'; };
   var psum = function (o) { return people.reduce(function (a, n) { return a + (o.p[n] || 0); }, 0); };
-  var line = function (o) { return cell(o.b) + cell(o.r) + cell(o.o) + cell(o.b + o.r + o.o, 'em') + people.map(function (n) { return cell(o.p[n]); }).join('') + cell(psum(o), 'em'); };
+  var line = function (o) { return people.map(function (n) { return cell(o.p[n]); }).join('') + cell(psum(o), 'em sep') + cell(o.b) + cell(o.r) + cell(o.o) + cell(o.b + o.r + o.o, 'em'); };
   var ncol = 6 + people.length;
   ST.xOpen = ST.xOpen || {};
   var h = Object.keys(byM).sort().map(function (m) {
@@ -1743,8 +1743,8 @@ function renderDeductTab() {
     }).join('') + '</table></td></tr>';
     return r;
   }).join('');
-  $('x-list').innerHTML = h ? '<p class="muted swipe">點月份看明細、刪除｜← 表格可以左右滑動 →</p><div class="xscroll"><table class="xlist xsum"><thead><tr><th>月份</th><th class="n">員工季分紅</th><th class="n">存年終</th><th class="n">其他扣除</th><th class="n">＝ 分配前扣除</th>' +
-    people.map(function (n) { return '<th class="n">' + esc(n) + '</th>'; }).join('') + '<th class="n">＝ 股東分紅</th></tr></thead><tbody>' + h +
+  $('x-list').innerHTML = h ? '<p class="muted swipe">點月份看明細、刪除｜← 表格可以左右滑動 →</p><div class="xscroll"><table class="xlist xsum"><thead><tr><th>月份</th>' + people.map(function (n) { return '<th class="n">' + esc(n) + '</th>'; }).join('') + '<th class="n sep">＝ 股東分紅</th>' +
+    '<th class="n">員工季分紅</th><th class="n">存年終</th><th class="n">其他扣除</th><th class="n">＝ 分配前扣除</th></tr></thead><tbody>' + h +
     '<tr class="yt"><th>全年合計</th>' + line(T) + '</tr></tbody></table></div>' : '<p class="muted">這一年還沒有分紅或扣除</p>';
 }
 // 記錄實際發出的股東分紅：設定裡的股東（浩勤、豐吉…）記「股東分紅（已發）」；其他人（佳茹、Nina…）記「其他扣除・某某分紅」
