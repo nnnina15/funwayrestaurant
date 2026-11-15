@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.21.5';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.21.6';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -2081,30 +2081,33 @@ function renderLoanTab() {
     o[x.type === '員工借款' ? 'out' : 'back'] += Number(x.amount || 0); o.rows.push(x);
   });
   order.forEach(function (n) { P[n].owe = P[n].out - P[n].back; });
-  order.sort(function (a, b) { var A = P[a], B = P[b]; if ((A.owe > 0) !== (B.owe > 0)) return A.owe > 0 ? -1 : 1; return A.last < B.last ? 1 : A.last > B.last ? -1 : 0; });
+  // 分三組：欠店裡（正）→ 店裡欠他們（負，例：股東拿分紅出來借給員工）→ 已還清（預設收起來）
+  var grp = function (o) { return o.owe > 0 ? 0 : o.owe < 0 ? 1 : 2; };
+  order.sort(function (a, b) { var A = P[a], B = P[b]; if (grp(A) !== grp(B)) return grp(A) - grp(B); return A.last < B.last ? 1 : A.last > B.last ? -1 : 0; });
   ST.loanOpen = ST.loanOpen || {};
   var mm = function (m) { return m.slice(0, 4) + '/' + Number(m.slice(5, 7)); };
-  var h = '', settled = false, T = { out: 0, back: 0, owe: 0 };
+  var h = '', seen = {}, T = { out: 0, back: 0, them: 0, us: 0 };
   order.forEach(function (n) {
-    var o = P[n], open = !!ST.loanOpen[n];
-    if (o.owe > 0 || ST.loanSettled) { T.out += o.out; T.back += o.back; T.owe += o.owe; }
-    if (o.owe <= 0 && !settled) {   // 已還清的人：預設收起來，點標題展開
-      settled = true;
-      var nS = order.filter(function (k) { return P[k].owe <= 0; }).length;
-      h += '<tr class="mh xm" onclick="ST.loanSettled=!ST.loanSettled;renderLoanTab()"><th colspan="4"><span class="car">' + (ST.loanSettled ? '▾' : '▸') + '</span>已還清 ' + nS + ' 人' + (ST.loanSettled ? '' : '<small>（點一下展開）</small>') + '</th></tr>';
+    var o = P[n], open = !!ST.loanOpen[n], g = grp(o);
+    T.out += o.out; T.back += o.back; if (o.owe > 0) T.them += o.owe; else T.us -= o.owe;
+    if (!seen[g]) {
+      seen[g] = true;
+      var cnt = order.filter(function (k) { return grp(P[k]) === g; }).length;
+      if (g === 1) h += '<tr class="mh"><th colspan="4">店裡欠他們 ' + cnt + ' 人<small>（例：股東拿分紅借給員工，員工還了再還給他們）</small></th></tr>';
+      if (g === 2) h += '<tr class="mh xm" onclick="ST.loanSettled=!ST.loanSettled;renderLoanTab()"><th colspan="4"><span class="car">' + (ST.loanSettled ? '▾' : '▸') + '</span>已還清 ' + cnt + ' 人' + (ST.loanSettled ? '' : '<small>（點一下展開）</small>') + '</th></tr>';
     }
-    if (o.owe <= 0 && !ST.loanSettled) { T.out += o.out; T.back += o.back; T.owe += o.owe; return; }
+    if (g === 2 && !ST.loanSettled) return;
     h += '<tr class="xm' + (open ? ' open' : '') + '" onclick="ST.loanOpen[\'' + jsq(n) + '\']=!ST.loanOpen[\'' + jsq(n) + '\'];renderLoanTab()"><th><span class="car">' + (open ? '▾' : '▸') + '</span>' + esc(n) + '<small>' + o.rows.length + ' 筆｜最近 ' + mm(o.last) + '</small></th>' +
       '<td class="n neg">' + (o.out ? '-' + money(o.out) : '<span class="muted">—</span>') + '</td><td class="n pos">' + (o.back ? '+' + money(o.back) : '<span class="muted">—</span>') + '</td>' +
-      '<td class="n em' + (o.owe > 0 ? ' neg' : '') + '">' + (o.owe ? money(o.owe) : '<span class="ok">✓ 還清</span>') + '</td></tr>';
+      '<td class="n em' + (o.owe > 0 ? ' neg' : '') + '">' + (o.owe > 0 ? money(o.owe) : o.owe < 0 ? '<span class="warn">店裡欠 ' + money(-o.owe) + '</span>' : '<span class="ok">✓ 還清</span>') + '</td></tr>';
     if (open) h += '<tr class="xd"><td colspan="4"><table>' + o.rows.map(function (x) {
       var out = x.type === '員工借款', memo = (String(x.note || '').match(/（(.*)）|\((.*)\)/) || [])[1] || '';
       return '<tr><td class="nowrap">' + mm(x.month) + ' 月</td><td class="nowrap">' + (out ? '借出' : '還款') + pendTag('deduct', x.id) + '</td><td class="muted">' + esc(memo) + '</td><td class="n' + (out ? ' neg' : ' pos') + '">' + (out ? '-' : '+') + money(x.amount) +
         '</td><td class="n"><button class="danger del-x" aria-label="刪除" title="刪除" onclick="event.stopPropagation();delLoan(\'' + jsq(x.id) + '\')">✕</button></td></tr>';
     }).join('') + '</table></td></tr>';
   });
-  $('xl-list').innerHTML = h ? '<p class="muted swipe">點名字看每一筆、刪除</p><div class="xscroll"><table class="xlist xsum xl-ppl"><thead><tr><th>借款人</th><th class="n">借出</th><th class="n">還款</th><th class="n">目前欠</th></tr></thead><tbody>' + h +
-    '<tr class="yt"><th>合計</th><td class="n">-' + money(T.out) + '</td><td class="n">+' + money(T.back) + '</td><td class="n">' + money(T.owe) + '</td></tr></tbody></table></div>' : '<p class="muted">還沒有借還款紀錄</p>';
+  $('xl-list').innerHTML = h ? '<p class="muted swipe">點名字看每一筆、刪除</p><div class="xscroll"><table class="xlist xsum xl-ppl"><thead><tr><th>借款人</th><th class="n">借出</th><th class="n">還款</th><th class="n">目前</th></tr></thead><tbody>' + h +
+    '<tr class="yt"><th>合計</th><td class="n">-' + money(T.out) + '</td><td class="n">+' + money(T.back) + '</td><td class="n"><span class="neg">欠店裡 ' + money(T.them) + '</span>' + (T.us ? '<br><span class="warn">店裡欠 ' + money(T.us) + '</span>' : '') + '</td></tr></tbody></table></div>' : '<p class="muted">還沒有借還款紀錄</p>';
 }
 function delLoan(id) { if (confirm('確定刪除這筆借還款？')) { enqueue('deduct.del', { id: id }); renderLoanTab(); } }
 function addLoan() {
