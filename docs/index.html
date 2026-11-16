@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.23.1">
+<meta name="app-version" content="4.23.2">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -738,6 +738,23 @@
   .xsum tr.yt > *, .xlist tr.yt > *, .ytable tr.yrow th, .ytable tr.yrow td, .ytable > tbody > tr.yrow > th, .ytable tfoot th, .ytable tfoot td, .dv tr.tot > * { background: var(--tot); border-top: 0; font-weight: 800; }
   .xsum tr.xm.open, .xsum tr.xm:hover { background: color-mix(in srgb, var(--brand) 8%, var(--card)); }
   .xsum tr.mh > th { background: transparent; }
+  /* 股東分紅計算表：手機上改成直的（一人一張卡，每一行「名稱｜數字」） */
+  @media (max-width: 700px) {
+    .xp-tbl { min-width: 0; }
+    .xp-tbl thead { display: none; }
+    .xp-tbl, .xp-tbl tbody, .xp-tbl tr, .xp-tbl th, .xp-tbl td { display: block; width: 100%; }
+    .xp-tbl tr.xpr { background: var(--soft) !important; border-radius: 14px; padding: 6px 12px 10px; margin-bottom: 10px; }
+    .xp-tbl tr.xpr > th { font-size: 18px; padding: 6px 0; border: 0; }
+    .xp-tbl tr.xpr > th small { display: inline; margin-left: 6px; }
+    .xp-tbl tr.xpr > td { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px solid var(--line); text-align: right; }
+    .xp-tbl tr.xpr > td::before { content: attr(data-l); color: var(--muted); font-size: 14px; text-align: left; flex: 1; }
+    .xp-tbl tr.xpr > td small { flex-basis: 100%; text-align: right; order: 5; }
+    .xp-tbl tr.xpr > td.xp-net { border-bottom: 0; font-size: 18px; }
+    .xp-tbl tr.xpr > td.xp-net b { font-size: 22px; }
+    .xp-tbl tr.xpr > td[data-l="備註"] { border-bottom: 0; }
+    .xp-tbl tr.xpr > td[data-l="備註"]::before { display: none; }
+    .xp-tbl input.xp-memo { width: 100%; }
+  }
 </style>
 </head>
 <body>

@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.23.1';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.23.2';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1688,17 +1688,18 @@ function renderDeductTab() {
       var o = ST.xp.owe[n] !== undefined ? ST.xp.owe[n] : (c.owe > 0 ? String(Math.min(c.owe, Math.max(expr(a) || 0, 0))) : '');   // 預設扣回欠款，但不超過這次的分紅
       var q = jsq(n);
       selN++;
+      var dd = Math.round(c.ded || 0);
       rowsH += '<tr class="xpr" data-name="' + esc(n) + '"><th>' + esc(n) + '<small>' + esc(c.tag) + '</small></th>' +
-        (c.pct !== undefined ? '<td class="n"><small>' + money(c.base) + ' × ' + c.pct + '%</small>' + money(Math.round(c.base * c.pct / 100)) + '</td><td class="n bad">−' + money(Math.round(c.ded)) + '</td>'
-          : '<td class="n muted">固定分紅</td><td class="n muted">—</td>') +
-        '<td class="n"><input class="xp-got" inputmode="numeric" value="' + esc(a) + '" placeholder="金額" oninput="digitsOnly(this);ST.xp.amt[\'' + q + '\']=this.value;xpSum()"></td>' +
-        '<td class="n"><input class="xp-owe" inputmode="numeric" value="' + esc(o) + '" placeholder="0" oninput="digitsOnly(this);ST.xp.owe[\'' + q + '\']=this.value;xpSum()">' + (c.owe ? '<small>目前欠 ' + money(c.owe) + '</small>' : '') + '</td>' +
-        '<td class="n xp-net"></td>' +
-        '<td><input class="xp-memo" maxlength="80" value="' + esc(ST.xp.memo[n] || '') + '" placeholder="備註（可不填）" oninput="ST.xp.memo[\'' + q + '\']=this.value"></td></tr>';
+        (c.pct !== undefined ? '<td class="n" data-l="月盈餘 × 比例"><small>' + money(c.base) + ' × ' + c.pct + '%</small>' + money(Math.round(c.base * c.pct / 100)) + '</td><td class="n" data-l="− 分配前扣除">' + (dd ? '<span class="bad">−' + money(dd) + '</span>' : '<span class="muted">0</span>') + '</td>'
+          : '<td class="n muted" data-l="月盈餘 × 比例">固定分紅</td><td class="n muted" data-l="− 分配前扣除">—</td>') +
+        '<td class="n" data-l="＝ 獲得分紅（記到總覽）"><input class="xp-got" inputmode="numeric" value="' + esc(a) + '" placeholder="金額" oninput="digitsOnly(this);ST.xp.amt[\'' + q + '\']=this.value;xpSum()"></td>' +
+        '<td class="n" data-l="− 借還欠款（從分紅扣回）"><input class="xp-owe" inputmode="numeric" value="' + esc(o) + '" placeholder="0" oninput="digitsOnly(this);ST.xp.owe[\'' + q + '\']=this.value;xpSum()">' + (c.owe > 0 ? '<small>目前欠 ' + money(c.owe) + '</small>' : c.owe < 0 ? '<small>店裡欠他 ' + money(-c.owe) + '</small>' : '') + '</td>' +
+        '<td class="n xp-net" data-l="＝ 實發"></td>' +
+        '<td data-l="備註"><input class="xp-memo" maxlength="80" value="' + esc(ST.xp.memo[n] || '') + '" placeholder="備註（可不填）" oninput="ST.xp.memo[\'' + q + '\']=this.value"></td></tr>';
     }
     return '<button type="button" class="who' + (on ? ' on' : '') + '" onclick="xpToggle(\'' + jsq(n) + '\')">' + esc(n) + '</button>';
   }).join('');
-  $('xp-rows').innerHTML = rowsH ? '<p class="muted swipe">← 表格可以左右滑動 →</p><div class="xscroll"><table class="xp-tbl"><thead><tr><th></th><th class="n">月盈餘 × 比例</th><th class="n">− 分配前扣除</th><th class="n">＝ 獲得分紅<small>記到總覽</small></th><th class="n">− 借還欠款<small>從分紅扣回</small></th><th class="n">＝ 實發</th><th>備註</th></tr></thead><tbody>' + rowsH + '</tbody></table></div>' : '';
+  $('xp-rows').innerHTML = rowsH ? '<div class="xscroll"><table class="xp-tbl"><thead><tr><th></th><th class="n">月盈餘 × 比例</th><th class="n">− 分配前扣除</th><th class="n">＝ 獲得分紅<small>記到總覽</small></th><th class="n">− 借還欠款<small>從分紅扣回</small></th><th class="n">＝ 實發</th><th>備註</th></tr></thead><tbody>' + rowsH + '</tbody></table></div>' : '';
   var vw = ST.xp.view && calc[ST.xp.view] && calc[ST.xp.view].done ? xpDoneCard(ST.xp.view, calc[ST.xp.view], month, L) : '';
   $('xp-done').textContent = doneList.length ? '✓ ' + Number(month.slice(5)) + ' 月已發：' + doneList.join('、') : '';
   if (vw) $('xp-done').innerHTML += vw;
