@@ -10,4 +10,6 @@ assert.strictEqual(app.match(/var NEED_SERVER = '([^']+)'/)[1], v.version, 'App 
 const av = app.match(/var APP_VERSION = '([^']+)'/)[1];
 assert.strictEqual(fs.readFileSync(path.join(R, '..', 'docs', 'sw.js'), 'utf8').match(/const VERSION = '([^']+)'/)[1], av, 'sw.js 的 VERSION 要和 APP_VERSION 一樣');
 assert.strictEqual(fs.readFileSync(path.join(R, '..', 'docs', 'index.html'), 'utf8').match(/name="app-version" content="([^"]+)"/)[1], av, 'index.html 的 app-version 要和 APP_VERSION 一樣');
+const html = fs.readFileSync(path.join(R, '..', 'docs', 'index.html'), 'utf8');
+assert.ok(html.includes('src="app.js?v=' + av + '"') && html.includes('src="compute.js?v=' + av + '"'), 'index.html 的 app.js?v=／compute.js?v= 要和 APP_VERSION 一樣');
 console.log('docs/gas 同步 ✓', v.version);

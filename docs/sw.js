@@ -1,7 +1,7 @@
 // 風味記帳｜離線快取
 // 有網路：一律先拿最新版（最多等 4 秒），所以改版後打開就是新的
 // 沒網路：用這台裝置存的版本，照樣能開
-const VERSION = '4.23.3';
+const VERSION = '4.23.4';
 const CACHE = 'fengwei-v' + VERSION;
 const ASSETS = ['./', './index.html', './app.js', './compute.js', './manifest.json',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png', './logo-ink.png', './logo-white.png'];
@@ -10,7 +10,10 @@ self.addEventListener('install', function (e) {
   // 加上版本號去抓：GitHub Pages 的 CDN 會把舊檔案留 10 分鐘，帶不同網址就一定拿到新的
   e.waitUntil(caches.open(CACHE).then(function (c) {
     return Promise.all(ASSETS.map(function (u) {
-      return fetch(bust(u, VERSION), { cache: 'reload' }).then(function (r) { if (!r.ok) throw new Error(u); return c.put(u, r); });
+      return fetch(bust(u, VERSION), { cache: 'reload' }).then(function (r) {
+        if (!r.ok) throw new Error(u);
+        return Promise.all([c.put(u, r.clone())].concat(/\.js$/.test(u) ? [c.put(u + '?v=' + VERSION, r)] : []));   // 畫面用 app.js?v=版本 來要
+      });
     }));
   }).then(function () { return self.skipWaiting(); }));
 });
@@ -29,10 +32,26 @@ self.addEventListener('message', function (e) {
 self.addEventListener('fetch', function (e) {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  e.respondWith(networkFirst(req));
+  e.respondWith(/[?&]v=/.test(req.url) ? versioned(req) : networkFirst(req));
 });
 
 function bust(u, v) { return u + (u.indexOf('?') < 0 ? '?' : '&') + '_v=' + v; }
+
+// 畫面裡寫死版本的程式檔（app.js?v=4.23.4）：一定要拿到「同一版」，不能因為網路慢就先給舊的
+// 本機已經存過同一版 → 直接用（最快）；沒有 → 等網路（不提早用舊版）；真的沒網路才用本機舊版
+function versioned(req) {
+  return caches.open(CACHE).then(function (c) {
+    return c.match(req).then(function (hit) {
+      if (hit) return hit;
+      return fetch(req.url, { cache: 'reload', credentials: 'same-origin' }).then(function (res) {
+        if (res && res.ok) { c.put(req, res.clone()); c.put(new URL(req.url).pathname.replace(/^.*\//, './'), res.clone()); }
+        return res;
+      }).catch(function () {
+        return caches.match(req, { ignoreSearch: true }).then(function (old) { return old || new Response('', { status: 503 }); });
+      });
+    });
+  });
+}
 
 function networkFirst(req) {
   return new Promise(function (resolve) {
