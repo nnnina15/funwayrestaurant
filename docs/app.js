@@ -1,6 +1,6 @@
 /* 風味記帳 App v2：離線優先，有網路自動同步到 Google 試算表 */
 'use strict';
-var APP_VERSION = '4.23.4';   // 和 sw.js 的 VERSION 一起改
+var APP_VERSION = '4.23.5';   // 和 sw.js 的 VERSION 一起改
 // 畫面（index.html）和程式（app.js）版本不一樣（更新到一半、網路慢拿到舊的）：重新載入一次拿齊同一版，避免畫面缺東缺西
 (function () {
   var m = document.querySelector('meta[name="app-version"]'), hv = m && m.getAttribute('content');
@@ -1717,30 +1717,31 @@ function renderDeductTab() {
   // 獲得／實發切換：實發＝獲得分紅 − 同一個月「從分紅扣回」的借款
   var pm = ST.xPay || 'got';
   Array.prototype.forEach.call($('x-pmode').children, function (b) { b.classList.toggle('on', b.dataset.v === pm); });
-  $('x-pnote').textContent = pm === 'net' ? '實發＝獲得分紅 − 從分紅扣回的借款（實際拿到手的錢）。分配前扣除不受影響。' : '獲得＝記到總覽的分紅金額（還沒扣掉從分紅扣回的借款）。';
+  $('x-pnote').textContent = pm === 'net' ? '實發＝獲得分紅 − 從分紅扣回的借款（實際拿到手的錢）。紅字＝有扣借款、和獲得不一樣。分配前扣除不受影響。' : '獲得＝記到總覽的分紅金額（還沒扣掉從分紅扣回的借款）。';
   var backOf = {};
   if (pm === 'net') view().deduct.forEach(function (d) {
     if (d.type === '員工還款' && /從分紅扣回/.test(d.note || '') && String(d.month).slice(0, 4) === y) { var k = d.month + '|' + loanWho(d.note); backOf[k] = (backOf[k] || 0) + Number(d.amount || 0); }
   });
   // 一個月一列：分配前扣除（員工季分紅、存年終、其他扣除）＋ 每位股東實際發的分紅；點月份展開明細（可刪除）
   var nmOf = function (d) { return String(d.note || '').replace(/（.*?）|\(.*?\)/g, '').trim() || '股東'; };
-  var people = [], mgrs = [], byM = {}, T = { b: 0, r: 0, o: 0, p: {}, g: {}, gx: 0 };
+  var people = [], mgrs = [], byM = {}, T = { b: 0, r: 0, o: 0, p: {}, g: {}, gx: 0, dif: {} };
   list.forEach(function (x) {
-    var M = byM[x.month] || (byM[x.month] = { b: 0, r: 0, o: 0, p: {}, g: {}, gx: 0, rows: [] }), a = Number(x.amount || 0);
+    var M = byM[x.month] || (byM[x.month] = { b: 0, r: 0, o: 0, p: {}, g: {}, gx: 0, dif: {}, rows: [] }), a = Number(x.amount || 0);
     M.rows.push(x);
     if (x.type === '員工分紅') { M.b += a; T.b += a; }
     else if (x.type === '年終預留') { M.r += a; T.r += a; }
-    else if (x.type === '股東分紅（已發）') { var n = nmOf(x); if (people.indexOf(n) < 0) people.push(n); var bk = backOf[x.month + '|' + n] || 0; delete backOf[x.month + '|' + n]; M.p[n] = (M.p[n] || 0) + a - bk; T.p[n] = (T.p[n] || 0) + a - bk; }
+    else if (x.type === '股東分紅（已發）') { var n = nmOf(x); if (people.indexOf(n) < 0) people.push(n); var bk = backOf[x.month + '|' + n] || 0; delete backOf[x.month + '|' + n]; M.p[n] = (M.p[n] || 0) + a - bk; T.p[n] = (T.p[n] || 0) + a - bk; if (bk) { M.dif['p' + n] = T.dif['p' + n] = M.dif.ps = T.dif.ps = true; } }
     else if (x.type === '其他扣除' && /分紅/.test(x.note || '')) {   // 店長／其他人的分紅：一人一欄（算在分配前扣除）
       var g = String(x.note || '').replace(/（.*?）|\(.*?\)/g, '').replace(/分紅.*$/, '').trim() || '其他';
-      if (mgrs.indexOf(g) < 0) mgrs.push(g); var bg = backOf[x.month + '|' + g] || 0; delete backOf[x.month + '|' + g]; M.g[g] = (M.g[g] || 0) + a - bg; T.g[g] = (T.g[g] || 0) + a - bg; M.gx += a; T.gx += a;
+      if (mgrs.indexOf(g) < 0) mgrs.push(g); var bg = backOf[x.month + '|' + g] || 0; delete backOf[x.month + '|' + g]; M.g[g] = (M.g[g] || 0) + a - bg; T.g[g] = (T.g[g] || 0) + a - bg; M.gx += a; T.gx += a; if (bg) M.dif['g' + g] = T.dif['g' + g] = true;
     }
     else { M.o += a; T.o += a; }
   });
   var mgrName = (xmLast(computeLocal()) || {}).who;
   var cell = function (v, cls) { return '<td class="n' + (cls ? ' ' + cls : '') + '">' + (v ? money(v) : '<span class="muted">—</span>') + '</td>'; };
   var psum = function (o) { return people.reduce(function (a, n) { return a + (o.p[n] || 0); }, 0); };
-  var line = function (o) { return people.map(function (n) { return cell(o.p[n]); }).join('') + cell(psum(o), 'em sep') + mgrs.map(function (n) { return cell(o.g[n]); }).join('') + cell(o.b) + cell(o.r) + cell(o.o) + cell(o.b + o.r + o.o + o.gx, 'em'); };   // 分配前扣除用店長分紅原本金額（不受實發切換影響）
+  var line = function (o) { var rd = function (k) { return o.dif[k] ? ' neg' : ''; };   // 實發和獲得不一樣（有從分紅扣回借款）→ 紅字
+    return people.map(function (n) { return cell(o.p[n], rd('p' + n).trim()); }).join('') + cell(psum(o), 'em sep' + rd('ps')) + mgrs.map(function (n) { return cell(o.g[n], rd('g' + n).trim()); }).join('') + cell(o.b) + cell(o.r) + cell(o.o) + cell(o.b + o.r + o.o + o.gx, 'em'); };   // 分配前扣除用店長分紅原本金額（不受實發切換影響）
   var ncol = 6 + people.length + mgrs.length;
   ST.xOpen = ST.xOpen || {};
   var h = Object.keys(byM).sort().map(function (m) {
