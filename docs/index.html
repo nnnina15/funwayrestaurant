@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="app-version" content="4.23.6">
+<meta name="app-version" content="4.23.7">
 <title>風味記帳</title>
 <meta name="theme-color" content="#1b1b1b">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -766,6 +766,15 @@
   .xsum.xlist:not(.xl-ppl) > tbody > tr.xm:nth-child(even) > th:first-child { background: var(--zebra); }
   .xsum.xlist:not(.xl-ppl) > tbody > tr.xm.open > th:first-child { background: color-mix(in srgb, var(--brand) 8%, var(--card)); }
   .xsum.xlist:not(.xl-ppl) > tbody > tr.yt > th:first-child { background: var(--tot); }
+  /* 手機：月報（外送三段：日結 − 實際收到 ＝ 付給平台）不要撐出畫面 */
+  @media (max-width: 480px) {
+    .msum td, .msum th { padding-left: 4px; padding-right: 4px; font-size: 14px; }
+    .msum tr.dlv td:first-child { gap: 4px; }
+    .msum .dlv-g { padding-right: 12px; }
+    .msum .dlv-p { padding-left: 14px; }
+    .msum .dlv-p em { display: block; margin: 0; text-align: right; }
+    .msum td.n { word-break: keep-all; }
+  }
 </style>
 </head>
 <body>
@@ -1076,7 +1085,7 @@
 <div id="toast"></div>
 <div id="busy">處理中…</div>
 
-<script src="compute.js?v=4.23.6"></script>
-<script src="app.js?v=4.23.6"></script>
+<script src="compute.js?v=4.23.7"></script>
+<script src="app.js?v=4.23.7"></script>
 </body>
 </html>
